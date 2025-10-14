@@ -59,7 +59,7 @@ export default function Alerts() {
           />
           <Alert
             variant="error"
-            title="Error Message"
+            title="Error Message "
             message="Be cautious when performing this action."
             showLink={false}
           />

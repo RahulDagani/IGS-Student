@@ -9,7 +9,6 @@ import {
   ChevronDownIcon,
   HorizontaLDots,
   PieChartIcon,
-  PlugInIcon,
 } from "../icons/index";
 
 import {
@@ -25,10 +24,7 @@ import {
   Filter,
   Settings,
   University,
-  PlayCircle,
   Newspaper,
-  Library,
-  Mic,
   Mail,
   Wallet,
 } from "lucide-react";
@@ -62,7 +58,7 @@ const partnerItems: NavItem[] = [
       {
         name: "Agents",
         path: "/applications/students",
-        icon: <GraduationCap size={18} />,
+        icon: <Handshake size={18} />,
       },
       {
         name: "Students",
@@ -72,38 +68,38 @@ const partnerItems: NavItem[] = [
       {
         name: "Applications",
         path: "/agent/termsofuse",
-        icon: <Book size={18} />,
+        icon: <FileText size={18} />,
       },
       {
         name: "Wallet",
         path: "/formcontroller",
-        icon: <FileText size={18} />,
+        icon: <Wallet size={18} />,
       },
       {
         name: "Support",
-        icon: <Percent size={18} />,
+        icon: <Mail size={18} />,
         path: "/formcontroller",
       },
     ],
   },
   {
     name: "Commissions",
-    icon: <LayoutDashboard size={18} />,
+    icon: <Percent size={18} />,
     path: "/",
   },
   {
     name: "Setup ",
-    icon: <Users size={18} />,
+    icon: <Settings size={18} />,
     subItems: [
       {
         name: "Pages",
         path: "/applications/students",
-        icon: <GraduationCap size={18} />,
+        icon: <Book size={18} />,
       },
       {
         name: "Resources",
         path: "/applications/students",
-        icon: <GraduationCap size={18} />,
+        icon: <Newspaper size={18} />,
       },
       
     ],
@@ -118,32 +114,32 @@ const studentItems: NavItem[] = [
   },
   {
     name: "Applications",
-    icon: <LayoutDashboard size={18} />,
+    icon: <FileText size={18} />,
     path: "/",
   },
   {
     name: "Wallet",
-    icon: <Users size={18} />,
+    icon: <Wallet size={18} />,
     path: "/applications/students",
   },
   {
     name: "Support",
-    icon: <LayoutDashboard size={18} />,
+    icon: <Mail size={18} />,
     path: "/",
   },
   {
     name: "Setup ",
-    icon: <Users size={18} />,
+    icon: <Settings size={18} />,
     subItems: [
       {
         name: "Pages",
         path: "/applications/students",
-        icon: <GraduationCap size={18} />,
+        icon: <Book size={18} />,
       },
       {
         name: "Resources",
         path: "/applications/students",
-        icon: <GraduationCap size={18} />,
+        icon: <Newspaper size={18} />,
       },
       
     ],
@@ -153,7 +149,7 @@ const studentItems: NavItem[] = [
 const universityAndCoursesItems: NavItem[] = [
   {
     name: "Universities",
-    icon: <Users size={18} />,
+    icon: <University size={18} />,
     path: "/applications/students",
   },
   {
@@ -163,7 +159,7 @@ const universityAndCoursesItems: NavItem[] = [
   },
   {
     name: "Master Data",
-    icon: <Users size={18} />,
+    icon: <Filter size={18} />,
     subItems: [
       {
         name: "Study Levels",
@@ -197,12 +193,12 @@ const universityAndCoursesItems: NavItem[] = [
 const userItems: NavItem[] = [
   {
     name: "Users",
-    icon: <Users size={18} />,
+    icon: <UserPlus size={18} />,
     path: "/applications/students",
   },
   {
     name: "Roles",
-    icon: <LayoutDashboard size={18} />,
+    icon: <Users size={18} />,
     path: "/",
   },
 ]

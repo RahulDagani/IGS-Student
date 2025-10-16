@@ -22,7 +22,7 @@ export const EcommerceMetrics = () => {
             
             <span className="my-auto ml-2">
     <Badge color="success" >
-            <ArrowDownIcon className="text-success-500" />
+            <ArrowUpIcon className="text-success-500" />
             9.05%
           </Badge>
             </span>
@@ -31,7 +31,7 @@ export const EcommerceMetrics = () => {
            
           </div>
            <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl dark:bg-gray-800">
-                              <BoxIconLine className="text-gray-800 dark:text-white/90" />
+                              <GroupIcon className="text-gray-800 dark:text-white/90" />
 
 
         </div>
@@ -57,7 +57,7 @@ export const EcommerceMetrics = () => {
             
             <span className="my-auto ml-2">
     <Badge color="error" >
-            <ArrowDownIcon className="text-error-500" />
+            <ArrowUpIcon className="text-error-500" />
             9.05%
           </Badge>
             </span>

@@ -67,7 +67,7 @@ const partnerItems: NavItem[] = [
       },
       {
         name: "Applications",
-        path: "/agent/termsofuse",
+        path: "/applications",
         icon: <FileText size={18} />,
       },
       {

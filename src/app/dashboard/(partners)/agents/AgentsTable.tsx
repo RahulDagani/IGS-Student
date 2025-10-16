@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Badge from "@/components/ui/badge/Badge";
+import Link from "next/link";
 
 interface Agent {
   id: number;
@@ -227,9 +228,12 @@ export default function AgentTable() {
                   filteredAndSortedData.map((agent) => (
                     <TableRow key={agent.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <TableCell className="px-5 py-4 text-start">
-                        <span className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                          {agent.name}
-                        </span>
+                        <Link href={`/dashboard/agents/${agent.id}`}>
+                          <span className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
+                            {agent.name}
+                          </span>
+                        </Link>
+
                       </TableCell>
                       <TableCell className="px-5 py-4 text-gray-800 text-start text-theme-sm dark:text-white/90">
                         {agent.businessName}

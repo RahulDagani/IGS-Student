@@ -54,247 +54,165 @@ interface NavItemOther {
   }[];
 }
 
+const partnerItems: NavItem[] = [
+  {
+    name: "Agencies",
+    icon: <Users size={18} />,
+    subItems: [
+      {
+        name: "Agents",
+        path: "/applications/students",
+        icon: <GraduationCap size={18} />,
+      },
+      {
+        name: "Students",
+        path: "/students",
+        icon: <User size={18} />,
+      },
+      {
+        name: "Applications",
+        path: "/agent/termsofuse",
+        icon: <Book size={18} />,
+      },
+      {
+        name: "Wallet",
+        path: "/formcontroller",
+        icon: <FileText size={18} />,
+      },
+      {
+        name: "Support",
+        icon: <Percent size={18} />,
+        path: "/formcontroller",
+      },
+    ],
+  },
+  {
+    name: "Commissions",
+    icon: <LayoutDashboard size={18} />,
+    path: "/",
+  },
+  {
+    name: "Setup ",
+    icon: <Users size={18} />,
+    subItems: [
+      {
+        name: "Pages",
+        path: "/applications/students",
+        icon: <GraduationCap size={18} />,
+      },
+      {
+        name: "Resources",
+        path: "/applications/students",
+        icon: <GraduationCap size={18} />,
+      },
+      
+    ],
+  },
+]
+
+const studentItems: NavItem[] = [
+  {
+    name: "Students",
+    icon: <Users size={18} />,
+    path: "/applications/students",
+  },
+  {
+    name: "Applications",
+    icon: <LayoutDashboard size={18} />,
+    path: "/",
+  },
+  {
+    name: "Wallet",
+    icon: <Users size={18} />,
+    path: "/applications/students",
+  },
+  {
+    name: "Support",
+    icon: <LayoutDashboard size={18} />,
+    path: "/",
+  },
+  {
+    name: "Setup ",
+    icon: <Users size={18} />,
+    subItems: [
+      {
+        name: "Pages",
+        path: "/applications/students",
+        icon: <GraduationCap size={18} />,
+      },
+      {
+        name: "Resources",
+        path: "/applications/students",
+        icon: <GraduationCap size={18} />,
+      },
+      
+    ],
+  },
+]
+
+const universityAndCoursesItems: NavItem[] = [
+  {
+    name: "Universities",
+    icon: <Users size={18} />,
+    path: "/applications/students",
+  },
+  {
+    name: "Courses",
+    icon: <LayoutDashboard size={18} />,
+    path: "/",
+  },
+  {
+    name: "Master Data",
+    icon: <Users size={18} />,
+    subItems: [
+      {
+        name: "Study Levels",
+        path: "/applications/students",
+        icon: <GraduationCap size={18} />,
+      },
+      {
+        name: "Disciplines",
+        path: "/applications/students",
+        icon: <GraduationCap size={18} />,
+      },
+      {
+        name: "Countries",
+        path: "/applications/students",
+        icon: <GraduationCap size={18} />,
+      },
+      {
+        name: "States",
+        path: "/applications/students",
+        icon: <GraduationCap size={18} />,
+      },{
+        name: "Intakes",
+        path: "/applications/students",
+        icon: <GraduationCap size={18} />,
+      },
+      
+    ],
+  },
+]
+
+const userItems: NavItem[] = [
+  {
+    name: "Users",
+    icon: <Users size={18} />,
+    path: "/applications/students",
+  },
+  {
+    name: "Roles",
+    icon: <LayoutDashboard size={18} />,
+    path: "/",
+  },
+]
+
 export const navItems: NavItem[] = [
   {
     name: "Dashboard",
     icon: <LayoutDashboard size={18} />,
     path: "/",
-  },
-  {
-    name: "Students ",
-    icon: <Users size={18} />,
-    subItems: [
-      {
-        name: "Applications",
-        path: "/applications/students",
-        icon: <GraduationCap size={18} />,
-      },
-      {
-        name: "All Students",
-        path: "/students",
-        icon: <User size={18} />,
-      },
-      {
-        name: "Terms of Use",
-        path: "/agent/termsofuse",
-        icon: <Book size={18} />,
-      },
-      {
-        name: "Agreements",
-        path: "/formcontroller",
-        icon: <FileText size={18} />,
-      },
-    ],
-  },
-  {
-    name: "Agents",
-    icon: <Users size={18} />,
-    subItems: [
-      {
-        name: "Applications",
-        path: "/applications/students",
-        icon: <GraduationCap size={18} />,
-      },
-      {
-        name: "All Agents",
-        path: "/students",
-        icon: <User size={18} />,
-      },
-      {
-        name: "Terms of Use",
-        path: "/agent/termsofuse",
-        icon: <Book size={18} />,
-      },
-      {
-        name: "Agreements",
-        path: "/formcontroller",
-        icon: <FileText size={18} />,
-      },
-      {
-        name: "Commissions",
-        icon: <Percent size={18} />,
-        subItems: [
-          { 
-            name: "Add", 
-            path: "/commission/add", 
-            icon: <FileText size={18} /> 
-          },
-          { 
-            name: "View", 
-            path: "/commission/show", 
-            icon: <FileText size={18} /> 
-          },
-        ],
-      },
-    ],
-  },
-  {
-    name: "Employees",
-    icon: <Users size={18} />,
-    path: "/associates",
-  },
-  {
-    name: "MPower Leads",
-    icon: <UserPlus size={18} />,
-    path: "/mpower_leads",
-  },
-  {
-    name: "Support Tickets",
-    icon: <Handshake size={18} />,
-    path: "/tickets",
-  },
-  {
-    name: "Filters & Settings",
-    icon: <Filter size={18} />,
-    subItems: [
-      {
-        name: "App Settings",
-        path: "/app_settings",
-        icon: <Settings size={18} />,
-      },
-      { 
-        name: "Intake", 
-        path: "/intake",
-        icon: <Settings size={18} />
-      },
-      { 
-        name: "Study Level", 
-        path: "/studylevel", 
-        icon: <Settings size={18} /> 
-      },
-      { 
-        name: "Discipline", 
-        path: "/discipline", 
-        icon: <Settings size={18} /> 
-      },
-      { 
-        name: "Country", 
-        path: "/country", 
-        icon: <Settings size={18} /> 
-      },
-      { 
-        name: "State", 
-        path: "/state", 
-        icon: <Settings size={18} /> 
-      },
-    ],
-  },
-  {
-    name: "Universities & Courses",
-    icon: <University size={18} />,
-    subItems: [
-      {
-        name: "Universities",
-        icon: <University size={18} />,
-        subItems: [
-          { 
-            name: "Add", 
-            path: "/university/add", 
-            icon: <University size={18} /> 
-          },
-          { 
-            name: "View", 
-            path: "/university", 
-            icon: <University size={18} /> 
-          },
-        ],
-      },
-      {
-        name: "Courses",
-        icon: <University size={18} />,
-        subItems: [
-          { 
-            name: "Add", 
-            path: "/course/add", 
-            icon: <University size={18} /> 
-          },
-          { 
-            name: "View", 
-            path: "/course",
-            icon: <University size={18} /> 
-          },
-        ],
-      },
-    ],
-  },
-  {
-    name: "Content Management",
-    icon: <Library size={18} />,
-    subItems: [
-      {
-        name: "Teams",
-        path: "/show_teams",
-        icon: <Handshake size={18} />,
-      },
-      {
-        name: "Themes",
-        path: "/themes",
-        icon: <PlayCircle size={18} />,
-      },
-      {
-        name: "Sliders",
-        path: "/sliders",
-        icon: <PlayCircle size={18} />,
-      },
-      {
-        name: "Pages",
-        icon: <University size={18} />,
-        subItems: [
-          { 
-            name: "Banner", 
-            path: "/banner/add", 
-            icon: <University size={18} />,
-          },
-          { 
-            name: "Media Links", 
-            path: "/media/add", 
-            icon: <University size={18} />,
-          },
-        ],
-      },
-      {
-        name: "News",
-        path: "/show_news",
-        icon: <Newspaper size={18} />,
-      },
-      {
-        name: "Resources",
-        path: "/show_resources",
-        icon: <PlayCircle size={18} />,
-      },
-      {
-        name: "Knowledge Center",
-        path: "/show_knowledge_center",
-        icon: <Book size={18} />,
-      },
-      {
-        name: "Student Testimonial",
-        path: "/show_webinars",
-        icon: <Mic size={18} />,
-      },
-      {
-        name: "Email Templates",
-        icon: <Mail size={18} />,
-        subItems: [
-          { 
-            name: "Add", 
-            path: "/mailing_settings/add", 
-            icon: <Mail size={18} />,
-          },
-          { 
-            name: "Show", 
-            path: "/mailing_settings/show-template", 
-            icon: <Mail size={18} />,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    name: "Wallet",
-    icon: <Wallet size={18} />,
-    path: "/wallets",
-  },
+  }
 ];
 
 const othersItems: NavItemOther[] = [
@@ -332,34 +250,6 @@ const othersItems: NavItemOther[] = [
     name: "Resources",
     subItems: [
       { name: "Database Backup", path: "/db-backup", pro: false },
-    ],
-  },
-  {
-    icon: <PieChartIcon />,
-    name: "Charts",
-    subItems: [
-      { name: "Line Chart", path: "/line-chart", pro: false },
-      { name: "Bar Chart", path: "/bar-chart", pro: false },
-    ],
-  },
-  {
-    icon: <BoxCubeIcon />,
-    name: "UI Elements",
-    subItems: [
-      { name: "Alerts", path: "/alerts", pro: false },
-      { name: "Avatar", path: "/avatars", pro: false },
-      { name: "Badge", path: "/badge", pro: false },
-      { name: "Buttons", path: "/buttons", pro: false },
-      { name: "Images", path: "/images", pro: false },
-      { name: "Videos", path: "/videos", pro: false },
-    ],
-  },
-  {
-    icon: <PlugInIcon />,
-    name: "Authentication",
-    subItems: [
-      { name: "Sign In", path: "/signin", pro: false },
-      { name: "Sign Up", path: "/signup", pro: false },
     ],
   },
 ];
@@ -462,6 +352,38 @@ const AppSidebar: React.FC = () => {
   const renderMainMenuItems = () => (
     <ul className="flex flex-col gap-4">
       {navItems.map((item) => (
+        <NavItemComponent key={item.name} item={item} />
+      ))}
+    </ul>
+  );
+
+  const renderPartnerItems = () => (
+    <ul className="flex flex-col gap-4">
+      {partnerItems.map((item) => (
+        <NavItemComponent key={item.name} item={item} />
+      ))}
+    </ul>
+  );
+
+  const renderStudentItems = () => (
+    <ul className="flex flex-col gap-4">
+      {studentItems.map((item) => (
+        <NavItemComponent key={item.name} item={item} />
+      ))}
+    </ul>
+  );
+
+  const renderUniversityItems = () => (
+    <ul className="flex flex-col gap-4">
+      {universityAndCoursesItems.map((item) => (
+        <NavItemComponent key={item.name} item={item} />
+      ))}
+    </ul>
+  );
+
+  const renderUserItems = () => (
+    <ul className="flex flex-col gap-4">
+      {userItems.map((item) => (
         <NavItemComponent key={item.name} item={item} />
       ))}
     </ul>
@@ -687,6 +609,73 @@ const AppSidebar: React.FC = () => {
               {renderMainMenuItems()}
             </div>
 
+             <div className="">
+              <h2
+                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                  !isExpanded && !isHovered
+                    ? "lg:justify-center"
+                    : "justify-start"
+                }`}
+              >
+                {isExpanded || isHovered || isMobileOpen ? (
+                  "Partner Platform"
+                ) : (
+                  <HorizontaLDots />
+                )}
+              </h2>
+              {renderPartnerItems()}
+            </div>
+
+             <div className="">
+              <h2
+                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                  !isExpanded && !isHovered
+                    ? "lg:justify-center"
+                    : "justify-start"
+                }`}
+              >
+                {isExpanded || isHovered || isMobileOpen ? (
+                  " Student Platform"
+                ) : (
+                  <HorizontaLDots />
+                )}
+              </h2>
+              {renderStudentItems()}
+            </div>
+
+             <div className="">
+              <h2
+                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                  !isExpanded && !isHovered
+                    ? "lg:justify-center"
+                    : "justify-start"
+                }`}
+              >
+                {isExpanded || isHovered || isMobileOpen ? (
+                  " Universities & Courses"
+                ) : (
+                  <HorizontaLDots />
+                )}
+              </h2>
+              {renderUniversityItems()}
+            </div>
+
+ <div className="">
+              <h2
+                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                  !isExpanded && !isHovered
+                    ? "lg:justify-center"
+                    : "justify-start"
+                }`}
+              >
+                {isExpanded || isHovered || isMobileOpen ? (
+                  " User Management"
+                ) : (
+                  <HorizontaLDots />
+                )}
+              </h2>
+              {renderUserItems()}
+            </div>
             <div className="">
               <h2
                 className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${

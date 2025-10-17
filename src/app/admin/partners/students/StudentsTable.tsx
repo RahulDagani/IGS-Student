@@ -7,82 +7,95 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import Badge from "@/components/ui/badge/Badge";
-import Link from "next/link";
 
-interface Agent {
+
+interface Student {
   id: number;
   name: string;
-  businessName: string;
   email: string;
   phoneNumber: string;
-  status: "approved" | "pending approval" | "payment verification pending";
+  agentEmail: string;
+  agentName: string;
 }
 
 // Define the table data using the interface
-const tableData: Agent[] = [
+const tableData: Student[] = [
   {
     id: 1,
-    name: "John Smith",
-    businessName: "Smith Realty",
-    email: "john.smith@example.com",
+    name: "Alice Johnson",
+    email: "alice.johnson@example.com",
     phoneNumber: "+1 (555) 123-4567",
-    status: "approved",
+    agentEmail: "john.smith@example.com",
+    agentName: "John Smith",
+
   },
   {
     id: 2,
-    name: "Sarah Johnson",
-    businessName: "Johnson Properties",
-    email: "sarah.j@example.com",
+    name: "Bob Wilson",
+    email: "bob.wilson@example.com",
     phoneNumber: "+1 (555) 987-6543",
-    status: "pending approval",
+    agentEmail: "sarah.j@example.com",
+    agentName: "Sarah Johnson",
   },
   {
     id: 3,
-    name: "Mike Chen",
-    businessName: "Urban Living Realty",
-    email: "mike.chen@example.com",
+    name: "Carol Davis",
+    email: "carol.davis@example.com",
     phoneNumber: "+1 (555) 456-7890",
-    status: "payment verification pending",
+    agentEmail: "mike.chen@example.com",
+    agentName: "Mike Chen",
   },
   {
     id: 4,
-    name: "Emily Davis",
-    businessName: "Davis & Co Real Estate",
-    email: "emily.davis@example.com",
+    name: "David Brown",
+    email: "david.brown@example.com",
     phoneNumber: "+1 (555) 234-5678",
-    status: "approved",
+    agentEmail: "emily.davis@example.com",
+    agentName: "Emily Davis",
   },
   {
     id: 5,
-    name: "Robert Wilson",
-    businessName: "Wilson Properties Group",
-    email: "r.wilson@example.com",
+    name: "Eva Martinez",
+    email: "eva.martinez@example.com",
     phoneNumber: "+1 (555) 876-5432",
-    status: "pending approval",
+    agentEmail: "r.wilson@example.com",
+    agentName: "Robert Wilson",
   },
 ];
 
-type SortField = keyof Agent | "";
+type SortField = keyof Student | "";
 type SortDirection = "asc" | "desc";
 
-export default function AgentTable() {
+export default function StudentTable() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [agentFilter, setAgentFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
+  // Get unique agents for filter dropdown
+  const agents = useMemo(() => {
+    const uniqueAgents = Array.from(
+      new Map(
+        tableData.map(student => [student.agentEmail, {
+          email: student.agentEmail,
+          name: student.agentName
+        }])
+      ).values()
+    );
+    return uniqueAgents;
+  }, []);
+
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
-    const filtered = tableData.filter((agent) => {
+    const filtered = tableData.filter((student) => {
       const matchesSearch = 
-        agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        agent.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        agent.phoneNumber.includes(searchTerm);
+        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.phoneNumber.includes(searchTerm);
       
-      const matchesStatus = statusFilter === "all" || agent.status === statusFilter;
+      const matchesAgent = agentFilter === "all" || student.agentEmail === agentFilter;
       
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesAgent;
     });
 
     // Sorting
@@ -107,9 +120,9 @@ export default function AgentTable() {
     }
 
     return filtered;
-  }, [searchTerm, statusFilter, sortField, sortDirection]);
+  }, [searchTerm, agentFilter, sortField, sortDirection]);
 
-  const handleSort = (field: keyof Agent) => {
+  const handleSort = (field: keyof Student) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -118,30 +131,13 @@ export default function AgentTable() {
     }
   };
 
-  const getSortIcon = (field: keyof Agent) => {
+  const getSortIcon = (field: keyof Student) => {
     if (sortField !== field) return "↕️";
     return sortDirection === "asc" ? "↑" : "↓";
   };
 
-  const getStatusColor = (status: Agent["status"]) => {
-    switch (status) {
-      case "approved":
-        return "success";
-      case "pending approval":
-        return "warning";
-      case "payment verification pending":
-        return "error";
-      default:
-        return "primary";
-    }
-  };
 
-  const formatStatus = (status: Agent["status"]) => {
-    return status
-      .split(" ")
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-  };
+
 
   return (
     <div className="space-y-4">
@@ -175,19 +171,19 @@ export default function AgentTable() {
           </div>
         </div>
 
-        {/* Status Filter */}
+        {/* Agent Filter */}
         <div className="w-full flex justify-end">
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            value={agentFilter}
+            onChange={(e) => setAgentFilter(e.target.value)}
             className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 py-2.5 px-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[230px]"
           >
-            <option value="all">All Status</option>
-            <option value="approved">Approved</option>
-            <option value="pending approval">Pending Approval</option>
-            <option value="payment verification pending">
-              Payment Verification Pending
-            </option>
+            <option value="all">All Agents</option>
+            {agents.map((agent) => (
+              <option key={agent.email} value={agent.email}>
+                {agent.name} ({agent.email})
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -202,20 +198,19 @@ export default function AgentTable() {
                 <TableRow>
                   {[
                     { key: "name", label: "Name" },
-                    { key: "businessName", label: "Business Name" },
                     { key: "email", label: "Email" },
                     { key: "phoneNumber", label: "Phone Number" },
-                    { key: "status", label: "Status" },
+                    { key: "agentName", label: "Agent" },
                   ].map(({ key, label }) => (
                     <TableCell
                       key={key}
                       isHeader
                       className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => handleSort(key as keyof Agent)}
+                      onClick={() => handleSort(key as keyof Student)}
                     >
                       <div className="flex items-center gap-1">
                         {label}
-                        <span className="text-xs">{getSortIcon(key as keyof Agent)}</span>
+                        <span className="text-xs">{getSortIcon(key as keyof Student)}</span>
                       </div>
                     </TableCell>
                   ))}
@@ -225,42 +220,39 @@ export default function AgentTable() {
               {/* Table Body */}
               <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                 {filteredAndSortedData.length > 0 ? (
-                  filteredAndSortedData.map((agent) => (
-                    <TableRow key={agent.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  filteredAndSortedData.map((student) => (
+                    <TableRow key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <TableCell className="px-5 py-4 text-start">
-                        <Link href={`/admin/partners/agents/${agent.id}`}>
-                          <span className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                            {agent.name}
-                          </span>
-                        </Link>
-
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-gray-800 text-start text-theme-sm dark:text-white/90">
-                        {agent.businessName}
+                        <span className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
+                          {student.name}
+                        </span>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
-                        {agent.email}
+                        {student.email}
                       </TableCell>
                       <TableCell className="px-5 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
-                        {agent.phoneNumber}
+                        {student.phoneNumber}
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
-                        <Badge
-                          size="sm"
-                          color={getStatusColor(agent.status)}
-                        >
-                          {formatStatus(agent.status)}
-                        </Badge>
+                        <div>
+                          <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
+                            {student.agentName}
+                          </div>
+                          <div className="text-gray-500 text-theme-xs dark:text-gray-400">
+                            {student.agentEmail}
+                          </div>
+                        </div>
                       </TableCell>
+                     
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
                     <TableCell
-                      
+                    
                       className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400"
                     >
-                      No agents found matching your criteria.
+                      No students found matching your criteria.
                     </TableCell>
                   </TableRow>
                 )}
@@ -272,7 +264,7 @@ export default function AgentTable() {
 
       {/* Results Count */}
       <div className="text-sm text-gray-500 dark:text-gray-400">
-        Showing {filteredAndSortedData.length} of {tableData.length} agents
+        Showing {filteredAndSortedData.length} of {tableData.length} students
       </div>
     </div>
   );

@@ -2,22 +2,22 @@
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { Metadata } from "next";
 import React from "react";
-import StudentTable from "./StudentsTable";
+import Applications from "./Applications";
 
 export const metadata: Metadata = {
-  title: "Agents Students",
+  title: "Applications",
   description:
-    "List of All Agent wise Students on your Partner Platform",
+    "List of All Applications on your Student Platform",
   // other metadata
 };
 
-export default function AgentsTable() {
+export default function Application() {
   return (
     <div>
-      <PageBreadcrumb pageTitle="Students" />
+      <PageBreadcrumb pageTitle="Applications" />
       <div className="space-y-6">
         
-          <StudentTable />
+          <Applications />
        
       </div>
     </div>

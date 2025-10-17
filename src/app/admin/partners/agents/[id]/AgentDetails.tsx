@@ -5,7 +5,7 @@ const AgentDetails = () => {
   const agentInfo = {
     name: "John",
     email: "john@gmail.com",
-    phone: "7976557783",
+    phone: "+91 8619110253",
     businessName: "defg",
     country: "india",
     streetAddress: "abc, fts",
@@ -13,7 +13,7 @@ const AgentDetails = () => {
     state: "rajasthan",
     postalCode: "302020",
     website: "--",
-    whatsapp: "7978307783",
+    whatsapp: "+91 8619110253",
     skype: "--",
     panCard: "--",
     ifscCode: "--",

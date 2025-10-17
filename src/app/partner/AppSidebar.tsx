@@ -68,7 +68,7 @@ const partnerItems: NavItem[] = [
     path: "/",
   },    
   {
-    name: "Setup ",
+    name: "Setup",
     icon: <Settings size={18} />,
     subItems: [
       {

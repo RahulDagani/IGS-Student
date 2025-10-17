@@ -52,7 +52,7 @@ interface NavItemOther {
 
 const partnerItems: NavItem[] = [
   {
-    name: "Agencies",
+    name: "Students",
     icon: <Users size={18} />,
     subItems: [
       {

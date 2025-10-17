@@ -174,7 +174,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
   );
 };
 
-export default function studentsWalletTable() {
+export default function StudentsWalletTable() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortField, setSortField] = useState<SortField>("");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -249,13 +249,13 @@ export default function studentsWalletTable() {
     }
   };
 
-  const getVerifiedColor = (verified: boolean) => {
-    return verified ? "success" : "warning";
-  };
+  // const getVerifiedColor = (verified: boolean) => {
+  //   return verified ? "success" : "warning";
+  // };
 
-  const getVerifiedText = (verified: boolean) => {
-    return verified ? "Verified" : "Not Verified";
-  };
+  // const getVerifiedText = (verified: boolean) => {
+  //   return verified ? "Verified" : "Not Verified";
+  // };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {

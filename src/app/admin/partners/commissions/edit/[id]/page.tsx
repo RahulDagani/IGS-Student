@@ -14,6 +14,7 @@ interface CommissionFormData {
 // Mock function to fetch commission data - replace with actual API call
 const fetchCommission = async (id: string): Promise<CommissionFormData> => {
   // Simulate API call
+  console.log(id);
   await new Promise(resolve => setTimeout(resolve, 500));
   
   // Mock data - replace with actual API call

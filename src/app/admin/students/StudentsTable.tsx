@@ -15,8 +15,7 @@ interface Student {
   name: string;
   email: string;
   phoneNumber: string;
-  agentEmail: string;
-  agentName: string;
+
 }
 
 // Define the table data using the interface
@@ -26,8 +25,7 @@ const tableData: Student[] = [
     name: "Alice Johnson",
     email: "alice.johnson@example.com",
     phoneNumber: "+1 (555) 123-4567",
-    agentEmail: "john.smith@example.com",
-    agentName: "John Smith",
+   
 
   },
   {
@@ -35,32 +33,28 @@ const tableData: Student[] = [
     name: "Bob Wilson",
     email: "bob.wilson@example.com",
     phoneNumber: "+1 (555) 987-6543",
-    agentEmail: "sarah.j@example.com",
-    agentName: "Sarah Johnson",
+   
   },
   {
     id: 3,
     name: "Carol Davis",
     email: "carol.davis@example.com",
     phoneNumber: "+1 (555) 456-7890",
-    agentEmail: "mike.chen@example.com",
-    agentName: "Mike Chen",
+   
   },
   {
     id: 4,
     name: "David Brown",
     email: "david.brown@example.com",
     phoneNumber: "+1 (555) 234-5678",
-    agentEmail: "emily.davis@example.com",
-    agentName: "Emily Davis",
+   
   },
   {
     id: 5,
     name: "Eva Martinez",
     email: "eva.martinez@example.com",
     phoneNumber: "+1 (555) 876-5432",
-    agentEmail: "r.wilson@example.com",
-    agentName: "Robert Wilson",
+   
   },
 ];
 
@@ -69,22 +63,9 @@ type SortDirection = "asc" | "desc";
 
 export default function StudentTable() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [agentFilter, setAgentFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
-  // Get unique agents for filter dropdown
-  const agents = useMemo(() => {
-    const uniqueAgents = Array.from(
-      new Map(
-        tableData.map(student => [student.agentEmail, {
-          email: student.agentEmail,
-          name: student.agentName
-        }])
-      ).values()
-    );
-    return uniqueAgents;
-  }, []);
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
@@ -94,9 +75,8 @@ export default function StudentTable() {
         student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.phoneNumber.includes(searchTerm);
       
-      const matchesAgent = agentFilter === "all" || student.agentEmail === agentFilter;
       
-      return matchesSearch && matchesAgent;
+      return matchesSearch;
     });
 
     // Sorting
@@ -121,7 +101,7 @@ export default function StudentTable() {
     }
 
     return filtered;
-  }, [searchTerm, agentFilter, sortField, sortDirection]);
+  }, [searchTerm, sortField, sortDirection]);
 
   const handleSort = (field: keyof Student) => {
     if (sortField === field) {
@@ -172,21 +152,15 @@ export default function StudentTable() {
           </div>
         </div>
 
-        {/* Agent Filter */}
-        <div className="w-full flex justify-end">
-          <select
-            value={agentFilter}
-            onChange={(e) => setAgentFilter(e.target.value)}
-            className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 py-2.5 px-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[230px]"
-          >
-            <option value="all">All Agents</option>
-            {agents.map((agent) => (
-              <option key={agent.email} value={agent.email}>
-                {agent.name} ({agent.email})
-              </option>
-            ))}
-          </select>
-        </div>
+     
+        <Link href="/admin/students/add" className="shrink-0">
+            <button className=" h-11 px-4 rounded-lg border-2 border-green-500 bg-transparent text-sm text-green-500 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-green-500 dark:focus:border-brand-800 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Student
+            </button>
+          </Link>
       </div>
 
       {/* Table */}
@@ -201,7 +175,6 @@ export default function StudentTable() {
                     { key: "name", label: "Name" },
                     { key: "email", label: "Email" },
                     { key: "phoneNumber", label: "Phone Number" },
-                    { key: "agentName", label: "Agent" },
                   ].map(({ key, label }) => (
                     <TableCell
                       key={key}
@@ -237,16 +210,7 @@ export default function StudentTable() {
                       <TableCell className="px-5 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
                         {student.phoneNumber}
                       </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div>
-                          <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                            {student.agentName}
-                          </div>
-                          <div className="text-gray-500 text-theme-xs dark:text-gray-400">
-                            {student.agentEmail}
-                          </div>
-                        </div>
-                      </TableCell>
+                      
                      
                     </TableRow>
                   ))

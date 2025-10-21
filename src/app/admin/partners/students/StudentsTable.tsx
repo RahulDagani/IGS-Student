@@ -187,6 +187,14 @@ export default function StudentTable() {
             ))}
           </select>
         </div>
+        <Link href="/admin/partners/students/add" className="shrink-0">
+            <button className=" h-11 px-4 rounded-lg border-2 border-green-500 bg-transparent text-sm text-green-500 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-green-500 dark:focus:border-brand-800 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Student
+            </button>
+          </Link>
       </div>
 
       {/* Table */}

@@ -149,12 +149,12 @@ const universityAndCoursesItems: NavItem[] = [
   {
     name: "Universities",
     icon: <University size={18} />,
-    path: "/applications/students",
+    path: "/universities",
   },
   {
     name: "Courses",
     icon: <LayoutDashboard size={18} />,
-    path: "/",
+    path: "/universities/courses",
   },
   {
     name: "Master Data",
@@ -162,26 +162,26 @@ const universityAndCoursesItems: NavItem[] = [
     subItems: [
       {
         name: "Study Levels",
-        path: "/applications/students",
+        path: "/universities/study-levels",
         icon: <GraduationCap size={18} />,
       },
       {
         name: "Disciplines",
-        path: "/applications/students",
+        path: "/universities/disciplines",
         icon: <GraduationCap size={18} />,
       },
       {
         name: "Countries",
-        path: "/applications/students",
+        path: "/universities/countries",
         icon: <GraduationCap size={18} />,
       },
       {
         name: "States",
-        path: "/applications/students",
+        path: "/universities/states",
         icon: <GraduationCap size={18} />,
       },{
         name: "Intakes",
-        path: "/applications/students",
+        path: "/universities/intakes",
         icon: <GraduationCap size={18} />,
       },
       

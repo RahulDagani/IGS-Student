@@ -79,12 +79,14 @@ const fetchCourse = async (id: string): Promise<CourseFormData> => {
   return mockData;
 };
 
+type Tab = "basics" | "scores" | "gallery" | "details";
+
 export default function EditCourse() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
   
-  const [activeTab, setActiveTab] = useState<"basics" | "scores" | "gallery" | "details">("basics");
+  const [activeTab, setActiveTab] = useState<Tab>("basics");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -918,7 +920,7 @@ export default function EditCourse() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as Tab)}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab.id
                     ? "border-brand-500 text-brand-600 dark:text-brand-400"
@@ -952,7 +954,7 @@ export default function EditCourse() {
                   onClick={() => {
                     const tabIndex = tabs.findIndex(tab => tab.id === activeTab);
                     if (tabIndex > 0) {
-                      setActiveTab(tabs[tabIndex - 1].id as any);
+                      setActiveTab(tabs[tabIndex - 1].id as Tab);
                     }
                   }}
                   className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -966,7 +968,7 @@ export default function EditCourse() {
                   onClick={() => {
                     const tabIndex = tabs.findIndex(tab => tab.id === activeTab);
                     if (tabIndex < tabs.length - 1) {
-                      setActiveTab(tabs[tabIndex + 1].id as any);
+                      setActiveTab(tabs[tabIndex + 1].id as Tab);
                     }
                   }}
                   className="flex items-center gap-2 rounded-lg border border-brand-500 bg-brand-500 px-4 py-3 text-sm font-medium text-white hover:bg-brand-600"

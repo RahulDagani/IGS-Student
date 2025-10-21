@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Globe, MapPin, Mail, FileText, Video, Link, Building2, BookOpen, Users, ArrowBigRight, ArrowBigRightDash } from "lucide-react";
+import { Globe, MapPin, Mail, FileText, Video, Link, Building2, BookOpen, Users, ArrowBigRightDash } from "lucide-react";
 
 interface UniversityFormData {
   // Basic Info
@@ -35,7 +35,7 @@ interface UniversityFormData {
 const fetchUniversity = async (id: string): Promise<UniversityFormData> => {
   // Simulate API call
   await new Promise(resolve => setTimeout(resolve, 500));
-  
+  console.log(id)
   // Mock data - replace with actual API call
   const mockData: UniversityFormData = {
     universityName: "Harvard University",
@@ -59,14 +59,16 @@ const fetchUniversity = async (id: string): Promise<UniversityFormData> => {
   };
   
   return mockData;
-};
+};;
+
+type Tab = "basic" | "contact" | "media" | "additional"
 
 export default function EditUniversity() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
   
-  const [activeTab, setActiveTab] = useState<"basic" | "contact" | "media" | "additional">("basic");
+  const [activeTab, setActiveTab] = useState<Tab>("basic");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -722,7 +724,7 @@ export default function EditUniversity() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as Tab)}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab.id
                     ? "border-brand-500 text-brand-600 dark:text-brand-400"
@@ -756,7 +758,7 @@ export default function EditUniversity() {
                   onClick={() => {
                     const tabIndex = tabs.findIndex(tab => tab.id === activeTab);
                     if (tabIndex > 0) {
-                      setActiveTab(tabs[tabIndex - 1].id as any);
+                      setActiveTab(tabs[tabIndex - 1].id as Tab);
                     }
                   }}
                   className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -770,7 +772,7 @@ export default function EditUniversity() {
                   onClick={() => {
                     const tabIndex = tabs.findIndex(tab => tab.id === activeTab);
                     if (tabIndex < tabs.length - 1) {
-                      setActiveTab(tabs[tabIndex + 1].id as any);
+                      setActiveTab(tabs[tabIndex + 1].id as Tab);
                     }
                   }}
                   className="flex items-center gap-2 rounded-lg border border-brand-500 bg-brand-500 px-4 py-3 text-sm font-medium text-white hover:bg-brand-600"

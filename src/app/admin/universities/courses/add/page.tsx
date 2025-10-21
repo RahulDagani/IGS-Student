@@ -1,7 +1,7 @@
 "use client"
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Book, Building2, GraduationCap, Calendar, Star, Upload, DollarSign } from "lucide-react";
+import { Book, Building2, GraduationCap, Calendar, Upload, DollarSign } from "lucide-react";
 
 interface CourseFormData {
   // Basics
@@ -38,9 +38,11 @@ interface CourseFormData {
   admissionRequirements: string;
 }
 
+type Tab = "basics" | "scores" | "gallery" | "details";
+
 export default function AddCourse() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"basics" | "scores" | "gallery" | "details">("basics");
+  const [activeTab, setActiveTab] = useState<Tab>("basics");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [formData, setFormData] = useState<CourseFormData>({
@@ -721,7 +723,7 @@ export default function AddCourse() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as Tab)}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab.id
                     ? "border-brand-500 text-brand-600 dark:text-brand-400"
@@ -755,7 +757,7 @@ export default function AddCourse() {
                   onClick={() => {
                     const tabIndex = tabs.findIndex(tab => tab.id === activeTab);
                     if (tabIndex > 0) {
-                      setActiveTab(tabs[tabIndex - 1].id as any);
+                      setActiveTab(tabs[tabIndex - 1].id as Tab);
                     }
                   }}
                   className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -769,7 +771,7 @@ export default function AddCourse() {
                   onClick={() => {
                     const tabIndex = tabs.findIndex(tab => tab.id === activeTab);
                     if (tabIndex < tabs.length - 1) {
-                      setActiveTab(tabs[tabIndex + 1].id as any);
+                      setActiveTab(tabs[tabIndex + 1].id as Tab);
                     }
                   }}
                   className="flex items-center gap-2 rounded-lg border border-brand-500 bg-brand-500 px-4 py-3 text-sm font-medium text-white hover:bg-brand-600"

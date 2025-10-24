@@ -12,10 +12,10 @@ export const metadata: Metadata = {
   // other metadata
 };
 
-export default function WalletHistory() {
+export default function Commissions() {
   return (
     <div>
-      <PageBreadcrumb pageTitle="Wallet History" />
+      <PageBreadcrumb pageTitle="Commissions" />
       <div className="space-y-6">
         
           <CommissionsTable />

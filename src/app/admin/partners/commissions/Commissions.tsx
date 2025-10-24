@@ -340,7 +340,7 @@ export default function CommissionsTable() {
   return (
     <div className="space-y-4">
          {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">Total Commissions</div>
           <div className="text-2xl font-bold text-gray-800 dark:text-white">
@@ -365,7 +365,7 @@ export default function CommissionsTable() {
             {Array.from(new Set(filteredAndSortedData.map(c => c.studyLevel))).length}
           </div>
         </div>
-      </div>
+      </div> */}
       {/* Search and Filter Controls */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         {/* Search Input */}

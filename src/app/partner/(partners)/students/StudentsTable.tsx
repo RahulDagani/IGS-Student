@@ -15,51 +15,85 @@ interface Student {
   name: string;
   email: string;
   phoneNumber: string;
-
+  applicationLink: string;
 }
 
-// Define the table data using the interface
 const tableData: Student[] = [
   {
     id: 1,
     name: "Alice Johnson",
     email: "alice.johnson@example.com",
     phoneNumber: "+1 (555) 123-4567",
-   
-
+    applicationLink: "https://live.applytech.org/view-student-application/1"
   },
   {
     id: 2,
     name: "Bob Wilson",
     email: "bob.wilson@example.com",
     phoneNumber: "+1 (555) 987-6543",
-   
+    applicationLink: "https://live.applytech.org/view-student-application/2"
   },
   {
     id: 3,
     name: "Carol Davis",
     email: "carol.davis@example.com",
     phoneNumber: "+1 (555) 456-7890",
-   
+    applicationLink: "https://live.applytech.org/view-student-application/3"
   },
   {
     id: 4,
     name: "David Brown",
     email: "david.brown@example.com",
     phoneNumber: "+1 (555) 234-5678",
-   
+    applicationLink: "https://live.applytech.org/view-student-application/4"
   },
   {
     id: 5,
     name: "Eva Martinez",
     email: "eva.martinez@example.com",
     phoneNumber: "+1 (555) 876-5432",
-   
+    applicationLink: "https://live.applytech.org/view-student-application/5"
   },
 ];
 
 type SortField = keyof Student | "";
 type SortDirection = "asc" | "desc";
+
+// Copy function component
+const CopyApplicationLink = ({ link }: { link: string }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = link;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="truncate max-w-[200px]">{link}</span>
+      <button
+        onClick={handleCopy}
+        className="px-2 py-1 text-theme-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+      >
+        {copied ? 'Copied!' : 'Copy'}
+      </button>
+    </div>
+  );
+};
 
 export default function StudentTable() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -175,6 +209,8 @@ export default function StudentTable() {
                     { key: "name", label: "Name" },
                     { key: "email", label: "Email" },
                     { key: "phoneNumber", label: "Phone Number" },
+                    { key: "applicationLink", label: "Application Link" },
+
                   ].map(({ key, label }) => (
                     <TableCell
                       key={key}
@@ -210,6 +246,9 @@ export default function StudentTable() {
                       <TableCell className="px-5 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
                         {student.phoneNumber}
                       </TableCell>
+                      <TableCell className="px-5 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
+  <CopyApplicationLink link={student.applicationLink} />
+</TableCell>
                       
                      
                     </TableRow>

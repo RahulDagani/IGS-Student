@@ -68,9 +68,14 @@ const AddEditCountryModal: React.FC<AddEditCountryModalProps> = ({
     try {
       await onSave(formData);
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
+
       console.error('Error saving country:', error);
-      setError(error.message || 'Failed to save country');
+      if (error instanceof Error) {
+        setError(error.message || 'Failed to save country');
+      } else {
+        setError('Failed to save country');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -252,9 +257,13 @@ export default function CountriesTable() {
       setError(null);
       const data = await countryService.getCountries(searchTerm);
       setCountries(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      console.error('Error saving country:', error);
+    if (err instanceof Error) {
       setError(err.message || 'Failed to load countries');
-      console.error('Error loading countries:', err);
+    } else {
+      setError('Failed to load countries');
+    }
     } finally {
       setIsLoading(false);
     }
@@ -262,7 +271,7 @@ export default function CountriesTable() {
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
-    let filtered = [...countries];
+    const filtered = [...countries];
 
     // Sorting
     if (sortField) {
@@ -326,8 +335,16 @@ export default function CountriesTable() {
       try {
         await countryService.deleteCountry(id);
         await loadCountries(); // Refresh the list
-      } catch (error: any) {
-        alert(error.message || 'Failed to delete country');
+      } catch (error: unknown) {
+        
+
+        console.error('Error saving country:', error);
+        if (error instanceof Error) {
+            alert(error.message || 'Failed to delete country');
+        } else {
+          alert('Failed to delete country');
+
+        }
       }
     }
   };

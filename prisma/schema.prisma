@@ -1575,6 +1575,61 @@ model tech_agent_student_docs {
   @@map("tech_agent_student_docs")
 }
 
+model apply_tenants {
+  id            Int      @id @default(autoincrement())
+  name          String
+  companyName   String   @map("company_name")
+  subdomain     String   @unique
+  customDomain  String?  @map("custom_domain") @unique
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  status        TenantStatus @default(ACTIVE)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @map("updated_at")
+
+  
+  @@map("apply_tenants")
+}
+
+model apply_tenant_users {
+  id           Int      @id @default(autoincrement())
+  tenant_id    Int
+  name         String
+  email        String   @unique
+  role         String
+  is_verified  Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  // Relation
+  authProviders apply_tenant_user_auth_providers[]
+
+  @@index([tenant_id])
+}
+
+model apply_tenant_user_auth_providers {
+  id               Int      @id @default(autoincrement())
+  user_id          Int
+  provider         String
+  provider_user_id String?
+  email            String?
+  password_hash    String?
+  access_token     String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  // Relation
+  user apply_tenant_users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum FeeStatus {
   pending
   paid

@@ -31,7 +31,7 @@ interface Field {
   field_type: string;
   is_required: boolean;
   order: number;
-  options: any;
+  options: string[];
   section: Section;
 }
 

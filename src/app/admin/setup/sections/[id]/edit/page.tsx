@@ -11,6 +11,14 @@ interface SectionFormData {
   order: number;
 }
 
+interface Section {
+  id: string;
+  name: string;
+  role: string;
+  order: number;
+  // Add other properties as needed based on your API response
+}
+
 export default function EditSection() {
   const router = useRouter();
   const params = useParams();
@@ -38,7 +46,7 @@ export default function EditSection() {
       const response = await fetch('/api/admin/sections');
       if (response.ok) {
         const sections = await response.json();
-        const currentSection = sections.find((section: any) => section.id === sectionId);
+        const currentSection = sections.find((section: Section) => section.id === sectionId);
         
         if (currentSection) {
           setFormData({

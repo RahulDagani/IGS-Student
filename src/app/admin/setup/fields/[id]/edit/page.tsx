@@ -1,8 +1,8 @@
-// app/admin/setup/fields/add/page.tsx
+// app/admin/setup/fields/[id]/edit/page.tsx
 "use client"
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Type, List, ArrowLeft } from "lucide-react";
+import { useRouter, useParams } from "next/navigation";
+import { Type, List, ArrowLeft, Loader } from "lucide-react";
 import Link from "next/link";
 
 interface FieldFormData {
@@ -22,11 +22,28 @@ interface Section {
   role: string;
 }
 
-export default function AddField() {
+interface Field {
+  id: string;
+  section_id: string;
+  role: string;
+  field_name: string;
+  field_label: string;
+  field_type: string;
+  is_required: boolean;
+  order: number;
+  options: any;
+  section: Section;
+}
+
+export default function EditField() {
   const router = useRouter();
+  const params = useParams();
+  const fieldId = params.id as string;
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [field, setField] = useState<Field | null>(null);
   
   const [formData, setFormData] = useState<FieldFormData>({
     section_id: "",
@@ -43,18 +60,48 @@ export default function AddField() {
   const [newOption, setNewOption] = useState("");
 
   useEffect(() => {
-    fetchSections();
-  }, []);
+    if (fieldId) {
+      fetchData();
+    }
+  }, [fieldId]);
 
-  const fetchSections = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch('/api/admin/sections');
-      const data = await response.json();
-      setSections(data);
+      const [sectionsResponse, fieldsResponse] = await Promise.all([
+        fetch('/api/admin/sections'),
+        fetch('/api/admin/fields')
+      ]);
+
+      if (sectionsResponse.ok && fieldsResponse.ok) {
+        const sectionsData = await sectionsResponse.json();
+        const fieldsData = await fieldsResponse.json();
+        
+        setSections(sectionsData);
+        
+        const currentField = fieldsData.find((field: Field) => field.id === fieldId);
+        
+        if (currentField) {
+          setField(currentField);
+          setFormData({
+            section_id: currentField.section_id,
+            role: currentField.role,
+            field_name: currentField.field_name,
+            field_label: currentField.field_label,
+            field_type: currentField.field_type,
+            is_required: currentField.is_required,
+            order: currentField.order || 0,
+            options: currentField.options || [],
+          });
+        } else {
+          alert('Field not found');
+          router.push('/admin/setup/fields');
+        }
+      }
     } catch (error) {
-      console.error('Error fetching sections:', error);
+      console.error('Error fetching data:', error);
+      alert('Failed to load field data');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -75,8 +122,8 @@ export default function AddField() {
       }));
     }
 
-    // Generate field name from label
-    if (name === 'field_label' && !formData.field_name) {
+    // Generate field name from label only if it's not manually modified
+    if (name === 'field_label' && field && formData.field_name === field.field_name) {
       const fieldName = value
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '_')
@@ -135,8 +182,8 @@ export default function AddField() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/admin/fields', {
-        method: 'POST',
+      const response = await fetch(`/api/admin/fields/${fieldId}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -151,20 +198,20 @@ export default function AddField() {
         router.refresh();
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to create field');
+        alert(error.error || 'Failed to update field');
       }
     } catch (error) {
-      console.error('Error creating field:', error);
-      alert('Failed to create field');
+      console.error('Error updating field:', error);
+      alert('Failed to update field');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+        <Loader className="animate-spin h-8 w-8 text-brand-500" />
       </div>
     );
   }
@@ -180,10 +227,10 @@ export default function AddField() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
-            Add New Field
+            Edit Field
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Create a new form field for data collection
+            Update field properties and behavior
           </p>
         </div>
       </div>
@@ -194,7 +241,7 @@ export default function AddField() {
             Field Details
           </h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Define the field properties and behavior.
+            Update the field properties and behavior.
           </p>
         </div>
         
@@ -406,10 +453,10 @@ export default function AddField() {
                 {isSubmitting ? (
                   <div className="flex items-center justify-center gap-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Creating...
+                    Updating...
                   </div>
                 ) : (
-                  "Create Field"
+                  "Update Field"
                 )}
               </button>
             </div>

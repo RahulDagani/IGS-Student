@@ -1,8 +1,8 @@
-// app/admin/setup/sections/add/page.tsx
+// app/admin/setup/sections/[id]/edit/page.tsx
 "use client"
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
-import { FolderOpen, ArrowLeft } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { FolderOpen, ArrowLeft, Loader } from "lucide-react";
 import Link from "next/link";
 
 interface SectionFormData {
@@ -11,9 +11,13 @@ interface SectionFormData {
   order: number;
 }
 
-export default function AddSection() {
+export default function EditSection() {
   const router = useRouter();
+  const params = useParams();
+  const sectionId = params.id as string;
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [formData, setFormData] = useState<SectionFormData>({
     name: "",
@@ -22,6 +26,38 @@ export default function AddSection() {
   });
 
   const [errors, setErrors] = useState<Partial<SectionFormData>>({});
+
+  useEffect(() => {
+    if (sectionId) {
+      fetchSection();
+    }
+  }, [sectionId]);
+
+  const fetchSection = async () => {
+    try {
+      const response = await fetch('/api/admin/sections');
+      if (response.ok) {
+        const sections = await response.json();
+        const currentSection = sections.find((section: any) => section.id === sectionId);
+        
+        if (currentSection) {
+          setFormData({
+            name: currentSection.name,
+            role: currentSection.role,
+            order: currentSection.order || 0,
+          });
+        } else {
+          alert('Section not found');
+          router.push('/admin/setup/fields');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching section:', error);
+      alert('Failed to load section');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -64,8 +100,8 @@ export default function AddSection() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/admin/sections', {
-        method: 'POST',
+      const response = await fetch(`/api/admin/sections/${sectionId}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -73,35 +109,43 @@ export default function AddSection() {
       });
 
       if (response.ok) {
-        router.push('/admin/forms');
+        router.push('/admin/setup/fields');
         router.refresh();
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to create section');
+        alert(error.error || 'Failed to update section');
       }
     } catch (error) {
-      console.error('Error creating section:', error);
-      alert('Failed to create section');
+      console.error('Error updating section:', error);
+      alert('Failed to update section');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-64">
+        <Loader className="animate-spin h-8 w-8 text-brand-500" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/admin/setup/feilds">
+        <Link href="/admin/setup/fields">
           <button className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
             <ArrowLeft size={20} />
           </button>
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
-            Add New Section
+            Edit Section
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Create a new form section for organizing fields
+            Update section information and properties
           </p>
         </div>
       </div>
@@ -112,7 +156,7 @@ export default function AddSection() {
             Section Details
           </h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Define the basic information for this form section.
+            Update the basic information for this form section.
           </p>
         </div>
         
@@ -203,10 +247,10 @@ export default function AddSection() {
                 {isSubmitting ? (
                   <div className="flex items-center justify-center gap-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Creating...
+                    Updating...
                   </div>
                 ) : (
-                  "Create Section"
+                  "Update Section"
                 )}
               </button>
             </div>

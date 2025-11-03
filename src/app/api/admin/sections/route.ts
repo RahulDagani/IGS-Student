@@ -2,10 +2,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET() {
+
+
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const role = searchParams.get('role');
+    
+    const whereClause: any = { tenant_id: '1' };
+    if (role) {
+      whereClause.role = role;
+    }
+
     const sections = await prisma.apply_role_fields_sections.findMany({
-      where: { tenant_id: '1' },
+      where: whereClause,
       include: {
         fields: {
           orderBy: { order: 'asc' }
@@ -16,6 +26,7 @@ export async function GET() {
 
     return NextResponse.json(sections);
   } catch (error) {
+    console.error('Error fetching sections:', error);
     return NextResponse.json(
       { error: 'Failed to fetch sections' },
       { status: 500 }

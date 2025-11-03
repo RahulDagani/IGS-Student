@@ -4,14 +4,16 @@ import { prisma } from '@/lib/prisma';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } 
 ) {
+    const { id } = await params; // Await the params
+
   try {
     const body = await request.json();
     const { name, role, order } = body;
 
     const section = await prisma.apply_role_fields_sections.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         name,
         role,
@@ -31,11 +33,13 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } 
 ) {
+    const { id } = await params; // Await the params
+
   try {
     await prisma.apply_role_fields_sections.delete({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     return NextResponse.json({ success: true });

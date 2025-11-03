@@ -4,8 +4,9 @@ import { prisma } from '@/lib/prisma';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params; // Await the params
   try {
     const body = await request.json();
     const { 
@@ -17,7 +18,7 @@ export async function PUT(
     } = body;
 
     const field = await prisma.apply_role_field_definitions.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         field_label,
         field_type,
@@ -42,11 +43,13 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params; // Await the params
+
   try {
     await prisma.apply_role_field_definitions.delete({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     return NextResponse.json({ success: true });

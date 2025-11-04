@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { LogIn, ChevronLeftIcon, Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams  } from "next/navigation";
 import Link from "next/link";
+
+import { Suspense } from 'react';
 
 interface FormData {
   email: string;
@@ -87,11 +89,14 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   </label>
 );
 
-export default function AgentLoginPage() {
+function AgentLoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/partner';
+  
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; submit?: string }>({});
   const [formData, setFormData] = useState<FormData>({
     email: "",
     password: "",
@@ -122,7 +127,7 @@ export default function AgentLoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/login/agent", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -130,7 +135,7 @@ export default function AgentLoginPage() {
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          rememberMe: formData.rememberMe,
+          userType: 'agent',
         }),
       });
 
@@ -140,8 +145,8 @@ export default function AgentLoginPage() {
         throw new Error(data.error || "Login failed");
       }
 
-      // Redirect to agent dashboard on successful login
-      router.push("/partner");
+      // Redirect to intended page or partner dashboard
+      router.push(callbackUrl);
     } catch (error) {
       setErrors({ submit: error instanceof Error ? error.message : "Login failed" });
     } finally {
@@ -270,23 +275,13 @@ export default function AgentLoginPage() {
               </div>
             </form>
 
-            <div className="mt-5">
-              <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
-                Not an agent? {""}
-                <Link
-                  href="/login"
-                  className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
-                >
-                  User Login
-                </Link>
-              </p>
-            </div>
+          
 
             <div className="mt-3">
               <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
                 Need an agent account? {""}
                 <Link
-                  href="/agent-register"
+                  href="/register/agent"
                   className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
                 >
                   Contact Administrator
@@ -299,3 +294,20 @@ export default function AgentLoginPage() {
     </div>
   );
 }
+
+export default function AgentLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col flex-1 lg:w-1/2 w-full">
+        <div className="flex flex-col flex-1 bg-white dark:bg-gray-900">
+          <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto px-4 sm:px-0">
+            <div className="text-center">Loading...</div>
+          </div>
+        </div>
+      </div>
+    }>
+      <AgentLoginContent />
+    </Suspense>
+  );
+}
+

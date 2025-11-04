@@ -6,11 +6,15 @@ import AppSidebar from "./AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import React from "react";
 
-export default function AdminLayout({
-  children,
-}: {
+import { withAuth } from '@/components/auth/with-auth';
+import { SessionPayload } from '@/lib/auth';
+
+interface PartnerLayoutProps {
   children: React.ReactNode;
-}) {
+  user: SessionPayload;
+}
+
+function PartnerLayout({ children, user }: PartnerLayoutProps) {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
 
   // Dynamic class for main content margin based on sidebar state
@@ -37,3 +41,6 @@ export default function AdminLayout({
     </div>
   );
 }
+
+
+export default withAuth(PartnerLayout, ['agent'], ['user']);

@@ -215,6 +215,7 @@ export default function AgentAccountDetails() {
 
   const renderPersonalTab = () => (
     <div className="space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
       {/* Full Name */}
       <div>
         <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
@@ -257,6 +258,8 @@ export default function AgentAccountDetails() {
             className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
           />
         </div>
+      </div>
+
       </div>
 
       {/* Agency Logo */}
@@ -322,7 +325,10 @@ export default function AgentAccountDetails() {
 
   const renderBusinessTab = () => (
     <div className="space-y-5">
-      {/* Business Name */}
+      
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Business Name */}
       <div>
         <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
           Registered Business Name *
@@ -343,8 +349,6 @@ export default function AgentAccountDetails() {
           />
         </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Country */}
         <div>
           <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
@@ -386,9 +390,6 @@ export default function AgentAccountDetails() {
             className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
           />
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* City */}
         <div>
           <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
@@ -405,7 +406,6 @@ export default function AgentAccountDetails() {
             className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
           />
         </div>
-
         {/* State */}
         <div>
           <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
@@ -440,6 +440,8 @@ export default function AgentAccountDetails() {
           />
         </div>
       </div>
+
+     
 
       {/* Business Registration Certificate */}
       <div>
@@ -514,7 +516,10 @@ export default function AgentAccountDetails() {
 
   const renderContactTab = () => (
     <div className="space-y-5">
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
       {/* WhatsApp */}
+      
       <div>
         <label htmlFor="whatsapp" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
           WhatsApp Number
@@ -554,6 +559,8 @@ export default function AgentAccountDetails() {
             className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
           />
         </div>
+      </div>
+
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

@@ -246,7 +246,7 @@ function AgentLoginContent() {
                     </span>
                   </div>
                   <Link
-                    href="/agent-forgot-password"
+                    href="/signin/agent/forgot-password"
                     className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400"
                   >
                     Forgot password?

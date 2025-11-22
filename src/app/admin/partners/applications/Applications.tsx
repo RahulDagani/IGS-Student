@@ -8,7 +8,7 @@ interface Application {
   university: string;
   course: string;
   intake: string;
-  status: "Applied" | "Received" | "Submitted to University" | "Documents Pending" | "Application Complete";
+  status: string;
   assignedTo: string;
   studentName: string;
   studentEmail: string;
@@ -24,6 +24,10 @@ interface Application {
   profileStatus: string;
   commonDocumentsStatus: string;
   specificDocumentsStatus: string;
+  // New fields for update status functionality
+  current_status_id?: number;
+  student_user_id?: number;
+  created_by?: number;
 }
 
 interface Agent {
@@ -72,6 +76,15 @@ interface FilterModalProps {
   agents: Agent[];
   students: Student[];
   loadingStudents: boolean;
+}
+
+interface UpdateStatusModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  application: Application | null;
+  statuses: ApplicationStatus[];
+  onUpdateStatus: (applicationId: number, statusId: number) => Promise<void>;
+  loading: boolean;
 }
 
 interface ApiApplicationResponse {
@@ -297,6 +310,110 @@ const FilterModal: React.FC<FilterModalProps> = ({
   );
 };
 
+const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({
+  isOpen,
+  onClose,
+  application,
+  statuses,
+  onUpdateStatus,
+  loading,
+}) => {
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+
+  useEffect(() => {
+    if (application && statuses.length > 0) {
+      // Set the current status of the application as default
+      const currentStatus = statuses.find(status => status.id === application.current_status_id);
+      setSelectedStatus(currentStatus ? currentStatus.id.toString() : "");
+    }
+  }, [application, statuses]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!application || !selectedStatus) return;
+
+    await onUpdateStatus(application.id, parseInt(selectedStatus));
+    onClose();
+  };
+
+  const handleClose = () => {
+    setSelectedStatus("");
+    onClose();
+  };
+
+  if (!isOpen || !application) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+            Update Application Status
+          </h3>
+          <button
+            onClick={handleClose}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="mb-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            <strong>University:</strong> {application.university}
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            <strong>Course:</strong> {application.course}
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            <strong>Student:</strong> {application.studentName}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Application Status
+            </label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              required
+            >
+              <option value="">Select a status</option>
+              {statuses.map((status) => (
+                <option key={status.id} value={status.id.toString()}>
+                  {status.status_label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !selectedStatus}
+              className="flex-1 px-4 py-2 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Updating..." : "Update Status"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const CardIcons = {
   GraduationCap: () => (
     <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,9 +437,10 @@ const CardIcons = {
 
 interface ApplicationCardProps {
   application: Application;
+  onUpdateStatus: (application: Application) => void;
 }
 
-const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
+const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onUpdateStatus }) => {
   const getStatusColor = (status: Application["status"]) => {
     switch (status) {
       case "Applied":
@@ -472,8 +590,11 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
         <button className="flex-1 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600 text-white font-semibold py-2 rounded-lg text-sm transition-all">
           LIVE CHAT
         </button>
-        <button className="flex-1 border border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-400 dark:text-indigo-400 dark:hover:bg-indigo-900/30 font-semibold py-2 rounded-lg text-sm transition-all">
-          Continue
+        <button 
+          onClick={() => onUpdateStatus(application)}
+          className="flex-1 border border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-400 dark:text-indigo-400 dark:hover:bg-indigo-900/30 font-semibold py-2 rounded-lg text-sm transition-all"
+        >
+          Update Status
         </button>
       </div>
     </div>
@@ -482,6 +603,9 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application }) => {
 
 export default function ApplicationsTable() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
+  const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState<boolean>(false);
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [applicationStatuses, setApplicationStatuses] = useState<ApplicationStatus[]>([]);
   const [filters, setFilters] = useState<FilterOptions>({
     agent: "all",
     student: "all",
@@ -493,12 +617,43 @@ export default function ApplicationsTable() {
   const [loading, setLoading] = useState({
     agents: false,
     students: false,
-    applications: false
+    applications: false,
+    statuses: false,
+    updatingStatus: false
   });
   const [error, setError] = useState<string | null>(null);
 
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
   const { token } = useAuth();
+
+  // Fetch application statuses
+  useEffect(() => {
+    const fetchApplicationStatuses = async () => {
+      setLoading(prev => ({ ...prev, statuses: true }));
+      try {
+        const response = await fetch(`${BASE_URL}/tenant/application/statuses`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          setApplicationStatuses(data.data);
+        } else {
+          throw new Error('Failed to fetch application statuses');
+        }
+      } catch (err) {
+        setError('Failed to load application statuses');
+        console.error('Error fetching application statuses:', err);
+      } finally {
+        setLoading(prev => ({ ...prev, statuses: false }));
+      }
+    };
+
+    fetchApplicationStatuses();
+  }, [BASE_URL, token]);
 
   useEffect(() => {
     const fetchAgents = async () => {
@@ -589,7 +744,7 @@ export default function ApplicationsTable() {
             university: app.application.university_name,
             course: app.application.course_name,
             intake: "Fall 2024", // You might want to get this from the API if available
-            status: mapStatus(app.application.status_key),
+            status: app.application.status_label,
             assignedTo: app.application.assigned_to || "Not Assigned",
             studentName: `${app.student_profile.first_name} ${app.student_profile.last_name}`,
             studentEmail: "student@example.com", // You might want to get this from student data
@@ -601,7 +756,11 @@ export default function ApplicationsTable() {
             externalEvaluation: "Not Provided", // You might want to get this from the API if available
             profileStatus: app.profile_status,
             commonDocumentsStatus: app.common_documents.status,
-            specificDocumentsStatus: app.specific_documents.status
+            specificDocumentsStatus: app.specific_documents.status,
+            // New fields for update status functionality
+            current_status_id: app.application.current_status_id,
+            student_user_id: app.application.student_user_id,
+            created_by: app.application.created_by
           }));
           
           setApplications(transformedApplications);
@@ -620,23 +779,60 @@ export default function ApplicationsTable() {
     fetchApplications();
   }, [filters.agent, filters.student, BASE_URL, token]);
 
-  const mapStatus = (statusKey: string): Application["status"] => {
-    switch (statusKey) {
-      case "applied":
-        return "Applied";
-      case "received":
-        return "Received";
-      case "submitted_to_university":
-        return "Submitted to University";
-      case "documents_pending":
-        return "Documents Pending";
-      default:
-        return "Applied";
-    }
-  };
-
   const handleApplyFilters = (newFilters: FilterOptions) => {
     setFilters(newFilters);
+  };
+
+  const handleUpdateStatusClick = (application: Application) => {
+    setSelectedApplication(application);
+    setIsUpdateStatusModalOpen(true);
+  };
+
+  const handleUpdateStatus = async (applicationId: number, statusId: number) => {
+    if (!selectedApplication) return;
+
+    setLoading(prev => ({ ...prev, updatingStatus: true }));
+    try {
+      const { created_by, student_user_id } = selectedApplication;
+      
+      const response = await fetch(
+        `${BASE_URL}/tenant/agent/application/status/${created_by}/${student_user_id}/${applicationId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            current_status_id: statusId
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update the application in the local state
+        setApplications(prev => prev.map(app => {
+          if (app.id === applicationId) {
+            const newStatus = applicationStatuses.find(status => status.id === statusId);
+            return {
+              ...app,
+              status: newStatus?.status_label || app.status,
+              current_status_id: statusId
+            };
+          }
+          return app;
+        }));
+      } else {
+        throw new Error('Failed to update application status');
+      }
+    } catch (err) {
+      setError('Failed to update application status');
+      console.error('Error updating application status:', err);
+    } finally {
+      setLoading(prev => ({ ...prev, updatingStatus: false }));
+    }
   };
 
   const hasActiveFilters = filters.agent !== "all" || filters.student !== "all";
@@ -715,7 +911,11 @@ export default function ApplicationsTable() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {applications && applications.length > 0 ? (
             applications.map((application, index) => (
-              <ApplicationCard key={`${application.id}-${index}`} application={application} />
+              <ApplicationCard 
+                key={`${application.id}-${index}`} 
+                application={application} 
+                onUpdateStatus={handleUpdateStatusClick}
+              />
             ))
           ) : (
             <div className="col-span-full text-center py-12">
@@ -743,6 +943,15 @@ export default function ApplicationsTable() {
         agents={agents}
         students={students}
         loadingStudents={loading.students}
+      />
+
+      <UpdateStatusModal
+        isOpen={isUpdateStatusModalOpen}
+        onClose={() => setIsUpdateStatusModalOpen(false)}
+        application={selectedApplication}
+        statuses={applicationStatuses}
+        onUpdateStatus={handleUpdateStatus}
+        loading={loading.updatingStatus}
       />
     </div>
   );

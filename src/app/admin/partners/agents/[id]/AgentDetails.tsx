@@ -47,9 +47,38 @@ const AgentDetails = () => {
   const [agentInfo, setAgentInfo] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [approved, setApproved] = useState<boolean>(false);
+  
   const {id: agentId} = useParams();
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
     const {token} = useAuth();
+
+  const approveAgent = async () => {
+    try {
+        setLoading(true);
+        const response = await fetch(
+          `${BASE_URL}/tenant/agent/${agentId}/verify/`,{
+            method: "PUT",
+          headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+        }
+        );
+        
+        if (!response.ok) {
+          throw new Error(`Failed to approve agent: ${response.status}`);
+        }
+
+        setApproved(true)
+        
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setLoading(false);
+      }
+  }
 
   useEffect(() => {
     const fetchAgentDetails = async () => {
@@ -72,6 +101,9 @@ const AgentDetails = () => {
         
         if (data.success && data.agent) {
           setAgentInfo(data.agent);
+          if(data.agent.is_agent_verified == 1){
+            setApproved(true)
+          }
         } else {
           throw new Error("Invalid response format");
         }
@@ -385,9 +417,14 @@ const AgentDetails = () => {
         <button className="px-6 py-2.5 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
           Verify Payment Details
         </button>
-        <button className="px-6 py-2.5 bg-green-600 rounded-lg text-sm font-medium text-white hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-          {agentInfo.is_agent_verified ? "Update Agent" : "Approve Agent"}
+        {approved ? <button disabled className="px-6 py-2.5 bg-green-300 rounded-lg text-sm font-medium text-white hover:bg-green-300 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+          {"Approved"}
+        </button> :
+          <button onClick={approveAgent} className="px-6 py-2.5 bg-green-600 rounded-lg text-sm font-medium text-white hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+          {"Approve Agent"}
         </button>
+        }
+        
       </div>
     </div>
   );

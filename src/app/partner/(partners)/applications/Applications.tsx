@@ -179,6 +179,7 @@ interface DocumentUploadModalProps {
   onClose: () => void;
   applicationId: number;
   documents: Document[];
+  studentId: number,
   documentType: 'common' | 'specific';
   onUploadSuccess: () => void;
 }
@@ -197,6 +198,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   onClose,
   applicationId,
   documents,
+  studentId,
   documentType,
   onUploadSuccess,
 }) => {
@@ -235,7 +237,14 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         xhr.onerror = () => reject(new Error('Upload failed'));
       });
 
-      xhr.open('PUT', `${BASE_URL}/agent/student/application/${applicationId}/upload/document`);
+      if(documentType == "common"){
+        xhr.open('PUT', `${BASE_URL}/agent/student/application/${studentId}/upload/common/document`);
+      }else{
+
+        xhr.open('PUT', `${BASE_URL}/agent/student/application/${applicationId}/upload/document`);
+      }
+
+      
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.send(formData);
 
@@ -758,6 +767,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
 export default function ApplicationsTable() {
   const { token, logout } = useAuth();
+  console.log(token)
   const router = useRouter();
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -768,6 +778,7 @@ export default function ApplicationsTable() {
   const [isDocumentModalOpen, setIsDocumentModalOpen] = useState<boolean>(false);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [selectedDocumentType, setSelectedDocumentType] = useState<'common' | 'specific'>('specific');
+  const [appStudentId, setAppStudentId] = useState<number | null>(null);
   const [filters, setFilters] = useState<FilterOptions>({
     university: "all",
     course: "all",
@@ -1100,7 +1111,7 @@ export default function ApplicationsTable() {
           filteredAndSortedData.map((application) => (
             <ApplicationCard 
               key={application.id} 
-              application={application} 
+              application={application}
               onContinue={handleContinue}
             />
           ))
@@ -1149,6 +1160,7 @@ export default function ApplicationsTable() {
               ? selectedApplication.common_documents?.list || []
               : selectedApplication.specific_documents?.list || []
           }
+          studentId={selectedApplication.student_user_id || 0}
           documentType={selectedDocumentType}
           onUploadSuccess={handleUploadSuccess}
         />

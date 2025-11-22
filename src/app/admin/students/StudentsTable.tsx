@@ -279,7 +279,7 @@ export default function StudentTable() {
                   filteredAndSortedData.map((student) => (
                     <TableRow key={student.user_id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <TableCell className="px-5 py-4 text-start">
-                        <Link href={"/admin/students/" + student.user_id}>
+                        <Link href={"/admin/students/" + student.user_id + "/details"}>
                           <span className="font-medium text-gray-800 text-theme-sm dark:text-white/90 hover:text-brand-600 dark:hover:text-brand-400 cursor-pointer">
                             {getFullName(student)}
                           </span>

@@ -60,13 +60,8 @@ const partnerItems: NavItem[] = [
         icon: <Handshake size={18} />,
       },
       {
-        name: "Agent Students",
-        path: "/partners/agents/students",
-        icon: <User size={18} />,
-      },
-      {
         name: "Students",
-        path: "/partners/students",
+        path: "/partners/agents/students",
         icon: <User size={18} />,
       },
       {

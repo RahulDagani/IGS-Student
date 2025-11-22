@@ -1,95 +1,84 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Save, X } from "lucide-react";
+import { Save, X, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import SetupSettingsSidebar from "@/app/admin/layout/SetupSettingsSidebar";
 
-interface PaymentMethod {
+interface PaymentConfiguration {
   id: string;
-  name: string;
-  shortCode: string;
-  note: string;
-  status: "active" | "inactive";
+  payment_gateway: string;
+  secret_key: string;
+  publishable_key: string;
+  webhook_secret: string;
+  is_active: boolean;
 }
 
-// Static data for demonstration
-const staticPaymentMethods: PaymentMethod[] = [
-  {
-    id: "1",
-    name: "Bank Transfer",
-    shortCode: "BANK_TRF",
-    note: "Transfer funds directly to our bank account",
-    status: "active"
-  },
-  {
-    id: "2",
-    name: "Account Payment",
-    shortCode: "ACC_PAY",
-    note: "Payment through customer account",
-    status: "active"
-  },
-  {
-    id: "3",
-    name: "Cash Payment",
-    shortCode: "CASH",
-    note: "Pay with cash at our physical locations",
-    status: "inactive"
-  }
-];
-
-export default function EditPaymentMethodPage() {
+export default function EditPaymentPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
 
-  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    secret_key: "",
+    publishable_key: "",
+    webhook_secret: "",
+    is_active: 1,
+  });
+  const [payment, setPayment] = useState<PaymentConfiguration | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
-  const [formData, setFormData] = useState<PaymentMethod>({
-    id: "",
-    name: "",
-    shortCode: "",
-    note: "",
-    status: "active"
-  });
-
   useEffect(() => {
-    // Simulate API fetch
-    const fetchPaymentMethod = async () => {
-      setLoading(true);
-      try {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const method = staticPaymentMethods.find(m => m.id === id);
-        if (method) {
-          setFormData(method);
-        } else {
-          setError("Payment method not found");
-        }
-      } catch (err) {
-      console.log(err)
-
-        setError("Failed to load payment method");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (id) {
-      fetchPaymentMethod();
+      fetchPayment();
     }
   }, [id]);
 
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+  const { token } = useAuth();
+
+  const fetchPayment = async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/tenant/settings/payment/${id}`,{
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const result = await response.json();
+        const data = result.data[0];
+        
+        setPayment(data);
+        setFormData({
+          secret_key: data.secret_key,
+          publishable_key: data.publishable_key,
+          webhook_secret: data.webhook_secret || "",
+          is_active: data.is_active ? 1 : 0,
+        });
+      } else {
+        setError("Failed to load payment configuration");
+      }
+    } catch (error) {
+      console.error("Error fetching payment:", error);
+      setError("Failed to load payment configuration");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
     setFormData({
       ...formData,
-      [name]: value
+      [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked ? 1 : 0 : value,
     });
   };
 
@@ -98,19 +87,27 @@ export default function EditPaymentMethodPage() {
     setSaving(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setSuccess("Payment method updated successfully!");
-      
-      // Redirect back after success
-      setTimeout(() => {
-        router.push("/admin/setup/payment-methods");
-      }, 1500);
-    } catch (err) {
-      console.log(err)
+      const response = await fetch(`${BASE_URL}/tenant/settings/payment/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData),
+      });
 
-      setError("Failed to update payment method");
+      if (response.ok) {
+        setSuccess("Payment configuration updated successfully!");
+        setTimeout(() => {
+          router.push("/admin/setup/payment");
+        }, 1500);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || "Failed to update payment configuration");
+      }
+    } catch (error) {
+      console.error("Error updating payment configuration:", error);
+      setError("Failed to update payment configuration");
     } finally {
       setSaving(false);
     }
@@ -118,20 +115,39 @@ export default function EditPaymentMethodPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-[#0f172a]">
-        <SetupSettingsSidebar />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-white">Loading payment method...</div>
-        </div>
+      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
+        <div className="text-white">Loading payment configuration...</div>
+      </div>
+    );
+  }
+
+  if (!payment) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
+        <div className="text-white">Payment configuration not found</div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-[#0f172a]">
+   <div className="flex flex-col lg:flex-row min-h-screen bg-[#0f172a]">
+             {/* Sidebar */}
       <SetupSettingsSidebar />
+      <div className="flex-1 mt-6 ml-0 lg:ml-6 lg:mt-0 mb-6 bg-[#111827] rounded-xl shadow-lg border border-white/10 p-6">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <Link
+            href="/admin/setup/payment"
+            className="flex items-center gap-2 text-gray-400 hover:text-white"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Payments
+          </Link>
+          <h1 className="text-2xl font-bold text-white">
+            Edit {payment.payment_gateway.charAt(0).toUpperCase() + payment.payment_gateway.slice(1)} Configuration
+          </h1>
+        </div>
 
-      <div className="flex-1 ml-0 lg:ml-6 mt-6 lg:mt-0 mb-6 bg-[#111827] rounded-xl shadow-lg border border-white/10 p-6">
         {/* Toast Notifications */}
         {success && (
           <div className="mb-6 p-4 bg-green-500/10 border border-green-500 rounded-lg flex justify-between items-center">
@@ -157,108 +173,108 @@ export default function EditPaymentMethodPage() {
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-white">Edit Payment Method</h2>
-            <p className="text-gray-400 mt-1">
-              Update payment method details
-            </p>
-          </div>
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-gray-200 rounded-lg hover:bg-gray-700 transition-all"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back
-          </button>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-gray-800/40 border border-gray-700 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">
-              Payment Method Details
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-200 mb-2">
-                  Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  placeholder="e.g., Bank Transfer, Credit Card, etc."
-                  className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                />
+          <div className="bg-[#111827] rounded-xl shadow-lg border border-white/10 p-6">
+            {/* Gateway Info (Read-only) */}
+            <div className="mb-6 p-4 bg-gray-800 rounded-lg">
+              <label className="block text-sm font-medium text-gray-400 mb-1">
+                Payment Gateway
+              </label>
+              <div className="text-lg font-semibold text-white capitalize">
+                {payment.payment_gateway}
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-200 mb-2">
-                  Short Code <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="shortCode"
-                  value={formData.shortCode}
-                  onChange={handleChange}
-                  required
-                  placeholder="e.g., BANK_TRF, CC, etc."
-                  className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none font-mono"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Unique code for internal reference (uppercase, underscores)
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-200 mb-2">
-                  Note/Description
-                </label>
-                <textarea
-                  name="note"
-                  value={formData.note}
-                  onChange={handleChange}
-                  placeholder="Provide details about this payment method..."
-                  rows={3}
-                  className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-200 mb-2">
-                  Status
-                </label>
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Gateway type cannot be changed after creation
+              </p>
             </div>
-          </div>
 
-          <div className="flex gap-3 pt-6 border-t border-gray-700">
+            {/* Secret Key */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Secret Key <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                name="secret_key"
+                placeholder="sk_test_..."
+                value={formData.secret_key}
+                onChange={handleChange}
+                className="w-full px-3 py-2 bg-[#1F2937] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+              />
+            </div>
+
+            {/* Publishable Key */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Publishable Key <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="publishable_key"
+                placeholder="pk_test_..."
+                value={formData.publishable_key}
+                onChange={handleChange}
+                className="w-full px-3 py-2 bg-[#1F2937] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+              />
+            </div>
+
+            {/* Webhook Secret */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Webhook Secret
+              </label>
+              <input
+                type="password"
+                name="webhook_secret"
+                placeholder="whsec_..."
+                value={formData.webhook_secret}
+                onChange={handleChange}
+                className="w-full px-3 py-2 bg-[#1F2937] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                Required for webhook verification (Stripe, etc.)
+              </p>
+            </div>
+
+            {/* Active Status */}
+            <div className="flex items-center mb-6">
+              <input
+                type="checkbox"
+                name="is_active"
+                id="is_active"
+                checked={formData.is_active === 1}
+                onChange={handleChange}
+                className="w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
+              />
+              <label htmlFor="is_active" className="ml-2 text-sm text-gray-300">
+                Set as active payment gateway
+              </label>
+            </div>
+
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-3 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-all disabled:opacity-50 font-medium"
+              className="w-full flex justify-center items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-50"
             >
-              <Save className="w-5 h-5" />
-              {saving ? "Updating Payment Method..." : "Update Payment Method"}
+              <Save className="w-4 h-4" />
+              {saving ? "Updating Payment Gateway..." : "Update Payment Gateway"}
             </button>
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex items-center gap-3 px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-all font-medium"
-            >
-              Cancel
-            </button>
+          </div>
+
+          {/* Configuration Tips */}
+          <div className="p-4 bg-blue-500/10 border border-blue-500 rounded-lg">
+            <h3 className="text-sm font-medium text-blue-400 mb-2">
+              Security Notes:
+            </h3>
+            <ul className="text-xs text-blue-300 space-y-1">
+              <li>• Never share your secret keys or webhook secrets</li>
+              <li>• Use environment variables in production</li>
+              <li>• Regularly rotate your API keys</li>
+              <li>• Monitor your payment gateway logs for suspicious activity</li>
+            </ul>
           </div>
         </form>
       </div>

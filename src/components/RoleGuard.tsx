@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -12,16 +12,29 @@ interface RoleGuardProps {
 export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (loading) return; // ✅ wait for auth to finish initializing
     
     if (!isAuthenticated) {
-      router.replace("/signin/agent");
+
+      let signinRoute = "/signin"; // default
+      
+      if (pathname?.startsWith("/student")) {
+        signinRoute = "/signin/student";
+      } else if (pathname?.startsWith("/partner")) {
+        signinRoute = "/signin/agent";
+      }
+
+
+      const returnUrl = encodeURIComponent(pathname || "/");
+      router.replace(`${signinRoute}?returnUrl=${returnUrl}`);
+
     } else if (user && !allowedRoles.includes(user.role)) {
       router.replace("/unauthorized");
     }
-  }, [loading, isAuthenticated, user, allowedRoles, router]);
+  }, [loading, isAuthenticated, user, allowedRoles, router, pathname]);
 
   if (loading) {
     return (

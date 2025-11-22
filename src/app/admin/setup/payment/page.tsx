@@ -1,187 +1,241 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, Plus, Edit, Trash2, Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
-import SetupSettingsSidebar from "@/app/admin/layout/SetupSettingsSidebar";
+import { useState, useEffect } from "react";
+import { Plus, Edit, Trash2, Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import SetupSettingsSidebar from "../../layout/SetupSettingsSidebar";
 
-interface PaymentMethod {
+interface PaymentConfiguration {
   id: string;
-  name: string;
-  shortCode: string;
-  note: string;
-  status: "active" | "inactive";
+  payment_gateway: string;
+  publishable_key: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-export default function PaymentMethodsPage() {
-  const router = useRouter();
-  
-  // Static data for demonstration
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
-    {
-      id: "1",
-      name: "Bank Transfer",
-      shortCode: "BANK_TRF",
-      note: "Transfer funds directly to our bank account",
-      status: "active"
-    },
-    {
-      id: "2",
-      name: "Account Payment",
-      shortCode: "ACC_PAY",
-      note: "Payment through customer account",
-      status: "active"
-    },
-    {
-      id: "3",
-      name: "Cash Payment",
-      shortCode: "CASH",
-      note: "Pay with cash at our physical locations",
-      status: "inactive"
-    }
-  ]);
+export default function PaymentTablePage() {
+  const [payments, setPayments] = useState<PaymentConfiguration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this payment method?")) {
-      setPaymentMethods(methods => methods.filter(method => method.id !== id));
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+  const { token } = useAuth();
+
+  useEffect(() => {
+    fetchPayments();
+  }, []);
+
+  const fetchPayments = async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/tenant/settings/payment`,{
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const result = await response.json();
+        const data = result.data;
+        setPayments(Array.isArray(data) ? data : [data]);
+      } else {
+        setPayments([]);
+      }
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+      setPayments([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleStatusToggle = (id: string) => {
-    setPaymentMethods(methods =>
-      methods.map(method =>
-        method.id === id
-          ? {
-              ...method,
-              status: method.status === "active" ? "inactive" : "active"
-            }
-          : method
-      )
-    );
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this payment configuration?")) {
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      const response = await fetch(`${BASE_URL}/tenant/settings/payment/${id}`, {
+        method: "DELETE",
+        headers: {
+            
+            'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        setPayments(payments.filter(payment => payment.id !== id));
+      } else {
+        alert("Failed to delete payment configuration");
+      }
+    } catch (error) {
+      console.error("Error deleting payment:", error);
+      alert("Failed to delete payment configuration");
+    } finally {
+      setDeletingId(null);
+    }
   };
+
+  const toggleActive = async (id: string, currentStatus: boolean) => {
+    try {
+      const response = await fetch(`${BASE_URL}/tenant/settings/payment/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+            'Authorization': `Bearer ${token}`
+
+        },
+        body: JSON.stringify({
+          is_active: currentStatus ? 0 : 1,
+        }),
+      });
+
+      if (response.ok) {
+        setPayments(payments.map(payment =>
+          payment.id === id
+            ? { ...payment, is_active: !currentStatus }
+            : payment
+        ));
+      }
+    } catch (error) {
+      console.error("Error updating payment status:", error);
+    }
+  };
+
+  if (loading) {
+      return (
+        <div className="flex min-h-screen bg-[#0f172a]">
+          <SetupSettingsSidebar />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-white">
+              Loading Payment settings...
+            </div>
+          </div>
+        </div>
+      );
+    }
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#0f172a]">
-      {/* Sidebar */}
-      <SetupSettingsSidebar />
-
-      {/* Main Content */}
-      <div className="flex-1 ml-0 lg:ml-6 mt-6 lg:mt-0 mb-6 bg-[#111827] rounded-xl shadow-lg border border-white/10 p-6">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-white">Payment Methods</h2>
-            <p className="text-gray-400 mt-1">
-              Manage your payment methods and configurations
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-gray-200 rounded-lg hover:bg-gray-700 transition-all"
-            >
-              <ArrowLeft className="w-4 h-4" /> Back
-            </button>
-            <button
-              onClick={() => router.push("/admin/setup/payment/add")}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-all"
-            >
-              <Plus className="w-4 h-4" /> Add New
-            </button>
-          </div>
+          {/* Sidebar */}
+          <SetupSettingsSidebar />
+      <div className="flex-1 mt-6 ml-0 lg:ml-6 lg:mt-0 mb-6 bg-[#111827] rounded-xl shadow-lg border border-white/10 p-6">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-white">Payment Configurations</h1>
+          <Link
+            href="/admin/setup/payment/add"
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500"
+          >
+            <Plus className="w-4 h-4" />
+            Add Payment Gateway
+          </Link>
         </div>
 
-        {/* Payment Methods Table */}
-        <div className="bg-gray-800/40 border border-gray-700 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-700">
-                  <th className="text-left py-4 px-6 text-sm font-medium text-gray-300">
-                    Name
-                  </th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-gray-300">
-                    Short Code
-                  </th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-gray-300">
-                    Note
-                  </th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-gray-300">
-                    Status
-                  </th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-gray-300">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {paymentMethods.map((method) => (
-                  <tr
-                    key={method.id}
-                    className="border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors"
-                  >
-                    <td className="py-4 px-6 text-white">{method.name}</td>
-                    <td className="py-4 px-6 text-gray-300 font-mono text-sm">
-                      {method.shortCode}
-                    </td>
-                    <td className="py-4 px-6 text-gray-300 max-w-md">
-                      {method.note}
-                    </td>
-                    <td className="py-4 px-6">
-                      <button
-                        onClick={() => handleStatusToggle(method.id)}
-                        className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                          method.status === "active"
-                            ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                            : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                        }`}
-                      >
-                        {method.status === "active" ? (
-                          <Eye className="w-3 h-3" />
-                        ) : (
-                          <EyeOff className="w-3 h-3" />
-                        )}
-                        {method.status === "active" ? "Active" : "Inactive"}
-                      </button>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() =>
-                            router.push(
-                              `/admin/setup/payment/edit/${method.id}`
-                            )
-                          }
-                          className="flex items-center gap-1  p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-all"
-                        >
-                          <Edit className="w-5 h-5" />
-                          
-                        </button>
-                        <button
-                          onClick={() => handleDelete(method.id)}
-                          className="flex items-center gap-1 p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-all"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                          
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {paymentMethods.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-400">No payment methods found.</p>
-              <button
-                onClick={() => router.push("/admin/setup/payment/add")}
-                className="mt-4 flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-all mx-auto"
+        {/* Table */}
+        <div className="bg-[#111827] rounded-xl shadow-lg border border-white/10 overflow-hidden">
+          {payments.length === 0 ? (
+            <div className="p-8 text-center">
+              <div className="text-gray-400 mb-4">No payment configurations found</div>
+              <Link
+                href="/admin/setup/payment/add"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500"
               >
-                <Plus className="w-4 h-4" /> Add Your First Payment Method
-              </button>
+                <Plus className="w-4 h-4" />
+                Add Your First Payment Gateway
+              </Link>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Gateway
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Publishable Key
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Last Updated
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {payments.map((payment) => (
+                    <tr key={payment.id} className="hover:bg-white/5">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-white capitalize">
+                          {payment.payment_gateway}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-300 font-mono">
+                          {payment.publishable_key && payment.publishable_key.substring(0, 20)}...
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => toggleActive(payment.id, payment.is_active)}
+                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+                            payment.is_active
+                              ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                              : "bg-red-500/20 text-red-400 border border-red-500/30"
+                          }`}
+                        >
+                          {payment.is_active ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                          {payment.is_active ? "Active" : "Inactive"}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {new Date(payment.updated_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/admin/setup/payment/edit/${payment.id}`}
+                            className="flex items-center gap-1 px-3 py-1 bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-500/30 border border-blue-500/30"
+                          >
+                            <Edit className="w-3 h-3" />
+                            Edit
+                          </Link>
+                          {/* <button
+                            onClick={() => handleDelete(payment.id)}
+                            disabled={deletingId === payment.id}
+                            className="flex items-center gap-1 px-3 py-1 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-500/30 border border-red-500/30 disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            {deletingId === payment.id ? "Deleting..." : "Delete"}
+                          </button> */}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
+        </div>
+
+        {/* Help Text */}
+        <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500 rounded-lg">
+          <h3 className="text-sm font-medium text-blue-400 mb-2">
+            Payment Gateway Information:
+          </h3>
+          <ul className="text-xs text-blue-300 space-y-1">
+            <li>• You can have multiple payment gateway configurations</li>
+            <li>• Only one gateway can be active at a time</li>
+            <li>• Toggle active status to switch between gateways</li>
+            <li>• Keep your secret keys secure and never share them</li>
+          </ul>
         </div>
       </div>
     </div>

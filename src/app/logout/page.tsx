@@ -12,12 +12,14 @@ export default function LogoutPage() {
     const performLogout = async () => {
         const role  = user?.role;
       try {
-        await logout();
+        logout();
 
         // Optional: Add a small delay to ensure logout completes
         setTimeout(() => {
             if(role == "agent"){
                 router.push('/signin/agent');
+            }else if(role == "student"){
+                router.push('/signin/student');
             }else{
                 router.push('/signin');
             }
@@ -28,6 +30,8 @@ export default function LogoutPage() {
         // Still redirect to login even if logout fails
         if(role == "agent"){
                 router.push('/signin/agent');
+            }else if(role == "student"){
+                router.push('/signin/student');
             }else{
                 router.push('/signin');
             }

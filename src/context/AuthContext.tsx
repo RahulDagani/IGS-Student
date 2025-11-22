@@ -55,6 +55,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if(role == "agent"){
       window.location.href = '/signin/agent';
 
+      }else if(role == "student"){
+        window.location.href = '/signin/student';
       }else{
         window.location.href = '/signin';
       }

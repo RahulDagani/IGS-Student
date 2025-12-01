@@ -13,11 +13,11 @@ const routePermissions = {
 // Public routes that don't require authentication
 const publicRoutes = [
   '/signin',
-  '/register',
+  '/signup',
   '/signin/agent',
-  '/register/agent',
+  '/signup/agent',
   '/api/auth/login',
-  '/api/auth/register/agent',
+  '/api/auth/signup/agent',
   '/forgot-password',
 ];
 

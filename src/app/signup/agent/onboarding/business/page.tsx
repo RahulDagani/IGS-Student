@@ -262,7 +262,7 @@ export default function BusinessDetailsPage() {
       // Handle successful submission
       if (data.success) {
         // Redirect to dashboard or next step
-        router.push("/register/agent/pending-verification");
+        router.push("/signup/agent/pending-verification");
       } else {
         throw new Error(data.message || "Submission failed");
       }

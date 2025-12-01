@@ -178,7 +178,7 @@ export default function AgentRegisterPage() {
         if(user && token){
           login(user, token);
             // Redirect to intended page or partner dashboard
-            router.push('/register/agent/onboarding/business');
+            router.push('/signup/agent/onboarding/business');
           
         }else{  
           throw new Error(data.message || "Registration failed");

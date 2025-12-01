@@ -153,11 +153,11 @@ function AgentLoginContent() {
           login(user, token);
         
           if(status === "business_pending"){
-            router.push('/register/agent/onboarding/business');
+            router.push('/signup/agent/onboarding/business');
           }else if(status === "under_review"){
-            router.push('/register/agent/pending-verification');
+            router.push('/signup/agent/pending-verification');
           }else if(status === "verification_failed"){
-            router.push('/register/agent/verification-failed');
+            router.push('/signup/agent/verification-failed');
           }else if(status === "verified"){
             // Redirect to intended page or partner dashboard
             router.push(callbackUrl);
@@ -299,7 +299,7 @@ function AgentLoginContent() {
               <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
                 Need an agent account? {""}
                 <Link
-                  href="/register/agent"
+                  href="/signup/agent"
                   className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
                 >
                   Contact Administrator

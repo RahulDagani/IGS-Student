@@ -1,7 +1,6 @@
 // middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { AuthService } from '@/lib/auth';
 
 // Define role-based route access
 const routePermissions = {
@@ -14,11 +13,11 @@ const routePermissions = {
 // Public routes that don't require authentication
 const publicRoutes = [
   '/signin',
-  '/register',
+  '/signup',
   '/signin/agent',
-  '/register/agent',
+  '/signup/agent',
   '/api/auth/login',
-  '/api/auth/register/agent',
+  '/api/auth/signup/agent',
   '/forgot-password',
 ];
 

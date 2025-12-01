@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { SearchIcon, CalendarIcon } from "lucide-react";
 
-// Define the status types based on your Prisma schema
 type DomainRequestStatus = "PENDING" | "APPROVED" | "REJECTED" | "CONNECTED";
 
 interface DomainRequest {

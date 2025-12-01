@@ -2,10 +2,11 @@
 "use client";
 
 import { useState } from "react";
-import { LogIn, ChevronLeftIcon } from "lucide-react";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { LogIn, ChevronLeftIcon,  } from "lucide-react";
+import { useRouter, useSearchParams  } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from 'react';
+import { useAuth } from "@/context/AuthContext";
 
 interface FormData {
   email: string;
@@ -105,27 +106,29 @@ const EyeCloseIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/admin';
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; submit?: string }>({});
   const [formData, setFormData] = useState<FormData>({
     email: "",
     password: "",
     rememberMe: false,
   });
 
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
+  const { login } = useAuth();
+  
+
+   const validateForm = (): boolean => {
+    const newErrors: { email?: string; password?: string } = {};
 
     if (!formData.email.trim()) newErrors.email = "Email is required";
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email is invalid";
     
     if (!formData.password) newErrors.password = "Password is required";
-    if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -138,9 +141,10 @@ export default function LoginPage() {
     if (!validateForm()) return;
 
     setLoading(true);
+    const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch(`${BASE_URL}/tenant/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -148,18 +152,24 @@ export default function LoginPage() {
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          rememberMe: formData.rememberMe,
         }),
       });
-
+      
       const data = await response.json();
+      if (data.status == "success") {
+        const { user, token } = data.data;
+        login(user, token);
+        
+        router.push(callbackUrl);
+      }
+
 
       if (!response.ok) {
         throw new Error(data.error || "Login failed");
       }
 
-      // Redirect to admin dashboard on successful login
-      router.push("/admin");
+      // Redirect to intended page or admin dashboard
+      
     } catch (error) {
       setErrors({ submit: error instanceof Error ? error.message : "Login failed" });
     } finally {
@@ -198,7 +208,7 @@ export default function LoginPage() {
           <div>
             <div className="mb-5 sm:mb-8">
               <h1 className="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90 sm:text-3xl">
-                Sign In
+                Tenant Sign In
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Enter your email and password to sign in!
@@ -296,7 +306,7 @@ export default function LoginPage() {
               <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
                 Don&apos;t have an account? {""}
                 <Link
-                  href="/signup"
+                  href="/register"
                   className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
                 >
                   Sign Up
@@ -307,5 +317,26 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col flex-1 lg:w-1/2 w-full">
+        <div className="flex flex-col flex-1 bg-white dark:bg-gray-900">
+          <div className="w-full max-w-md sm:pt-10 mx-auto mb-5 px-4 sm:px-0">
+            <div className="inline-flex items-center text-sm text-gray-500 dark:text-gray-400">
+              Loading...
+            </div>
+          </div>
+          <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto px-4 sm:px-0">
+            <div className="text-center">Loading...</div>
+          </div>
+        </div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

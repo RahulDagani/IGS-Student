@@ -4,6 +4,7 @@ import MonthlyTarget from "@/components/ecommerce/MonthlyTarget";
 import MonthlySalesChart from "@/components/ecommerce/MonthlySalesChart";
 import Badge from "@/components/ui/badge/Badge";
 import { ArrowDownIcon, ArrowUpIcon, BoxIconLine, GroupIcon } from "@/icons";
+import { AuthService } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title:
@@ -11,7 +12,10 @@ export const metadata: Metadata = {
   description: "This is a complete solution for Agents to manage student study abroad applications.",
 };
 
-export default function Ecommerce() {
+export default async function Partner() {
+  const user = await AuthService.getCurrentUser();
+  
+  console.log('Current User (Server):', user);
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
       <div className="col-span-12 space-y-6 xl:col-span-7">

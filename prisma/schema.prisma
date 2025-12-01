@@ -88,7 +88,7 @@ model tech_tenants {
   study_levels          tech_study_levels[]
   subscription_requests tech_subscription_requests[]
   subscriptions         tech_subscriptions[]
-  tenantMembers         tech_tenant_users[]
+  tenant_members         tech_tenant_users[]
   owner                 tech_users                   @relation(fields: [ownerId], references: [id])
   plan                  tech_plans                   @relation(fields: [planId], references: [id])
   universities          tech_universities[]
@@ -1575,17 +1575,34 @@ model tech_agent_student_docs {
   @@map("tech_agent_student_docs")
 }
 
+// model apply_tenants {
+//   id           Int          @id @default(autoincrement())
+//   name         String
+//   companyName  String       @map("company_name")
+//   subdomain    String       @unique
+//   customDomain String?      @unique @map("custom_domain")
+//   email        String       @unique
+//   passwordHash String       @map("password_hash")
+//   status       TenantStatus @default(ACTIVE)
+//   createdAt    DateTime     @default(now()) @map("created_at")
+//   updatedAt    DateTime     @default(now()) @map("updated_at")
+
+//   @@map("apply_tenants")
+// }
+
 model apply_tenants {
   id           Int          @id @default(autoincrement())
+  uuid         String                      @unique @default(uuid())
   name         String
-  companyName  String       @map("company_name")
   subdomain    String       @unique
-  customDomain String?      @unique @map("custom_domain")
+  company_name  String       @map("company_name")
+  custom_domain String?      @unique @map("custom_domain")
   email        String       @unique
-  passwordHash String       @map("password_hash")
+  password_hash String       @map("password_hash")
+  plan_id                 Int?
   status       TenantStatus @default(ACTIVE)
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @default(now()) @map("updated_at")
+  created_at    DateTime     @default(now()) @map("created_at")
+  updated_at    DateTime     @default(now()) @map("updated_at")
 
   @@map("apply_tenants")
 }
@@ -1604,12 +1621,26 @@ model apply_tenant_users {
   uuid          String                             @default(uuid())
   password      String
   phone_number  String?
-  authProviders apply_tenant_user_auth_providers[]
+  
+
+
+  // Relations
+  auth_providers apply_tenant_user_auth_providers[]
   agent         apply_tenant_users?                @relation("AgentUsers", fields: [agent_id], references: [id])
-  agentStudents apply_tenant_users[]               @relation("AgentUsers")
+  agent_students apply_tenant_users[]               @relation("AgentUsers")
+  student_meta  apply_student_meta?
+  agent_meta    apply_agent_meta?
+  uploaded_docs apply_student_docs[]               @relation("StudentStudyDocs")
+  verified_docs apply_student_docs[]               @relation("VerifiedStudentDocs")
+  assigned_applications apply_student_applications[]       @relation("AssignedApplications")
+  verified_app_docs apply_student_application_docs[] @relation("VerifyStudentAppDocs")
 
   @@index([tenant_id])
   @@index([agent_id])
+  @@index([role])
+  @@index([email])
+  @@index([created_at])
+  @@map("apply_tenant_users")
 }
 
 model apply_role_fields_sections {
@@ -1674,6 +1705,446 @@ model apply_tenant_user_auth_providers {
 
   @@index([user_id])
 }
+
+model apply_agent_meta {
+  id                    Int              @id @default(autoincrement())
+  uuid                  String           @unique @default(uuid())
+  tenant_id             Int
+  user_id               Int              @unique
+  name                  String?          @db.VarChar(255)
+  business_name         String           @db.VarChar(255)
+  business_certificate  String?          @db.VarChar(255)
+  agency_logo           String?          @db.VarChar(255) @default("logo.png")
+  pan_card_upload       String?          @db.VarChar(255)
+  country               String           @db.VarChar(100)
+  street_address        String?          @db.VarChar(255)
+  city                  String?          @db.VarChar(100)
+  state                 String?          @db.VarChar(100)
+  postal_code           String?          @db.VarChar(20)
+  website_url           String?          @db.VarChar(255)
+  instagram             String?          @db.VarChar(255)
+  facebook              String?          @db.VarChar(255)
+  linkedin              String?          @db.VarChar(255)
+  twitter               String?          @db.VarChar(255)
+  other                 String?          @db.VarChar(255)
+  whatsapp_id           String?          @db.VarChar(50)
+  skype_id              String?          @db.VarChar(50)
+  ifsc_code             String?          @db.VarChar(50)
+  bank_account_number   String?          @db.VarChar(255)
+  bank_account_name     String?          @db.VarChar(50)
+  is_payment_verified   Boolean?         @default(false)
+  is_admin_verified     Boolean          @default(false)
+  created_at            DateTime         @default(now())
+  updated_at            DateTime         @updatedAt
+  is_deleted            Boolean          @default(false)
+  
+  // Relations (assuming you have an apply_tenant_users model)
+  user                  apply_tenant_users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, user_id])
+  @@index([tenant_id])
+  @@index([user_id])
+  @@index([business_name])
+  @@index([country])
+  @@index([is_payment_verified])
+  @@index([is_admin_verified])
+  @@index([created_at])
+  @@map("apply_agent_meta")
+}
+
+model apply_student_meta {
+  id                     Int                         @id @default(autoincrement())
+  uuid                   String                      @unique @default(uuid())
+  tenant_id              Int
+  user_id                Int                         @unique
+  salutation             String?                     @db.VarChar(50)
+  first_name             String                      @db.VarChar(255)
+  middle_name            String?                     @db.VarChar(255)
+  last_name              String                      @db.VarChar(255)
+  alternate_email        String?                     @unique @db.VarChar(255)
+  country_code           String?                     @db.VarChar(10)
+  alternate_phone_number String?                     @db.VarChar(20)
+  dob                    DateTime?
+  gender                 String?                     @db.VarChar(50)
+  citizenship            String?                     @db.VarChar(100)
+  address                String?                     @db.VarChar(500)
+  city                   String?                     @db.VarChar(100)
+  state                  String?                     @db.VarChar(100)
+  country                String?                     @db.VarChar(100)
+  zip_code               String?                     @db.VarChar(20)
+  emergency_c_name       String?                     @db.VarChar(255)
+  emergency_c_relation   String?                     @db.VarChar(100)
+  emergency_c_email      String?                     @db.VarChar(255)
+  emergency_c_phone      String?                     @db.VarChar(20)
+  profile                String?                     @db.VarChar(500)
+  created_at             DateTime                    @default(now())
+  updated_at             DateTime                    @updatedAt
+  is_deleted             Boolean                     @default(false)
+  
+  // Relations
+  user                   apply_tenant_users          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  interests              apply_student_interests[]
+  applications           apply_student_applications[]
+
+  @@unique([tenant_id, user_id])
+  @@index([tenant_id])
+  @@index([user_id])
+  @@index([alternate_email])
+  @@index([alternate_phone_number])
+  @@index([citizenship])
+  @@index([country])
+  @@index([created_at])
+  @@map("apply_student_meta")
+}
+
+model apply_student_interests {
+  id                Int               @id @default(autoincrement())
+  uuid              String            @unique @default(uuid())
+  tenant_id         Int
+  student_id        Int
+  preferred_country String?           @db.VarChar(100)
+  level_of_study    String?           @db.VarChar(100)
+  discipline        String?           @db.VarChar(100)
+  sat_score         Int?
+  act_score         Int?
+  toefl_score       Int?
+  pte_score         Int?
+  duolingo_score    Int?
+  ielts_score       Float?
+  created_at        DateTime          @default(now())
+  updated_at        DateTime          @updatedAt
+  is_deleted        Boolean           @default(false)
+  
+  // Relations
+  student           apply_student_meta @relation(fields: [student_id], references: [user_id], onDelete: Cascade)
+
+  @@unique([tenant_id, student_id])
+  @@index([tenant_id])
+  @@index([student_id])
+  @@index([preferred_country])
+  @@index([level_of_study])
+  @@index([discipline])
+  @@index([created_at])
+  @@map("apply_student_interests")
+}
+
+model apply_applications_status {
+  id                         Int                         @id @default(autoincrement())
+  uuid                       String                      @unique @default(uuid())
+  status                     String                      @unique @db.VarChar(100)
+  created_at                 DateTime                    @default(now())
+  updated_at                 DateTime                    @updatedAt
+  is_deleted                 Boolean                     @default(false)
+  
+  // Relations
+  applications               apply_student_applications[]
+
+  @@index([status])
+  @@index([created_at])
+  @@map("apply_applications_status")
+}
+
+model apply_student_applications {
+  id                          Int                             @id @default(autoincrement())
+  uuid                        String                          @unique @default(uuid())
+  tenant_id                   Int
+  student_id                  Int
+  course_id                   Int
+  portal_student_id           String?                         @db.VarChar(20)
+  application_login           String?                         @db.VarChar(255)
+  application_password        String?                         @db.VarChar(255)
+  university_slug             String                          @db.VarChar(255)
+  level_slug                  String                          @db.VarChar(255)
+  discipline_slug             String                          @db.VarChar(255)
+  course_slug                 String                          @db.VarChar(255)
+  intake_slug                 String                          @db.VarChar(255)
+  year                        String                          @db.VarChar(255)
+  applied_date                String                          @db.VarChar(255)
+  status_id                   Int?
+  application_status_id       Int                             @default(1)
+  fee_status                  FeeStatus?
+  assigned_to                 Int
+  sender_id                   Int?
+  notification                Int?
+  front_notification          Int?
+  high_school_file            String?                         @db.VarChar(255)
+  higher_education_file       String?                         @db.VarChar(255)
+  degree_certificate          String?                         @db.VarChar(255)
+  passport_file               String?                         @db.VarChar(255)
+  gre_gmat_file               String?                         @db.VarChar(255)
+  act_sat_file                String?                         @db.VarChar(255)
+  english_language_score_file String?                         @db.VarChar(255)
+  resume_file                 String?                         @db.VarChar(255)
+  sop_file                    String?                         @db.VarChar(255)
+  lor_file                    String?                         @db.VarChar(255)
+  financial_file              String?                         @db.VarChar(255)
+  additional_file             String?                         @db.VarChar(255)
+  created_at                  DateTime                        @default(now())
+  updated_at                  DateTime                        @updatedAt
+  is_deleted                  Boolean                         @default(false)
+  
+  // Relations
+  required_docs               apply_student_app_required_docs[]
+  uploaded_docs               apply_student_application_docs[]
+  application_status          apply_applications_status        @relation(fields: [application_status_id], references: [id])
+  assigned_to_user            apply_tenant_users              @relation("AssignedApplications", fields: [assigned_to], references: [id])
+  // course                      tech_university_courses         @relation(fields: [course_id], references: [id])
+  student                     apply_student_meta              @relation(fields: [student_id], references: [user_id], onDelete: Cascade)
+  status_tracking             apply_track_app_status?
+
+  @@index([tenant_id])
+  @@index([student_id])
+  @@index([course_id])
+  @@index([status_id])
+  @@index([university_slug])
+  @@index([course_slug])
+  @@index([application_status_id])
+  @@index([fee_status])
+  @@index([assigned_to])
+  @@index([created_at])
+  @@map("apply_student_applications")
+}
+
+model apply_track_app_status {
+  id                                  Int                         @id @default(autoincrement())
+  uuid                                String                      @unique @default(uuid())
+  tenant_id                           Int
+  user_id                             Int
+  student_id                          Int
+  application_id                      Int                         @unique
+  applied                             DateTime?
+  received                            DateTime?
+  incomplete_application              DateTime?
+  documents_pending                   DateTime?
+  application_complete                DateTime?
+  application_submitted_to_university DateTime?
+  fully_admitted                      DateTime?
+  conditionally_admitted              DateTime?
+  denied                              DateTime?
+  i20_issued                          DateTime?
+  i20_received                        DateTime?
+  visa_appointment                    DateTime?
+  visa_approved                       DateTime?
+  visa_denied                         DateTime?
+  deferred_admission                  DateTime?
+  arrived_on_campus                   DateTime?
+  application_withdrawn               DateTime?
+  created_at                          DateTime                    @default(now())
+  updated_at                          DateTime                    @updatedAt
+  is_deleted                          Boolean                     @default(false)
+  
+  // Relations
+  application                         apply_student_applications @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  // user                                apply_tenant_users         @relation(fields: [user_id], references: [id])
+
+  @@unique([tenant_id, application_id])
+  @@index([tenant_id])
+  @@index([user_id])
+  @@index([student_id])
+  @@index([application_id])
+  @@index([created_at])
+  @@map("apply_track_app_status")
+}
+
+model apply_student_required_docs {
+  id                Int                 @id @default(autoincrement())
+  uuid              String              @unique @default(uuid())
+  tenant_id         Int
+  study_level       String              @db.VarChar(255)
+  label             String              @db.VarChar(255)
+  document_key      String              @db.VarChar(255)
+  required          Boolean             @default(true)
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @updatedAt
+  is_deleted        Boolean             @default(false)
+  
+  // Relations
+  student_documents apply_student_docs[]
+
+  @@unique([tenant_id, study_level, document_key])
+  @@index([tenant_id])
+  @@index([study_level])
+  @@index([document_key])
+  @@index([required])
+  @@index([created_at])
+  @@map("apply_student_required_docs")
+}
+
+model apply_student_app_required_docs {
+  id                 Int                             @id @default(autoincrement())
+  uuid               String                          @unique @default(uuid())
+  tenant_id          Int
+  application_id     Int
+  label              String                          @db.VarChar(255)
+  document_key       String                          @db.VarChar(255)
+  link               String?
+  required           Boolean                         @default(true)
+  created_at         DateTime                        @default(now())
+  updated_at         DateTime                        @updatedAt
+  is_deleted         Boolean                         @default(false)
+  
+  // Relations
+  application        apply_student_applications      @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  uploaded_documents apply_student_application_docs[]
+
+  @@unique([tenant_id, application_id, document_key])
+  @@index([tenant_id])
+  @@index([application_id])
+  @@index([document_key])
+  @@index([required])
+  @@index([created_at])
+  @@map("apply_student_app_required_docs")
+}
+
+model apply_student_application_docs {
+  id               Int                            @id @default(autoincrement())
+  uuid             String                         @unique @default(uuid())
+  tenant_id        Int
+  application_id   Int
+  student_id          Int
+  document_type_id Int
+  file_path        String                         @db.VarChar(255)
+  uploaded_at      DateTime                       @default(now())
+  status           DocStatus                      @default(Pending)
+  verified_by      Int?
+  verified_at      DateTime?
+  created_at       DateTime                       @default(now())
+  updated_at       DateTime                       @updatedAt
+  is_deleted       Boolean                        @default(false)
+  
+  // Relations
+  application      apply_student_applications     @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  document_type    apply_student_app_required_docs @relation(fields: [document_type_id], references: [id])
+  // user             apply_tenant_users             @relation("StudentApplicationDocs", fields: [student_id], references: [id])
+  verified_by_user apply_tenant_users?            @relation("VerifyStudentAppDocs", fields: [verified_by], references: [id])
+
+  @@unique([tenant_id, application_id, document_type_id])
+  @@index([tenant_id])
+  @@index([application_id])
+  @@index([student_id])
+  @@index([document_type_id])
+  @@index([status])
+  @@index([verified_by])
+  @@index([uploaded_at])
+  @@index([created_at])
+  @@map("apply_student_application_docs")
+}
+
+model apply_student_docs {
+  id               Int                        @id @default(autoincrement())
+  uuid             String                     @unique @default(uuid())
+  tenant_id        Int
+  student_id          Int
+  document_type_id Int
+  file_path        String                     @db.VarChar(255)
+  uploaded_at      DateTime                   @default(now())
+  status           DocStatus                  @default(Pending)
+  verified_by      Int?
+  verified_at      DateTime?
+  created_at       DateTime                   @default(now())
+  updated_at       DateTime                   @updatedAt
+  is_deleted       Boolean                    @default(false)
+  
+  // Relations
+  document_type    apply_student_required_docs @relation(fields: [document_type_id], references: [id])
+  user             apply_tenant_users         @relation("StudentStudyDocs", fields: [student_id], references: [id])
+  verified_by_user apply_tenant_users?        @relation("VerifiedStudentDocs", fields: [verified_by], references: [id])
+
+  @@unique([tenant_id, student_id, document_type_id])
+  @@index([tenant_id])
+  @@index([student_id])
+  @@index([document_type_id])
+  @@index([status])
+  @@index([verified_by])
+  @@index([uploaded_at])
+  @@index([created_at])
+  @@map("apply_student_docs")
+}
+
+// model apply_tenant_users {
+//   id            Int                                @id @default(autoincrement())
+//   tenant_id     Int
+//   name          String
+//   email         String                             @unique
+//   role          String
+//   is_verified   Boolean                            @default(false)
+//   created_at    DateTime                           @default(now())
+//   updated_at    DateTime                           @updatedAt
+//   agent_id      Int?
+//   is_allowed    Boolean                            @default(true)
+//   uuid          String                             @default(uuid())
+//   password      String
+//   phone_number  String?
+//   authProviders apply_tenant_user_auth_providers[]
+//   agent         apply_tenant_users?                @relation("AgentUsers", fields: [agent_id], references: [id])
+//   agentStudents apply_tenant_users[]               @relation("AgentUsers")
+
+//   @@index([tenant_id])
+//   @@index([agent_id])
+// }
+
+// model apply_role_fields_sections {
+//   id        String   @id @default(uuid())
+//   tenant_id String   @default("1")
+//   name      String
+//   role      String   // agent, student, etc.
+//   order     Int?
+//   created_at DateTime @default(now())
+//   updated_at DateTime @updatedAt
+
+//   fields apply_role_field_definitions[]
+
+//   @@map("apply_role_fields_sections")
+// }
+
+// model apply_role_field_definitions {
+//   id          String   @id @default(uuid())
+//   tenant_id   String   @default("1")
+//   section_id  String
+//   role        String   // agent, student, etc.
+//   field_name  String
+//   field_label String
+//   field_type  String   // text, email, select, number, date, etc.
+//   is_required Boolean  @default(false)
+//   order       Int?
+//   options     Json?    // For select fields
+//   created_at  DateTime @default(now())
+//   updated_at  DateTime @updatedAt
+
+//   section apply_role_fields_sections @relation(fields: [section_id], references: [id], onDelete: Cascade)
+//   field_values apply_user_field_values[]
+
+//   @@map("apply_role_field_definitions")
+// }
+
+// model apply_user_field_values {
+//   id         String   @id @default(uuid())
+//   user_id    String
+//   tenant_id  String   @default("1")
+//   field_id   String
+//   field_value String?
+//   created_at DateTime @default(now())
+//   updated_at DateTime @updatedAt
+
+//   field_definition apply_role_field_definitions @relation(fields: [field_id], references: [id], onDelete: Cascade)
+
+//   @@map("apply_user_field_values")
+// }
+
+// model apply_tenant_user_auth_providers {
+//   id               Int                @id @default(autoincrement())
+//   user_id          Int
+//   provider         String
+//   provider_user_id String?
+//   email            String?
+//   password_hash    String?
+//   access_token     String?
+//   created_at       DateTime           @default(now())
+//   updated_at       DateTime           @updatedAt
+//   user             apply_tenant_users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+//   @@index([user_id])
+// }
 
 enum TenantStatus {
   ACTIVE

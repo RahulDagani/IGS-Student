@@ -6,11 +6,16 @@ import AppSidebar from "./AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import React from "react";
 
-export default function AdminLayout({
-  children,
-}: {
+import { SessionPayload } from '@/lib/auth';
+
+import RoleGuard from "@/components/RoleGuard";
+
+interface PartnerLayoutProps {
   children: React.ReactNode;
-}) {
+  user?: SessionPayload;
+}
+
+function PartnerLayout({ children, user }: PartnerLayoutProps) {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
 
   // Dynamic class for main content margin based on sidebar state
@@ -21,6 +26,7 @@ export default function AdminLayout({
     : "lg:ml-[90px]";
 
   return (
+    <RoleGuard allowedRoles={["agent"]}>
     <div className="min-h-screen xl:flex">
       {/* Sidebar and Backdrop */}
       <AppSidebar />
@@ -35,5 +41,10 @@ export default function AdminLayout({
         <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">{children}</div>
       </div>
     </div>
+    </RoleGuard>
   );
 }
+
+
+export default PartnerLayout;
+// export default PartnerLayout;

@@ -2,10 +2,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET() {
+// Define proper types for the where clause
+interface WhereClause {
+  tenant_id: string;
+  role?: string;
+}
+
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const role = searchParams.get('role');
+    
+    const whereClause: WhereClause = { tenant_id: '1' };
+    if (role) {
+      whereClause.role = role;
+    }
+
     const sections = await prisma.apply_role_fields_sections.findMany({
-      where: { tenant_id: '1' },
+      where: whereClause,
       include: {
         fields: {
           orderBy: { order: 'asc' }
@@ -16,6 +30,7 @@ export async function GET() {
 
     return NextResponse.json(sections);
   } catch (error) {
+    console.error('Error fetching sections:', error);
     return NextResponse.json(
       { error: 'Failed to fetch sections' },
       { status: 500 }
@@ -23,9 +38,16 @@ export async function GET() {
   }
 }
 
+// Define proper type for the request body
+interface PostRequestBody {
+  name: string;
+  role: string;
+  order?: number;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json() as PostRequestBody;
     const { name, role, order } = body;
 
     const section = await prisma.apply_role_fields_sections.create({

@@ -1,4 +1,4 @@
-// app/admin/forms/page.tsx
+// app/admin/setup/page.tsx
 "use client"
 import React, { useState, useMemo, useEffect } from "react";
 import {
@@ -170,14 +170,14 @@ export default function FormsManagement() {
         </div>
 
         <div className="flex gap-3">
-          <Link href="/admin/forms/sections/add" className="shrink-0">
+          <Link href="/admin/setup/sections/add" className="shrink-0">
             <button className="h-11 px-4 rounded-lg border-2 border-green-500 bg-transparent text-sm text-green-500 shadow-theme-xs hover:bg-green-50 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-green-500 dark:text-green-500 dark:hover:bg-green-500/10 dark:focus:border-brand-800 flex items-center gap-2">
               <Plus size={16} />
               Add Section
             </button>
           </Link>
           
-          <Link href="/admin/forms/fields/add" className="shrink-0">
+          <Link href="/admin/setup/fields/add" className="shrink-0">
             <button className="h-11 px-4 rounded-lg border-2 border-brand-500 bg-transparent text-sm text-brand-500 shadow-theme-xs hover:bg-brand-50 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-brand-500 dark:text-brand-500 dark:hover:bg-brand-500/10 dark:focus:border-brand-800 flex items-center gap-2">
               <Plus size={16} />
               Add Field
@@ -224,7 +224,7 @@ export default function FormsManagement() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Link href={`/admin/forms/sections/${section.id}/edit`}>
+                  <Link href={`/admin/setup/sections/${section.id}/edit`}>
                     <button className="p-2 text-gray-500 hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400">
                       <Edit size={16} />
                     </button>
@@ -296,7 +296,7 @@ export default function FormsManagement() {
                           </TableCell>
                           <TableCell className="px-5 py-4 text-start">
                             <div className="flex items-center gap-2">
-                              <Link href={`/admin/forms/fields/${field.id}/edit`}>
+                              <Link href={`/admin/setup/fields/${field.id}/edit`}>
                                 <button className="p-1 text-gray-500 hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400">
                                   <Edit size={14} />
                                 </button>
@@ -328,7 +328,7 @@ export default function FormsManagement() {
             <p className="text-gray-500 dark:text-gray-400 mb-6">
               Get started by creating your first form section.
             </p>
-            <Link href="/admin/forms/sections/add">
+            <Link href="/admin/setup/sections/add">
               <button className="h-11 px-4 rounded-lg border-2 border-green-500 bg-transparent text-sm text-green-500 shadow-theme-xs hover:bg-green-50 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-green-500 dark:text-green-500 dark:hover:bg-green-500/10 dark:focus:border-brand-800 flex items-center gap-2 mx-auto">
                 <Plus size={16} />
                 Add Your First Section

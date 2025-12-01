@@ -1,4 +1,4 @@
-// app/admin/forms/fields/add/page.tsx
+// app/admin/setup/fields/add/page.tsx
 "use client"
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -147,7 +147,7 @@ export default function AddField() {
       });
 
       if (response.ok) {
-        router.push('/admin/forms');
+        router.push('/admin/setup/fields');
         router.refresh();
       } else {
         const error = await response.json();
@@ -173,7 +173,7 @@ export default function AddField() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/admin/forms">
+        <Link href="/admin/setup/fields">
           <button className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
             <ArrowLeft size={20} />
           </button>
@@ -390,7 +390,7 @@ export default function AddField() {
 
             {/* Submit Buttons */}
             <div className="flex gap-3 pt-6">
-              <Link href="/admin/forms" className="flex-1">
+              <Link href="/admin/setup/fields" className="flex-1">
                 <button
                   type="button"
                   className="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"

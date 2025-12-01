@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { LogIn, ChevronLeftIcon, Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams  } from "next/navigation";
 import Link from "next/link";
+
+import { Suspense } from 'react';
+import { useAuth } from "@/context/AuthContext";
 
 interface FormData {
   email: string;
@@ -87,11 +90,14 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   </label>
 );
 
-export default function AgentLoginPage() {
+function AgentLoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/partner';
+  
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; submit?: string }>({});
   const [formData, setFormData] = useState<FormData>({
     email: "",
     password: "",
@@ -113,6 +119,8 @@ export default function AgentLoginPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const { login } = useAuth();
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
@@ -120,9 +128,11 @@ export default function AgentLoginPage() {
     if (!validateForm()) return;
 
     setLoading(true);
+    const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+
 
     try {
-      const response = await fetch("/api/auth/login/agent", {
+      const response = await fetch(`${BASE_URL}/agent/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -130,18 +140,39 @@ export default function AgentLoginPage() {
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          rememberMe: formData.rememberMe,
         }),
       });
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Login failed");
+      if (data.success) {
+        const { user, token } = data.data;
+       
+        const {status} = data;
+        if(user && token){
+          login(user, token);
+        
+          if(status === "business_pending"){
+            router.push('/register/agent/onboarding/business');
+          }else if(status === "under_review"){
+            router.push('/register/agent/pending-verification');
+          }else if(status === "verification_failed"){
+            router.push('/register/agent/verification-failed');
+          }else if(status === "verified"){
+            // Redirect to intended page or partner dashboard
+            router.push(callbackUrl);
+          }
+        }else{
+          throw new Error(data.message || "Login failed");
+        }
+        
+      }else{
+        throw new Error(data.message || "Login failed");
       }
 
-      // Redirect to agent dashboard on successful login
-      router.push("/partner");
+      
+      
+      
     } catch (error) {
       setErrors({ submit: error instanceof Error ? error.message : "Login failed" });
     } finally {
@@ -166,15 +197,7 @@ export default function AgentLoginPage() {
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
       {/* Left Side - Form Content */}
       <div className="flex flex-col flex-1 bg-white dark:bg-gray-900">
-        <div className="w-full max-w-md sm:pt-10 mx-auto mb-5 px-4 sm:px-0">
-          <Link
-            href="/"
-            className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-          >
-            <ChevronLeftIcon className="w-4 h-4 mr-1" />
-            Back to home
-          </Link>
-        </div>
+        
 
         <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto px-4 sm:px-0">
           <div>
@@ -241,7 +264,7 @@ export default function AgentLoginPage() {
                     </span>
                   </div>
                   <Link
-                    href="/agent-forgot-password"
+                    href="/signin/agent/forgot-password"
                     className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400"
                   >
                     Forgot password?
@@ -270,23 +293,13 @@ export default function AgentLoginPage() {
               </div>
             </form>
 
-            <div className="mt-5">
-              <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
-                Not an agent? {""}
-                <Link
-                  href="/login"
-                  className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
-                >
-                  User Login
-                </Link>
-              </p>
-            </div>
+          
 
             <div className="mt-3">
               <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
                 Need an agent account? {""}
                 <Link
-                  href="/agent-register"
+                  href="/register/agent"
                   className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
                 >
                   Contact Administrator
@@ -299,3 +312,20 @@ export default function AgentLoginPage() {
     </div>
   );
 }
+
+export default function AgentLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col flex-1 lg:w-1/2 w-full">
+        <div className="flex flex-col flex-1 bg-white dark:bg-gray-900">
+          <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto px-4 sm:px-0">
+            <div className="text-center">Loading...</div>
+          </div>
+        </div>
+      </div>
+    }>
+      <AgentLoginContent />
+    </Suspense>
+  );
+}
+

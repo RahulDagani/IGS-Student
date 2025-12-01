@@ -18,31 +18,18 @@ export default function StepsGrid() {
     {
       id: 1,
       title: "Step 1",
-      desc: "Select a course",
-      icon: <GraduationCap className="text-indigo-500 w-6 h-6" />,
-      href: `/student/programs`,
-    },
-    {
-      id: 2,
-      title: "Step 2",
       desc: "Fill in application form",
       icon: <FileText className="text-indigo-500 w-6 h-6" />,
       href: `/student/apply/application-form`,
     },
     {
-      id: 3,
-      title: "Step 3",
-      desc: "Document list",
+      id: 2,
+      title: "Step 2",
+      desc: "Apply",
       icon: <Files className="text-indigo-500 w-6 h-6" />,
-      href: `/student/apply/documents`,
+      href: `/student/apply/programs`,
     },
-    {
-      id: 4,
-      title: "Step 4",
-      desc: "Track application progress",
-      icon: <MapPin className="text-indigo-500 w-6 h-6" />,
-      href: `/student/applications`,
-    },
+    
   ];
 
   return (

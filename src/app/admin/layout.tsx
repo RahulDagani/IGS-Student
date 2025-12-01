@@ -5,12 +5,18 @@ import AppHeader from "./layout/AppHeader";
 import AppSidebar from "./layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import React from "react";
+import { SessionPayload } from '@/lib/auth';
+import RoleGuard from "@/components/RoleGuard";
 
-export default function AdminLayout({
-  children,
-}: {
+
+// Define the props interface for the layout
+interface AdminLayoutProps {
   children: React.ReactNode;
-}) {
+  user?: SessionPayload;
+}
+
+
+function AdminLayout({ children, user }: AdminLayoutProps) {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
 
   // Dynamic class for main content margin based on sidebar state
@@ -21,6 +27,8 @@ export default function AdminLayout({
     : "lg:ml-[90px]";
 
   return (
+        <RoleGuard allowedRoles={["tenant"]}>
+    
     <div className="min-h-screen xl:flex">
       {/* Sidebar and Backdrop */}
       <AppSidebar />
@@ -35,5 +43,9 @@ export default function AdminLayout({
         <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">{children}</div>
       </div>
     </div>
+        </RoleGuard>
+    
   );
 }
+
+export default AdminLayout;

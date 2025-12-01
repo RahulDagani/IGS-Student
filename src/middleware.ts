@@ -1,7 +1,6 @@
 // middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { AuthService } from '@/lib/auth';
 
 // Define role-based route access
 const routePermissions = {

@@ -27,11 +27,11 @@ const sidebarItems: SidebarItem[] = [
         href: "/admin/setup/mail-configuration",
         icon: Mail,
     },
-    {
-        name: "SMS Configurations",
-        href: "/admin/setup/sms-configuration",
-        icon: MessageSquare,
-    },
+    // {
+    //     name: "SMS Configurations",
+    //     href: "/admin/setup/sms-configuration",
+    //     icon: MessageSquare,
+    // },
     {
         name: "Currency Settings",
         href: "/admin/setup/currency",

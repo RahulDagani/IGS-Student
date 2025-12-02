@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -8,113 +8,129 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Badge from "@/components/ui/badge/Badge";
+import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 
-interface Agent {
+interface WalletTransaction {
   id: number;
-  name: string;
-  email: string;
-  businessName: string;
-  phoneNumber: string;
-  verified: boolean;
-  status: "active" | "inactive";
-  createdAt: string;
+  tenant_id: number;
+  user_id: number;
+  wallet_id: number;
+  type: "credit" | "debit";
+  amount: string;
+  transaction_ref: string;
+  gateway: string;
+  gateway_transaction_id: string | null;
+  status: "pending" | "completed" | "failed";
+  description: string;
+  created_at: string;
 }
 
-// Define the table data using the interface
-const tableData: Agent[] = [
-  {
-    id: 1,
-    name: "John Smith",
-    email: "john.smith@example.com",
-    businessName: "Global Education Consultants",
-    phoneNumber: "+1 (555) 123-4567",
-    verified: true,
-    status: "active",
-    createdAt: "2024-01-15",
-  },
-  {
-    id: 2,
-    name: "Sarah Johnson",
-    email: "sarah.j@example.com",
-    businessName: "Study Abroad Experts",
-    phoneNumber: "+1 (555) 234-5678",
-    verified: true,
-    status: "active",
-    createdAt: "2024-02-20",
-  },
-  {
-    id: 3,
-    name: "Mike Chen",
-    email: "mike.chen@example.com",
-    businessName: "Future Pathways Agency",
-    phoneNumber: "+1 (555) 345-6789",
-    verified: false,
-    status: "inactive",
-    createdAt: "2024-03-10",
-  },
-  {
-    id: 4,
-    name: "Emily Davis",
-    email: "emily.davis@example.com",
-    businessName: "International Student Hub",
-    phoneNumber: "+1 (555) 456-7890",
-    verified: true,
-    status: "active",
-    createdAt: "2024-01-28",
-  },
-  {
-    id: 5,
-    name: "Robert Wilson",
-    email: "r.wilson@example.com",
-    businessName: "Education Bridge Consultants",
-    phoneNumber: "+1 (555) 567-8901",
-    verified: false,
-    status: "inactive",
-    createdAt: "2024-04-05",
-  },
-];
+interface PendingPayment {
+  id: number;
+  tenant_id: number;
+  user_id: number;
+  application_id: string;
+  application_fee: string;
+  fee_status: string;
+  created_at: string;
+  updated_at: string;
+  student_email: string;
+  course_name: string;
+  university_name: string;
+  country_code: string;
+  tuition_fee: string;
+  currency_code: string;
+  duration_min: number;
+  duration_max: number;
+  duration_unit: string;
+}
 
-type SortField = keyof Agent | "";
+interface WalletBalance {
+  balance: string | number;
+  currency: string;
+  wallet?: {
+    id: number;
+    tenant_id: number;
+    user_id: number;
+    balance: string;
+    currency: string;
+    created_at: string;
+    updated_at: string;
+    email: string;
+  };
+  recentTransactions?: WalletTransaction[];
+}
+
+interface Agent {
+  user_id: number;
+  email: string;
+  phone: string | null;
+  name: string;
+  business_name: string | null;
+  is_agent_verified: number;
+  is_payment_verified: number;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+}
+
+interface TransactionsResponse {
+  transactions: WalletTransaction[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+  };
+}
+
+interface PendingPaymentsResponse {
+  pendingPayments: PendingPayment[];
+  totalAmount: number;
+}
+
+interface AgentsResponse {
+  data: Agent[];
+}
+
+type SortField = keyof WalletTransaction | "";
 type SortDirection = "asc" | "desc";
 
 interface FilterOptions {
+  transactionType: string;
+  referenceType: string;
   status: string;
-  verified: string;
-  businessName: string;
 }
 
 interface FilterModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApply: (filters: FilterOptions) => void;
-  businessNames: string[];
 }
 
 const FilterModal: React.FC<FilterModalProps> = ({
   isOpen,
   onClose,
   onApply,
-  businessNames,
 }) => {
+  const [selectedTransactionType, setSelectedTransactionType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [selectedVerified, setSelectedVerified] = useState<string>("all");
-  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("all");
 
   const handleApply = () => {
     const filters: FilterOptions = {
+      transactionType: selectedTransactionType,
+      referenceType: "all",
       status: selectedStatus,
-      verified: selectedVerified,
-      businessName: selectedBusinessName,
     };
     onApply(filters);
     onClose();
   };
 
   const handleReset = () => {
+    setSelectedTransactionType("all");
     setSelectedStatus("all");
-    setSelectedVerified("all");
-    setSelectedBusinessName("all");
   };
 
   if (!isOpen) return null;
@@ -124,7 +140,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
       <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Filter Agents
+            Filter Transactions
           </h3>
           <button
             onClick={onClose}
@@ -137,7 +153,21 @@ const FilterModal: React.FC<FilterModalProps> = ({
         </div>
 
         <div className="space-y-4">
-          {/* Status Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Transaction Type
+            </label>
+            <select
+              value={selectedTransactionType}
+              onChange={(e) => setSelectedTransactionType(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            >
+              <option value="all">All Types</option>
+              <option value="credit">Credit</option>
+              <option value="debit">Debit</option>
+            </select>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Status
@@ -148,43 +178,9 @@ const FilterModal: React.FC<FilterModalProps> = ({
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
               <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-
-          {/* Verified Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Verification Status
-            </label>
-            <select
-              value={selectedVerified}
-              onChange={(e) => setSelectedVerified(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="all">All Verification</option>
-              <option value="verified">Verified</option>
-              <option value="not-verified">Not Verified</option>
-            </select>
-          </div>
-
-          {/* Business Name Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Business Name
-            </label>
-            <select
-              value={selectedBusinessName}
-              onChange={(e) => setSelectedBusinessName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="all">All Business Names</option>
-              {businessNames.map((businessName) => (
-                <option key={businessName} value={businessName}>
-                  {businessName}
-                </option>
-              ))}
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
             </select>
           </div>
         </div>
@@ -208,38 +204,197 @@ const FilterModal: React.FC<FilterModalProps> = ({
   );
 };
 
-export default function AgentsWalletTable() {
+export default function AgentWalletHistoryTable() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortField, setSortField] = useState<SortField>("");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
   const [filters, setFilters] = useState<FilterOptions>({
+    transactionType: "all",
+    referenceType: "all",
     status: "all",
-    verified: "all",
-    businessName: "all",
   });
+  const [selectedAgent, setSelectedAgent] = useState<number | null>(null);
+  const [agents, setAgents] = useState<Agent[]>([]);
 
-  // Get unique values for filters
-  const businessNames = useMemo(() => {
-    return Array.from(new Set(tableData.map(agent => agent.businessName)));
+  // API states
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [walletBalance, setWalletBalance] = useState<WalletBalance | null>(null);
+  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+  const { token } = useAuth();
+
+  // Fetch agents and data on component mount
+  useEffect(() => {
+    fetchAgents();
+    fetchData(); // Fetch all data initially
   }, []);
+
+  // Fetch data when agent selection changes
+  useEffect(() => {
+    fetchData(selectedAgent || undefined);
+  }, [selectedAgent]);
+
+  const fetchAgents = async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/tenant/agent/list`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result: ApiResponse<Agent[]> = await response.json();
+      
+      if (result.success) {
+        setAgents(result.data);
+      } else {
+        throw new Error("Failed to fetch agents");
+      }
+    } catch (err) {
+      setError("Failed to fetch agents");
+      console.error("Error fetching agents:", err);
+    }
+  };
+
+  const fetchData = async (agentId?: number) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await Promise.all([
+        fetchTransactions(agentId),
+        fetchWalletBalance(agentId),
+        fetchPendingPayments(agentId),
+      ]);
+    } catch (err) {
+      setError("Failed to fetch data");
+      console.error("Error fetching data:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchTransactions = async (agentId?: number) => {
+    try {
+      const url = agentId 
+        ? `${BASE_URL}/tenant/agent/wallet/transactions/${agentId}`
+        : `${BASE_URL}/tenant/agent/wallet/transactions`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result: ApiResponse<TransactionsResponse> = await response.json();
+      
+      if (result.success) {
+        setTransactions(result.data.transactions || []);
+      } else {
+        throw new Error("Failed to fetch transactions");
+      }
+    } catch (err) {
+      console.error("Error fetching transactions:", err);
+      setTransactions([]); // Set empty array on error
+    }
+  };
+
+  const fetchWalletBalance = async (agentId?: number) => {
+    try {
+      const url = agentId 
+        ? `${BASE_URL}/tenant/agent/wallet/balance/${agentId}`
+        : `${BASE_URL}/tenant/agent/wallet/balance`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        const balance = result.data.wallet?.balance || result.data.balance;
+        const numericBalance = typeof balance === 'string' ? parseFloat(balance) : balance;
+        
+        if (!isNaN(numericBalance)) {
+          setWalletBalance({
+            ...result.data,
+            balance: numericBalance
+          });
+        } else {
+          setWalletBalance({
+            balance: 0,
+            currency: 'USD'
+          });
+        }
+      } else {
+        // Set default balance when no data
+        setWalletBalance({
+          balance: 0,
+          currency: 'USD'
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching wallet balance:", err);
+      setWalletBalance({
+        balance: 0,
+        currency: 'USD'
+      });
+    }
+  };
+
+  const fetchPendingPayments = async (agentId?: number) => {
+    try {
+      const url = agentId 
+        ? `${BASE_URL}/tenant/agent/applications/pending/${agentId}`
+        : `${BASE_URL}/tenant/agent/applications/pending`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result: ApiResponse<PendingPaymentsResponse> = await response.json();
+      
+      if (result.success) {
+        setPendingPayments(result.data.pendingPayments || []);
+      } else {
+        throw new Error("Failed to fetch pending payments");
+      }
+    } catch (err) {
+      console.error("Error fetching pending payments:", err);
+      setPendingPayments([]); // Set empty array on error
+    }
+  };
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
-    const filtered = tableData.filter((agent) => {
+    if (!transactions || transactions.length === 0) return [];
+
+    const filtered = transactions.filter((transaction) => {
       const matchesSearch = 
-        agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        agent.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        agent.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        agent.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase());
+        transaction.transaction_ref.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        transaction.gateway.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesStatus = filters.status === "all" || agent.status === filters.status;
-      const matchesVerified = filters.verified === "all" || 
-        (filters.verified === "verified" && agent.verified) ||
-        (filters.verified === "not-verified" && !agent.verified);
-      const matchesBusinessName = filters.businessName === "all" || agent.businessName === filters.businessName;
+      const matchesTransactionType = filters.transactionType === "all" || transaction.type === filters.transactionType;
+      const matchesStatus = filters.status === "all" || transaction.status === filters.status;
       
-      return matchesSearch && matchesStatus && matchesVerified && matchesBusinessName;
+      return matchesSearch && matchesTransactionType && matchesStatus;
     });
 
     // Sorting
@@ -252,21 +407,25 @@ export default function AgentsWalletTable() {
           aValue = aValue.toLowerCase();
           bValue = bValue.toLowerCase();
         }
+
+        if(aValue && bValue){
+           if (aValue < bValue) {
+              return sortDirection === "asc" ? -1 : 1;
+            }
+            if (aValue > bValue) {
+              return sortDirection === "asc" ? 1 : -1;
+            }
+        }
         
-        if (aValue < bValue) {
-          return sortDirection === "asc" ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortDirection === "asc" ? 1 : -1;
-        }
+       
         return 0;
       });
     }
 
     return filtered;
-  }, [searchTerm, filters, sortField, sortDirection]);
+  }, [transactions, searchTerm, filters, sortField, sortDirection]);
 
-  const handleSort = (field: keyof Agent) => {
+  const handleSort = (field: keyof WalletTransaction) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -275,66 +434,231 @@ export default function AgentsWalletTable() {
     }
   };
 
-  const getSortIcon = (field: keyof Agent) => {
+  const getSortIcon = (field: keyof WalletTransaction) => {
     if (sortField !== field) return "↕️";
     return sortDirection === "asc" ? "↑" : "↓";
   };
 
-  const getStatusColor = (status: Agent["status"]) => {
-    switch (status) {
-      case "active":
+  const getTransactionTypeColor = (type: WalletTransaction["type"]) => {
+    switch (type) {
+      case "credit":
         return "success";
-      case "inactive":
+      case "debit":
         return "error";
       default:
         return "primary";
     }
   };
 
-  const getVerifiedColor = (verified: boolean) => {
-    return verified ? "success" : "warning";
+  const getStatusColor = (status: WalletTransaction["status"]) => {
+    switch (status) {
+      case "completed":
+        return "success";
+      case "pending":
+        return "warning";
+      case "failed":
+        return "error";
+      default:
+        return "primary";
+    }
   };
 
-  const getVerifiedText = (verified: boolean) => {
-    return verified ? "Verified" : "Not Verified";
+  const formatAmount = (amount: string) => {
+    const numericAmount = parseFloat(amount);
+    const formatted = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(Math.abs(numericAmount));
+    
+    return numericAmount >= 0 ? `+${formatted}` : `-${formatted}`;
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
+  };
+
+  const formatBalance = (balance: string | number | null | undefined) => {
+    if (balance === null || balance === undefined || balance === '') {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+      }).format(0);
+    }
+
+    const numericBalance = typeof balance === 'string' ? parseFloat(balance) : balance;
+    
+    if (isNaN(numericBalance)) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+      }).format(0);
+    }
+
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(numericBalance);
   };
 
   const handleApplyFilters = (newFilters: FilterOptions) => {
     setFilters(newFilters);
   };
 
-  const hasActiveFilters = filters.status !== "all" || filters.verified !== "all" || 
-                          filters.businessName !== "all";
+  const hasActiveFilters = filters.transactionType !== "all" || filters.status !== "all";
 
   const clearAllFilters = () => {
     setFilters({
+      transactionType: "all",
+      referenceType: "all",
       status: "all",
-      verified: "all",
-      businessName: "all",
     });
   };
 
+  const totalPendingAmount = pendingPayments.reduce((sum, payment) => {
+    return sum + parseFloat(payment.application_fee || '0');
+  }, 0);
+
+  const getSelectedAgentInfo = () => {
+    if (!selectedAgent) return null;
+    return agents.find(agent => agent.user_id === selectedAgent);
+  };
+
+  // Calculate summary data for all agents
+  const totalCreditsAllAgents = transactions
+    .filter(t => t.type === 'credit' && t.status === 'completed')
+    .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
+
+  const totalBalanceAllAgents = walletBalance?.balance 
+    ? (typeof walletBalance.balance === 'string' ? parseFloat(walletBalance.balance) : walletBalance.balance)
+    : 0;
+
+  const getVerificationStatus = (agent: Agent) => {
+    if (agent.is_agent_verified === 1 && agent.is_payment_verified === 1) {
+      return "Verified";
+    } else if (agent.is_agent_verified === 1) {
+      return "Profile Verified";
+    } else {
+      return "Pending Verification";
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-gray-600 dark:text-gray-400">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-red-600 dark:text-red-400">{error}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {/* Agent Selection */}
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Select Agent
+            </label>
+            <select
+              value={selectedAgent || ""}
+              onChange={(e) => setSelectedAgent(e.target.value ? parseInt(e.target.value) : null)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            >
+              <option value="">All Agents</option>
+              {agents.map((agent) => (
+                <option key={agent.user_id} value={agent.user_id}>
+                  {agent.name} ({agent.email}) - {getVerificationStatus(agent)}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          {selectedAgent ? (
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Viewing data for: <span className="font-semibold">
+                {getSelectedAgentInfo()?.name}
+                {getSelectedAgentInfo()?.business_name && ` - ${getSelectedAgentInfo()?.business_name}`}
+              </span>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Viewing data for: <span className="font-semibold">All Agents</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Available Balance Card */}
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+          <div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              {selectedAgent ? 'Available Balance' : 'Total Balance (All Agents)'}
+            </div>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {formatBalance(selectedAgent ? walletBalance?.balance : totalBalanceAllAgents)}
+            </div>
+          </div>
+        </div>
+
+        {/* Total Credits Card */}
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {selectedAgent ? 'Total Credits' : 'Total Credits (All Agents)'}
+          </div>
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            {formatBalance(totalCreditsAllAgents.toString())}
+          </div>
+        </div>
+
+        {/* Pending Payments Card */}
+        <Link href={selectedAgent ? `/admin/partners/wallets/pending-payments/${selectedAgent}` : `/admin/partners/wallets/pending-payments`}>
+          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+            <div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                {selectedAgent ? 'Pending Payments' : 'Pending Payments (All Agents)'}
+              </div>
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                {formatBalance(totalPendingAmount.toString())}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {pendingPayments.length} application(s) pending
+              </div>
+            </div>
+          </div>
+        </Link>
+      </div>
+
       {/* Search and Filter Controls */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
+      <div className="flex flex-col sm:flex-row gap-4">
         {/* Search Input */}
         <div className="flex-1 max-w-md">
           <div className="relative">
             <input
               type="text"
-              placeholder="Search by name, email, business name, or phone number..."
+              placeholder="Search by transaction reference, description, or gateway..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-14 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:bg-white/[0.03] dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[430px]"
+              className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-14 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:bg-white/[0.03] dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
             />
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg
@@ -379,19 +703,14 @@ export default function AgentsWalletTable() {
       {/* Active Filters Display */}
       {hasActiveFilters && (
         <div className="flex flex-wrap gap-2">
+          {filters.transactionType !== "all" && (
+            <Badge size="sm" color="primary">
+              Transaction: {filters.transactionType}
+            </Badge>
+          )}
           {filters.status !== "all" && (
             <Badge size="sm" color="primary">
               Status: {filters.status}
-            </Badge>
-          )}
-          {filters.verified !== "all" && (
-            <Badge size="sm" color="primary">
-              Verification: {filters.verified}
-            </Badge>
-          )}
-          {filters.businessName !== "all" && (
-            <Badge size="sm" color="primary">
-              Business: {filters.businessName}
             </Badge>
           )}
         </div>
@@ -400,32 +719,29 @@ export default function AgentsWalletTable() {
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
         <div className="max-w-full overflow-x-auto">
-          <div className="min-w-[1000px]">
+          <div className="min-w-[800px]">
             <Table>
               {/* Table Header */}
               <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                 <TableRow>
                   {[
-                    { key: "name", label: "Name" },
-                    { key: "email", label: "Email" },
-                    { key: "businessName", label: "Business Name" },
-                    { key: "phoneNumber", label: "Phone Number" },
-                    { key: "verified", label: "Verified" },
+                    { key: "created_at", label: "Date" },
+                    { key: "type", label: "Transaction Type" },
                     { key: "status", label: "Status" },
-                    { key: "createdAt", label: "Created At" },
-                    { key: "wallet", label: "Wallet History" },
+                    { key: "amount", label: "Amount" },
+                    { key: "transaction_ref", label: "Transaction Reference" },
+                    { key: "description", label: "Description" },
+                    { key: "gateway", label: "Gateway" },
                   ].map(({ key, label }) => (
                     <TableCell
                       key={key}
                       isHeader
                       className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => key !== "wallet" ? handleSort(key as keyof Agent) : undefined}
+                      onClick={() => handleSort(key as keyof WalletTransaction)}
                     >
                       <div className="flex items-center gap-1">
                         {label}
-                        {key !== "wallet" && (
-                          <span className="text-xs">{getSortIcon(key as keyof Agent)}</span>
-                        )}
+                        <span className="text-xs">{getSortIcon(key as keyof WalletTransaction)}</span>
                       </div>
                     </TableCell>
                   ))}
@@ -435,62 +751,57 @@ export default function AgentsWalletTable() {
               {/* Table Body */}
               <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                 {filteredAndSortedData.length > 0 ? (
-                  filteredAndSortedData.map((agent) => (
-                    <TableRow key={agent.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                          {agent.name}
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
+                  filteredAndSortedData.map((transaction) => (
+                    <TableRow key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <TableCell className="px-5 py-4 text-start min-w-[200px]">
                         <div className="text-gray-800 text-theme-sm dark:text-white/90">
-                          {agent.email}
+                          {formatDate(transaction.created_at)}
                         </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
-                        <span className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                          {agent.businessName}
+                        <Badge
+                          size="sm"
+                          color={getTransactionTypeColor(transaction.type)}
+                        >
+                          {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-5 py-4 text-start">
+                        <Badge
+                          size="sm"
+                          color={getStatusColor(transaction.status)}
+                        >
+                          {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-5 py-4 text-start">
+                        <span className={`font-medium text-theme-sm ${
+                          transaction.type === 'credit' 
+                            ? 'text-green-600 dark:text-green-400' 
+                            : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {formatAmount(transaction.amount)}
                         </span>
                       </TableCell>
-                      <TableCell className="px-5 py-4 text-gray-800 text-start text-theme-sm dark:text-white/90">
-                        {agent.phoneNumber}
+                      <TableCell className="px-5 py-4 text-gray-600 text-start text-theme-sm dark:text-gray-400">
+                        {transaction.transaction_ref}
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
-                        <Badge
-                          size="sm"
-                          color={getVerifiedColor(agent.verified)}
-                        >
-                          {getVerifiedText(agent.verified)}
-                        </Badge>
+                        <div className="text-gray-800 text-theme-sm dark:text-white/90 max-w-[200px] truncate">
+                          {transaction.description}
+                        </div>
                       </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <Badge
-                          size="sm"
-                          color={getStatusColor(agent.status)}
-                        >
-                          {agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
-                        {formatDate(agent.createdAt)}
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <Link
-                          href={`/admin/partners/wallet-history/${agent.id}`}
-                          className="text-brand-500 hover:text-brand-600 text-theme-sm font-medium"
-                        >
-                          View History
-                        </Link>
+                      <TableCell className="px-5 py-4 text-gray-600 text-start text-theme-sm dark:text-gray-400">
+                        {transaction.gateway.charAt(0).toUpperCase() + transaction.gateway.slice(1)}
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell
-                   
-                      className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400"
-                    >
-                      No agents found matching your criteria.
+                    <TableCell  className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400">
+                      {transactions.length === 0 
+                        ? "No transactions found." 
+                        : "No transactions match your search criteria."}
                     </TableCell>
                   </TableRow>
                 )}
@@ -502,7 +813,9 @@ export default function AgentsWalletTable() {
 
       {/* Results Count */}
       <div className="text-sm text-gray-500 dark:text-gray-400">
-        Showing {filteredAndSortedData.length} of {tableData.length} agents
+        Showing {filteredAndSortedData.length} of {transactions.length} transactions
+        {selectedAgent && ` for selected agent`}
+        {!selectedAgent && ` across all agents`}
       </div>
 
       {/* Filter Modal */}
@@ -510,7 +823,6 @@ export default function AgentsWalletTable() {
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
         onApply={handleApplyFilters}
-        businessNames={businessNames}
       />
     </div>
   );

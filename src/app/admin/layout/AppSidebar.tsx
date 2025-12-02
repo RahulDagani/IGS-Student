@@ -74,11 +74,11 @@ const partnerItems: NavItem[] = [
         path: "/partners/wallets",
         icon: <Wallet size={18} />,
       },
-      {
-        name: "Support",
-        icon: <Mail size={18} />,
-        path: "/partners/wallets",
-      },
+      // {
+      //   name: "Support",
+      //   icon: <Mail size={18} />,
+      //   path: "/partners/wallets",
+      // },
     ],
   },
   {
@@ -97,7 +97,7 @@ const partnerItems: NavItem[] = [
       },
       {
         name: "Resources",
-        path: "partners/commissions",
+        path: "/partners/resources",
         icon: <Newspaper size={18} />,
       },
       
@@ -121,11 +121,11 @@ const studentItems: NavItem[] = [
     icon: <Wallet size={18} />,
     path: "/students/wallets",
   },
-  {
-    name: "Support",
-    icon: <Mail size={18} />,
-    path: "/students",
-  },
+  // {
+  //   name: "Support",
+  //   icon: <Mail size={18} />,
+  //   path: "/students",
+  // },
   {
     name: "Setup ",
     icon: <Settings size={18} />,
@@ -137,7 +137,7 @@ const studentItems: NavItem[] = [
       },
       {
         name: "Resources",
-        path: "/students",
+        path: "/students/resources",
         icon: <Newspaper size={18} />,
       },
       

@@ -49,6 +49,7 @@ const AgentDetails = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [approved, setApproved] = useState<boolean>(false);
+  const [paymentVerified, setPaymentVerified] = useState<boolean>(false);
   
   const {id: agentId} = useParams();
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
@@ -80,6 +81,32 @@ const AgentDetails = () => {
       }
   }
 
+  const verifyPaymentDetails = async () => {
+    try {
+        setLoading(true);
+        const response = await fetch(
+          `${BASE_URL}/tenant/agent/${agentId}/verify/payment`,{
+            method: "PUT",
+          headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+        }
+        );
+        
+        if (!response.ok) {
+          throw new Error(`Failed to verify payment details: ${response.status}`);
+        }
+
+        setPaymentVerified(true)
+        
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setLoading(false);
+      }
+  }
+
   useEffect(() => {
     const fetchAgentDetails = async () => {
       try {
@@ -103,6 +130,9 @@ const AgentDetails = () => {
           setAgentInfo(data.agent);
           if(data.agent.is_agent_verified == 1){
             setApproved(true)
+          }
+          if(data.agent.is_payment_verified == 1){
+            setPaymentVerified(true)
           }
         } else {
           throw new Error("Invalid response format");
@@ -414,9 +444,13 @@ const AgentDetails = () => {
 
       {/* Action Buttons */}
       <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
-        <button className="px-6 py-2.5 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-          Verify Payment Details
+        {paymentVerified ? <button disabled className="px-6 py-2.5 bg-blue-300 rounded-lg text-sm font-medium text-white hover:bg-blue-300 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+          {"Payment Verified"}
+        </button> :
+          <button onClick={verifyPaymentDetails} className="px-6 py-2.5 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+          {"Verify Payment Details"}
         </button>
+}
         {approved ? <button disabled className="px-6 py-2.5 bg-green-300 rounded-lg text-sm font-medium text-white hover:bg-green-300 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
           {"Approved"}
         </button> :

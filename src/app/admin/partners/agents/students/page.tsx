@@ -36,15 +36,28 @@ interface Student {
   createdAt: string;
 }
 
+interface Agent {
+  user_id: number;
+  email: string;
+  phone: string | null;
+  name: string;
+  business_name: string | null;
+  is_agent_verified: number;
+  is_payment_verified: number;
+}
+
 type SortField = keyof Student | "";
 type SortDirection = "asc" | "desc";
 
 export default function StudentTable() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingAgents, setLoadingAgents] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [agentFilter, setAgentFilter] = useState<string>("all"); // "all" or agent ID
   const [sortField, setSortField] = useState<SortField>("");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
@@ -52,13 +65,55 @@ export default function StudentTable() {
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
   const { token } = useAuth();
 
-  // Fetch students by agent ID from API
+  // Fetch agents
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const response = await fetch(`${BASE_URL}/tenant/agent/list`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch agents: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && Array.isArray(data.data)) {
+          setAgents(data.data);
+        } else {
+          throw new Error("Invalid API response format for agents");
+        }
+      } catch (err) {
+        console.error("Error fetching agents:", err);
+        // Don't set error here, just log it - we can still show students
+      } finally {
+        setLoadingAgents(false);
+      }
+    };
+
+    if (token) {
+      fetchAgents();
+    }
+  }, [token, BASE_URL]);
+
+  // Fetch students based on selected agent
   useEffect(() => {
     const fetchStudents = async () => {
-
       try {
         setLoading(true);
-        const response = await fetch(`${BASE_URL}/tenant/agent/student/list`, {
+        
+        let url = `${BASE_URL}/tenant/agent/student/list`;
+        
+        // If a specific agent is selected, use the agent-specific endpoint
+        if (agentFilter !== "all") {
+          url = `${BASE_URL}/tenant/agent/student/list/${agentFilter}`;
+        }
+        
+        const response = await fetch(url, {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -98,8 +153,10 @@ export default function StudentTable() {
       }
     };
 
-    fetchStudents();
-  }, [token, BASE_URL]);
+    if (token) {
+      fetchStudents();
+    }
+  }, [token, BASE_URL, agentFilter]); // Add agentFilter as dependency
 
   // Helper function to determine status
   const getStudentStatus = (status: string): Student["status"] => {
@@ -184,10 +241,17 @@ export default function StudentTable() {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
-  if (loading) {
+  // Get the currently selected agent's name
+  const getSelectedAgentName = () => {
+    if (agentFilter === "all") return "All Agents";
+    const agent = agents.find(a => a.user_id.toString() === agentFilter);
+    return agent ? agent.name : "Unknown Agent";
+  };
+
+  if (loading && loadingAgents) {
     return (
       <div className="flex justify-center items-center py-8">
-        <div className="text-lg">Loading all agent students...</div>
+        <div className="text-lg">Loading...</div>
       </div>
     );
   }
@@ -205,7 +269,7 @@ export default function StudentTable() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
-          Students for All Agents
+          Students for {getSelectedAgentName()}
         </h1>
       </div>
 
@@ -239,18 +303,38 @@ export default function StudentTable() {
           </div>
         </div>
 
-        {/* Status Filter */}
-        <div className="w-full flex justify-end">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 py-2.5 px-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[230px]"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="pending">Pending</option>
-          </select>
+        {/* Filters Row */}
+        <div className="flex gap-4 w-full sm:w-auto">
+          {/* Agent Filter */}
+          <div className="flex-1 min-w-[200px]">
+            <select
+              value={agentFilter}
+              onChange={(e) => setAgentFilter(e.target.value)}
+              className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 py-2.5 px-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+              disabled={loadingAgents}
+            >
+              <option value="all">All Agents</option>
+              {agents.map((agent) => (
+                <option key={agent.user_id} value={agent.user_id}>
+                  {agent.name} {agent.business_name ? `(${agent.business_name})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="flex-1 min-w-[200px]">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 py-2.5 px-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -288,7 +372,15 @@ export default function StudentTable() {
 
               {/* Table Body */}
               <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                {filteredAndSortedData.length > 0 ? (
+                {loading ? (
+                  <TableRow>
+                    <TableCell
+                      className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400"
+                    >
+                      Loading students for {getSelectedAgentName()}...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredAndSortedData.length > 0 ? (
                   filteredAndSortedData.map((student) => (
                     <TableRow key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <TableCell className="px-5 py-4 text-start">

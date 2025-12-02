@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import Badge from "@/components/ui/badge/Badge";
 import { useAuth } from "@/context/AuthContext";
+import Link from "next/link";
 
 interface Application {
   id: number;
@@ -28,6 +29,39 @@ interface Application {
   current_status_id?: number;
   student_user_id?: number;
   created_by?: number;
+  // Store document lists
+  commonDocuments?: CommonDocument[];
+  specificDocuments?: SpecificDocument[];
+}
+
+interface CommonDocument {
+  id: number;
+  student_id: number;
+  study_level_id: number;
+  document_name: string;
+  is_mandatory: number;
+  file_url: string | null;
+  uploaded_at: string | null;
+  uploaded_by: number | null;
+  status: string;
+  remarks: string | null;
+  is_deleted: number;
+  created_at: string;
+}
+
+interface SpecificDocument {
+  id: number;
+  application_id: number;
+  document_name: string;
+  document_type: string;
+  is_mandatory: number;
+  file_url: string | null;
+  uploaded_at: string | null;
+  uploaded_by: number | null;
+  status: string;
+  remarks: string | null;
+  is_deleted: number;
+  created_at: string;
 }
 
 interface Agent {
@@ -84,6 +118,14 @@ interface UpdateStatusModalProps {
   application: Application | null;
   statuses: ApplicationStatus[];
   onUpdateStatus: (applicationId: number, statusId: number) => Promise<void>;
+  loading: boolean;
+}
+
+interface DocumentsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  documents: CommonDocument[] | SpecificDocument[] | undefined;
   loading: boolean;
 }
 
@@ -155,37 +197,11 @@ interface ApiApplicationResponse {
   };
   profile_status: string;
   common_documents: {
-    list: Array<{
-      id: number;
-      student_id: number;
-      study_level_id: number;
-      document_name: string;
-      is_mandatory: number;
-      file_url: string | null;
-      uploaded_at: string | null;
-      uploaded_by: number | null;
-      status: string;
-      remarks: string | null;
-      is_deleted: number;
-      created_at: string;
-    }>;
+    list: CommonDocument[];
     status: string;
   };
   specific_documents: {
-    list: Array<{
-      id: number;
-      application_id: number;
-      document_name: string;
-      document_type: string;
-      is_mandatory: number;
-      file_url: string | null;
-      uploaded_at: string | null;
-      uploaded_by: number | null;
-      status: string;
-      remarks: string | null;
-      is_deleted: number;
-      created_at: string;
-    }>;
+    list: SpecificDocument[];
     status: string;
   };
 }
@@ -229,7 +245,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999">
       <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
@@ -344,7 +360,7 @@ const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({
   if (!isOpen || !application) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999">
       <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
@@ -414,6 +430,136 @@ const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({
   );
 };
 
+const DocumentsModal: React.FC<DocumentsModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  documents,
+  loading
+}) => {
+  if (!isOpen) return null;
+
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'uploaded':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+    }
+  };
+
+  const getDocumentType = (doc: CommonDocument | SpecificDocument) => {
+    if ('document_type' in doc) {
+      return doc.document_type;
+    }
+    return 'Common';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+            {title}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">Loading documents...</div>
+            </div>
+          ) : !documents || documents.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No documents found
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {documents.map((doc) => (
+                <div 
+                  key={doc.id} 
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h4 className="font-medium text-gray-800 dark:text-white">
+                        {doc.document_name}
+                      </h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        Type: {getDocumentType(doc)} | 
+                        {doc.is_mandatory ? ' Required' : ' Optional'}
+                      </p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(doc.status)}`}>
+                      {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
+                    </span>
+                  </div>
+                  
+                  {doc.uploaded_at && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                      Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}
+                    </p>
+                  )}
+                  
+                  {doc.remarks && (
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                      <strong>Remarks:</strong> {doc.remarks}
+                    </p>
+                  )}
+                  
+                  {doc.file_url ? (
+                    <div className="mt-3">
+                      <a
+                        href={`https://api.applystore.org/${doc.file_url}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        View Document
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                      No file uploaded
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CardIcons = {
   GraduationCap: () => (
     <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -438,9 +584,16 @@ const CardIcons = {
 interface ApplicationCardProps {
   application: Application;
   onUpdateStatus: (application: Application) => void;
+  onViewCommonDocs: (application: Application) => void;
+  onViewSpecificDocs: (application: Application) => void;
 }
 
-const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onUpdateStatus }) => {
+const ApplicationCard: React.FC<ApplicationCardProps> = ({ 
+  application, 
+  onUpdateStatus,
+  onViewCommonDocs,
+  onViewSpecificDocs 
+}) => {
   const getStatusColor = (status: Application["status"]) => {
     switch (status) {
       case "Applied":
@@ -547,19 +700,25 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onUpdate
       <div className="mt-4">
         <p className="text-sm font-semibold text-red-500 mb-3">Pending</p>
         <div className="flex justify-between items-center text-center">
-          <div className="flex flex-col items-center">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
-              application.profileStatus === "complete" ? "bg-green-100" : "bg-red-100"
-            }`}>
-              <span className={`text-lg font-bold ${
-                application.profileStatus === "complete" ? "text-green-500" : "text-red-500"
+          <Link href={`/admin/partners/agents/students/${application.student_user_id}`}>
+            <div className="flex flex-col items-center cursor-pointer">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
+                application.profileStatus === "complete" ? "bg-green-100" : "bg-red-100"
               }`}>
-                {getDocumentStatusIcon(application.profileStatus)}
-              </span>
+                <span className={`text-lg font-bold ${
+                  application.profileStatus === "complete" ? "text-green-500" : "text-red-500"
+                }`}>
+                  {getDocumentStatusIcon(application.profileStatus)}
+                </span>
+              </div>
+              <p className="text-xs dark:text-white">Common Form</p>
             </div>
-            <p className="text-xs dark:text-white">Common Form</p>
-          </div>
-          <div className="flex flex-col items-center">
+          </Link>
+          
+          <div 
+            className="flex flex-col items-center cursor-pointer"
+            onClick={() => onViewCommonDocs(application)}
+          >
             <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
               application.commonDocumentsStatus === "complete" ? "bg-green-100" : "bg-red-100"
             }`}>
@@ -571,7 +730,11 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onUpdate
             </div>
             <p className="text-xs dark:text-white">Common Docs</p>
           </div>
-          <div className="flex flex-col items-center">
+          
+          <div 
+            className="flex flex-col items-center cursor-pointer"
+            onClick={() => onViewSpecificDocs(application)}
+          >
             <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
               application.specificDocumentsStatus === "complete" ? "bg-green-100" : "bg-red-100"
             }`}>
@@ -604,7 +767,11 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onUpdate
 export default function ApplicationsTable() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
   const [isUpdateStatusModalOpen, setIsUpdateStatusModalOpen] = useState<boolean>(false);
+  const [isCommonDocsModalOpen, setIsCommonDocsModalOpen] = useState<boolean>(false);
+  const [isSpecificDocsModalOpen, setIsSpecificDocsModalOpen] = useState<boolean>(false);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [selectedDocuments, setSelectedDocuments] = useState<CommonDocument[] | SpecificDocument[] | undefined>([]);
+  const [selectedModalTitle, setSelectedModalTitle] = useState<string>("");
   const [applicationStatuses, setApplicationStatuses] = useState<ApplicationStatus[]>([]);
   const [filters, setFilters] = useState<FilterOptions>({
     agent: "all",
@@ -743,20 +910,23 @@ export default function ApplicationsTable() {
             id: app.application.id,
             university: app.application.university_name,
             course: app.application.course_name,
-            intake: "Fall 2024", // You might want to get this from the API if available
+            intake: "Fall 2024",
             status: app.application.status_label,
             assignedTo: app.application.assigned_to || "Not Assigned",
             studentName: `${app.student_profile.first_name} ${app.student_profile.last_name}`,
-            studentEmail: "student@example.com", // You might want to get this from student data
-            agentName: "Agent Name", // You might want to get this from agent data
-            agentEmail: "agent@example.com", // You might want to get this from agent data
+            studentEmail: "student@example.com",
+            agentName: "Agent Name",
+            agentEmail: "agent@example.com",
             country: app.application.university_country,
             degree: app.application.study_level_name,
             location: `${app.application.university_city}, ${app.application.university_state}`,
-            externalEvaluation: "Not Provided", // You might want to get this from the API if available
+            externalEvaluation: "Not Provided",
             profileStatus: app.profile_status,
             commonDocumentsStatus: app.common_documents.status,
             specificDocumentsStatus: app.specific_documents.status,
+            // Store document lists
+            commonDocuments: app.common_documents.list,
+            specificDocuments: app.specific_documents.list,
             // New fields for update status functionality
             current_status_id: app.application.current_status_id,
             student_user_id: app.application.student_user_id,
@@ -786,6 +956,20 @@ export default function ApplicationsTable() {
   const handleUpdateStatusClick = (application: Application) => {
     setSelectedApplication(application);
     setIsUpdateStatusModalOpen(true);
+  };
+
+  const handleViewCommonDocs = (application: Application) => {
+    setSelectedApplication(application);
+    setSelectedDocuments(application.commonDocuments);
+    setSelectedModalTitle(`Common Documents - ${application.studentName}`);
+    setIsCommonDocsModalOpen(true);
+  };
+
+  const handleViewSpecificDocs = (application: Application) => {
+    setSelectedApplication(application);
+    setSelectedDocuments(application.specificDocuments);
+    setSelectedModalTitle(`Specific Documents - ${application.studentName}`);
+    setIsSpecificDocsModalOpen(true);
   };
 
   const handleUpdateStatus = async (applicationId: number, statusId: number) => {
@@ -915,6 +1099,8 @@ export default function ApplicationsTable() {
                 key={`${application.id}-${index}`} 
                 application={application} 
                 onUpdateStatus={handleUpdateStatusClick}
+                onViewCommonDocs={handleViewCommonDocs}
+                onViewSpecificDocs={handleViewSpecificDocs}
               />
             ))
           ) : (
@@ -952,6 +1138,22 @@ export default function ApplicationsTable() {
         statuses={applicationStatuses}
         onUpdateStatus={handleUpdateStatus}
         loading={loading.updatingStatus}
+      />
+
+      <DocumentsModal
+        isOpen={isCommonDocsModalOpen}
+        onClose={() => setIsCommonDocsModalOpen(false)}
+        title={selectedModalTitle}
+        documents={selectedDocuments}
+        loading={false}
+      />
+
+      <DocumentsModal
+        isOpen={isSpecificDocsModalOpen}
+        onClose={() => setIsSpecificDocsModalOpen(false)}
+        title={selectedModalTitle}
+        documents={selectedDocuments}
+        loading={false}
       />
     </div>
   );

@@ -74,11 +74,11 @@ const partnerItems: NavItem[] = [
         path: "/partners/wallets",
         icon: <Wallet size={18} />,
       },
-      {
-        name: "Support",
-        icon: <Mail size={18} />,
-        path: "/partners/wallets",
-      },
+      // {
+      //   name: "Support",
+      //   icon: <Mail size={18} />,
+      //   path: "/partners/wallets",
+      // },
     ],
   },
   {
@@ -97,7 +97,7 @@ const partnerItems: NavItem[] = [
       },
       {
         name: "Resources",
-        path: "partners/commissions",
+        path: "/partners/resources",
         icon: <Newspaper size={18} />,
       },
       
@@ -121,11 +121,11 @@ const studentItems: NavItem[] = [
     icon: <Wallet size={18} />,
     path: "/students/wallets",
   },
-  {
-    name: "Support",
-    icon: <Mail size={18} />,
-    path: "/students",
-  },
+  // {
+  //   name: "Support",
+  //   icon: <Mail size={18} />,
+  //   path: "/students",
+  // },
   {
     name: "Setup ",
     icon: <Settings size={18} />,
@@ -137,7 +137,7 @@ const studentItems: NavItem[] = [
       },
       {
         name: "Resources",
-        path: "/students",
+        path: "/students/resources",
         icon: <Newspaper size={18} />,
       },
       
@@ -223,18 +223,18 @@ const othersItems: NavItemOther[] = [
     path: "/setup/general"
     
   },
-   {
-    icon: <PieChartIcon />,
-    name: "Activity log",
-    path: "/activity-log"
-  },
+  //  {
+  //   icon: <PieChartIcon />,
+  //   name: "Activity log",
+  //   path: "/activity-log"
+  // },
   {
     icon: <BoxCubeIcon />,
     name: "Account",
     subItems: [
       { name: "Billing", path: "/billing", pro: false },
-      { name: "Profile", path: "/profile", pro: false },
-      { name: "Logout", path: "/logout", pro: false },
+      // { name: "Profile", path: "/profile", pro: false },
+      // { name: "Logout", path: "/logout", pro: false },
     ],
   },
   {
@@ -246,13 +246,13 @@ const othersItems: NavItemOther[] = [
       { name: "Domain Request", path: "/domains/requests", pro: false },
     ],
   },
-  {
-    icon: <BoxCubeIcon />,
-    name: "Resources",
-    subItems: [
-      { name: "Database Backup", path: "/db-backup", pro: false },
-    ],
-  },
+  // {
+  //   icon: <BoxCubeIcon />,
+  //   name: "Resources",
+  //   subItems: [
+  //     { name: "Database Backup", path: "/db-backup", pro: false },
+  //   ],
+  // },
 ];
 
 const AppSidebar: React.FC = () => {
@@ -267,16 +267,34 @@ const AppSidebar: React.FC = () => {
   //   return pathname === path;
   // }, [pathname]);
 
-  const isActive = useCallback(
+//   const isActive = useCallback(
+//   (path?: string): boolean => {
+//     if (!path) return false;
+
+//     // Normalize trailing slashes (optional)
+//     const cleanPath = path.endsWith('/') ? path.slice(0, -1) : path;
+//     const cleanCurrent = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+
+//     console.log(cleanCurrent, cleanPath)
+
+//     // Match exact or child routes
+//     return cleanCurrent === cleanPath || cleanCurrent.startsWith(`${cleanPath}/`);
+//   },
+//   [pathname]
+// );
+
+const isActive = useCallback(
   (path?: string): boolean => {
     if (!path) return false;
 
-    // Normalize trailing slashes (optional)
-    const cleanPath = path.endsWith('/') ? path.slice(0, -1) : path;
-    const cleanCurrent = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+    // Special case for home/dashboard
+    if (path === "/") {
+      return pathname === "/admin";
+    }
 
-    // Match exact or child routes
-    return cleanCurrent === cleanPath || cleanCurrent.startsWith(`${cleanPath}/`);
+    // For other paths, check if the current pathname matches or starts with /admin + the given path
+    const targetPath = `/admin${path}`;
+    return pathname === targetPath || pathname.startsWith(`${targetPath}/`);
   },
   [pathname]
 );
@@ -574,7 +592,7 @@ const AppSidebar: React.FC = () => {
     >
       <div
         className={`py-8 flex  ${
-          !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+          !isExpanded && !isHovered ? "lg:justify-center" : "justify-center"
         }`}
       >
         <Link href="/admin">
@@ -582,15 +600,15 @@ const AppSidebar: React.FC = () => {
             <>
             <div className="flex justify-center items-center">
               <Image
-                className=""
-                src="/images/logo/logo.png"
+                className="mx-auto"
+                src="/images/site/igslogo.png"
                 alt="Logo"
-                width={45}
-                height={45}
+                width={85}
+                height={65}
               />
-              <span className="dark:text-white ms-1 text-black font-semibold text-2xl">
+              {/* <span className="dark:text-white ms-1 text-black font-semibold text-2xl">
                 ApplyTech
-              </span>
+              </span> */}
             </div>
             </>
           ) : (

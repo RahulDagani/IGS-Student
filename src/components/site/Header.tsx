@@ -36,7 +36,7 @@ export default function Header() {
         <div className="hidden md:flex items-center gap-4">
           <button className="flex items-center gap-2 border border-[#0E2A47] text-[#0E2A47] px-6 py-2 rounded-full hover:bg-gray-50 transition">
             <User size={18} />
-            Become a Tutor
+            Become a Partner
           </button>
 
           <button className="flex items-center gap-2 bg-[#0566FF] text-white px-6 py-2 rounded-full hover:bg-blue-600 transition">
@@ -68,7 +68,7 @@ export default function Header() {
 
           <button className="w-full flex items-center justify-center gap-2 border border-[#0E2A47] text-[#0E2A47] px-6 py-2 rounded-full">
             <User size={18} />
-            Become a Tutor
+            Become a Partner
           </button>
 
           <button className="w-full flex items-center justify-center gap-2 bg-[#0566FF] text-white px-6 py-2 rounded-full">

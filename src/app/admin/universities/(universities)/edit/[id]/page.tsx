@@ -2,64 +2,102 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Globe, MapPin, Mail, FileText, Video, Link, Building2, BookOpen, Users, ArrowBigRightDash } from "lucide-react";
+import { Country, State, City } from "country-state-city";
+import { useAuth } from "@/context/AuthContext";
 
 interface UniversityFormData {
   // Basic Info
-  universityName: string;
+  university: string;
   description: string;
-  country: string;
-  state: string;
-  universityType: string;
+  country_code: string;
+  state_code: string;
+  city_code: string;
   
   // Contact Info
-  email: string;
-  address: string;
-  googleMapUrl: string;
+  email: string | null;
+  address: string | null;
+  map_url: string | null;
+  location_url: string | null;
   
-  // Media
-  logo: File | null;
-  image: File | null;
-  brochure: File | null;
-  existingLogo?: string;
-  existingImage?: string;
-  existingBrochure?: string;
+  // Media - Now as strings for URLs
+  logo: string | null;
+  image: string | null;
+  brochure: string | null;
   
   // Additional Info
-  videoLink: string;
-  tuitionFeeUrl: string;
-  partnerType: string;
-  collaboration: string;
+  video_link: string | null;
+  tuition_url: string | null;
+  kind_of_partner_id: number | null;
+  collaboration_type_id: number | null;
+  type_of_university_id: number | null;
 }
 
-// Mock function to fetch university data - replace with actual API call
-const fetchUniversity = async (id: string): Promise<UniversityFormData> => {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 500));
-  console.log(id)
-  // Mock data - replace with actual API call
-  const mockData: UniversityFormData = {
-    universityName: "Harvard University",
-    description: "A private Ivy League research university in Cambridge, Massachusetts. Founded in 1636 as Harvard College and named for its first benefactor, the Puritan clergyman John Harvard, it is the oldest institution of higher learning in the United States.",
-    country: "USA",
-    state: "Massachusetts",
-    universityType: "Private",
-    email: "admissions@harvard.edu",
-    address: "Massachusetts Hall, Cambridge, MA 02138, United States",
-    googleMapUrl: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2947.584031308025!2d-71.11698338454326!3d42.37444347918548!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89e377427d7f0199%3A0x593d2c2b0c0e8a0!2sHarvard%20University!5e0!3m2!1sen!2sus!4v1234567890",
-    logo: null,
-    image: null,
-    brochure: null,
-    existingLogo: "/images/harvard-logo.png",
-    existingImage: "/images/harvard-campus.jpg",
-    existingBrochure: "/brochures/harvard-brochure.pdf",
-    videoLink: "https://www.youtube.com/embed/harvard-video",
-    tuitionFeeUrl: "https://harvard.edu/tuition-fees",
-    partnerType: "Exclusive Partner",
-    collaboration: "Direct Admission"
+interface PartnerType {
+  id: number;
+  name: string;
+}
+
+interface CollaborationType {
+  id: number;
+  name: string;
+}
+
+interface UniversityType {
+  id: number;
+  name: string;
+}
+
+interface OptionsData {
+  partnerTypes: PartnerType[];
+  collaborationTypes: CollaborationType[];
+  universityTypes: UniversityType[];
+}
+
+interface UniversityData {
+  university: {
+    id: number;
+    uuid: string;
+    tenant_id: number;
+    university: string;
+    university_slug: string;
+    description: string;
+    country_code: string;
+    state_code: string;
+    city_code: string;
+    address: string | null;
+    map_url: string | null;
+    location_url: string | null;
+    kind_of_partner_id: number | null;
+    type_of_university_id: number | null;
+    collaboration_type_id: number | null;
+    logo: string | null;
+    image: string | null;
+    brochure: string | null;
+    video_link: string | null;
+    tuition_url: string | null;
+    email: string | null;
+    is_deleted: number;
+    created_at: string;
+    updated_at: string;
+    kind_of_partner_name: string | null;
+    collaboration_type_name: string | null;
+    university_type_name: string | null;
   };
-  
-  return mockData;
-};;
+  options: OptionsData;
+}
+
+interface ApiResponse {
+  success: boolean;
+  message: string;
+  data: UniversityData;
+}
+
+const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+
+// Dummy URLs for media files
+const DUMMY_LOGO_URL = "https://example.com/logo.png";
+const DUMMY_IMAGE_URL = "https://example.com/university.jpg";
+const DUMMY_BROCHURE_URL = "https://example.com/brochure.pdf";
 
 type Tab = "basic" | "contact" | "media" | "additional"
 
@@ -71,40 +109,100 @@ export default function EditUniversity() {
   const [activeTab, setActiveTab] = useState<Tab>("basic");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const {token} = useAuth();
+
+  const [selectedCountry, setSelectedCountry] = useState<string>("");
+  const [selectedState, setSelectedState] = useState<string>("");
+
+  const countries = Country.getAllCountries();
+  const states = selectedCountry ? State.getStatesOfCountry(selectedCountry) : [];
+  const cities = selectedState ? City.getCitiesOfState(selectedCountry, selectedState) : [];
   
   const [formData, setFormData] = useState<UniversityFormData>({
     // Basic Info
-    universityName: "",
+    university: "",
     description: "",
-    country: "",
-    state: "",
-    universityType: "",
+    country_code: "",
+    state_code: "",
+    city_code: "",
     
     // Contact Info
-    email: "",
-    address: "",
-    googleMapUrl: "",
+    email: null,
+    address: null,
+    map_url: null,
+    location_url: null,
     
-    // Media
+    // Media - as string URLs
     logo: null,
     image: null,
     brochure: null,
-    existingLogo: "",
-    existingImage: "",
-    existingBrochure: "",
     
     // Additional Info
-    videoLink: "",
-    tuitionFeeUrl: "",
-    partnerType: "",
-    collaboration: "",
+    video_link: null,
+    tuition_url: null,
+    kind_of_partner_id: null,
+    collaboration_type_id: null,
+    type_of_university_id: null,
   });
+
+  const [options, setOptions] = useState<OptionsData>({
+    partnerTypes: [],
+    collaborationTypes: [],
+    universityTypes: [],
+  });
+
+  const [filteredStates, setFilteredStates] = useState<typeof states>([]);
+  const [filteredCities, setFilteredCities] = useState<typeof cities>([]);
+
+  const fetchUniversity = async (id: string): Promise<UniversityData> => {
+    const response = await fetch(`${BASE_URL}/tenant/university/list/${id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+  
+    if (!response.ok) {
+      throw new Error(`Failed to fetch university: ${response.status}`);
+    }
+    
+    const result: ApiResponse = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+    
+    return result.data;
+  };
 
   useEffect(() => {
     const loadUniversity = async () => {
       try {
         const data = await fetchUniversity(id);
-        setFormData(data);
+        setFormData({
+          university: data.university.university,
+          description: data.university.description,
+          country_code: data.university.country_code,
+          state_code: data.university.state_code,
+          city_code: data.university.city_code,
+          email: data.university.email,
+          address: data.university.address,
+          map_url: data.university.map_url,
+          location_url: data.university.location_url,
+          logo: data.university.logo,
+          image: data.university.image,
+          brochure: data.university.brochure,
+          video_link: data.university.video_link,
+          tuition_url: data.university.tuition_url,
+          kind_of_partner_id: data.university.kind_of_partner_id,
+          collaboration_type_id: data.university.collaboration_type_id,
+          type_of_university_id: data.university.type_of_university_id,
+        });
+        
+        setOptions(data.options);
+        setSelectedCountry(data.university.country_code);
+        setSelectedState(data.university.state_code);
       } catch (error) {
         console.error('Error loading university:', error);
       } finally {
@@ -117,29 +215,108 @@ export default function EditUniversity() {
     }
   }, [id]);
 
+  // Update filtered states when country changes
+  useEffect(() => {
+    if (formData.country_code) {
+      const statesForCountry = states.filter(state => state.countryCode === formData.country_code);
+      setFilteredStates(statesForCountry);
+      
+      // Reset state and city if country changes
+      if (statesForCountry.length > 0 && !statesForCountry.some(state => state.isoCode === formData.state_code)) {
+        setFormData(prev => ({
+          ...prev,
+          state_code: "",
+          city_code: ""
+        }));
+      }
+    } else {
+      setFilteredStates([]);
+    }
+  }, [formData.country_code]);
+
+  // Update filtered cities when state changes
+  useEffect(() => {
+    if (formData.state_code) {
+      const citiesForState = cities.filter(city => city.stateCode === formData.state_code);
+      setFilteredCities(citiesForState);
+      
+      // Reset city if state changes
+      if (citiesForState.length > 0 && !citiesForState.some(city => city.name === formData.city_code)) {
+        setFormData(prev => ({
+          ...prev,
+          city_code: ""
+        }));
+      }
+    } else {
+      setFilteredCities([]);
+    }
+  }, [formData.state_code]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, files } = e.target;
-    if (files && files[0]) {
+    
+    // Handle country/state/city changes
+    if (name === 'country_code') {
+      setSelectedCountry(value);
+      setSelectedState("");
       setFormData(prev => ({
         ...prev,
-        [name]: files[0]
+        state_code: "",
+        city_code: ""
+      }));
+    } else if (name === 'state_code') {
+      setSelectedState(value);
+      setFormData(prev => ({
+        ...prev,
+        city_code: ""
       }));
     }
+
+    // Handle numeric fields
+    if (name === 'kind_of_partner_id' || name === 'collaboration_type_id' || name === 'type_of_university_id') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value === "" ? null : Number(value)
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value === "" ? null : value
+      }));
+    }
+  };
+
+  const handleMediaUrlChange = (field: keyof UniversityFormData, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value || null
+    }));
   };
 
   const handleRemoveFile = (fieldName: keyof UniversityFormData) => {
     setFormData(prev => ({
       ...prev,
-      [fieldName]: null,
-      [`existing${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}` as keyof UniversityFormData]: ""
+      [fieldName]: null
+    }));
+  };
+
+  const handleUseDummyUrl = (field: keyof UniversityFormData) => {
+    let dummyUrl = "";
+    switch(field) {
+      case 'logo':
+        dummyUrl = DUMMY_LOGO_URL;
+        break;
+      case 'image':
+        dummyUrl = DUMMY_IMAGE_URL;
+        break;
+      case 'brochure':
+        dummyUrl = DUMMY_BROCHURE_URL;
+        break;
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      [field]: dummyUrl
     }));
   };
 
@@ -148,62 +325,50 @@ export default function EditUniversity() {
     setIsSubmitting(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Create JSON payload
+      const payload = {
+        ...formData,
+        // Ensure numeric fields are sent as numbers or null
+        kind_of_partner_id: formData.kind_of_partner_id,
+        collaboration_type_id: formData.collaboration_type_id,
+        type_of_university_id: formData.type_of_university_id,
+      };
+
+      // Make API call to update university with JSON
+      const response = await fetch(`${BASE_URL}/tenant/university/edit/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Failed to update university: ${response.status}`);
+      }
+
+      const result = await response.json();
       
-      console.log("Updated university data:", formData);
-      // Here you would typically make an API call to update the university
-      // await fetch(`/api/universities/${id}`, { method: 'PUT', body: JSON.stringify(formData) });
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      console.log("University updated successfully:", result);
       
       // Redirect back to universities list
       router.push('/admin/universities');
       router.refresh();
     } catch (error) {
       console.error('Error updating university:', error);
+      // You might want to show an error message to the user here
+      alert(`Error updating university: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const countries = [
-    "USA",
-    "UK", 
-    "Canada",
-    "Australia",
-    "Germany",
-    "France",
-    "Netherlands",
-    "Ireland",
-    "New Zealand",
-    "Singapore"
-  ];
-
-  const universityTypes = [
-    "Public",
-    "Private",
-    "Community College",
-    "Technical Institute",
-    "Research University",
-    "Liberal Arts College"
-  ];
-
-  const partnerTypes = [
-    "Exclusive Partner",
-    "Preferred Partner",
-    "Standard Partner",
-    "Tier 1 Partner",
-    "Tier 2 Partner",
-    "Tier 3 Partner"
-  ];
-
-  const collaborationTypes = [
-    "Direct Admission",
-    "Pathway Program",
-    "Exchange Program",
-    "Research Collaboration",
-    "Dual Degree",
-    "Articulation Agreement"
-  ];
 
   const tabs = [
     { id: "basic", label: "Basic Info", icon: Building2 },
@@ -216,7 +381,7 @@ export default function EditUniversity() {
     <div className="space-y-5">
       {/* University Name */}
       <div>
-        <label htmlFor="universityName" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+        <label htmlFor="university" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
           University Name *
         </label>
         <div className="relative">
@@ -225,9 +390,9 @@ export default function EditUniversity() {
           </span>
           <input
             type="text"
-            id="universityName"
-            name="universityName"
-            value={formData.universityName}
+            id="university"
+            name="university"
+            value={formData.university}
             onChange={handleInputChange}
             placeholder="Enter university name"
             required
@@ -253,10 +418,10 @@ export default function EditUniversity() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Country */}
         <div>
-          <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+          <label htmlFor="country_code" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
             Country *
           </label>
           <div className="relative">
@@ -264,16 +429,16 @@ export default function EditUniversity() {
               <Globe size={18} />
             </span>
             <select
-              id="country"
-              name="country"
-              value={formData.country}
+              id="country_code"
+              name="country_code"
+              value={formData.country_code}
               onChange={handleInputChange}
               required
               className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 appearance-none"
             >
               <option value="">Select Country</option>
               {countries.map(country => (
-                <option key={country} value={country}>{country}</option>
+                <option key={country.isoCode} value={country.isoCode}>{country.name}</option>
               ))}
             </select>
           </div>
@@ -281,37 +446,61 @@ export default function EditUniversity() {
 
         {/* State */}
         <div>
-          <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+          <label htmlFor="state_code" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
             State/Province
           </label>
-          <input
-            type="text"
-            id="state"
-            name="state"
-            value={formData.state}
+          <select
+            id="state_code"
+            name="state_code"
+            value={formData.state_code || ""}
             onChange={handleInputChange}
-            placeholder="Enter state or province"
-            className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-          />
+            disabled={!formData.country_code}
+            className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="">Select State</option>
+            {filteredStates.map(state => (
+              <option key={state.isoCode} value={state.isoCode}>{state.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* City */}
+        <div>
+          <label htmlFor="city_code" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+            City
+          </label>
+          <select
+            id="city_code"
+            name="city_code"
+            value={formData.city_code || ""}
+            onChange={handleInputChange}
+            disabled={!formData.state_code}
+            className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="">Select City</option>
+            {filteredCities.map(city => (
+              <option key={city.name} value={city.name}>{city.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 
       {/* University Type */}
       <div>
-        <label htmlFor="universityType" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+        <label htmlFor="type_of_university_id" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
           Type of University *
         </label>
         <select
-          id="universityType"
-          name="universityType"
-          value={formData.universityType}
+          id="type_of_university_id"
+          name="type_of_university_id"
+          value={formData.type_of_university_id || ""}
           onChange={handleInputChange}
           required
           className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 appearance-none"
         >
           <option value="">Select University Type</option>
-          {universityTypes.map(type => (
-            <option key={type} value={type}>{type}</option>
+          {options.universityTypes.map(type => (
+            <option key={type.id} value={type.id}>{type.name}</option>
           ))}
         </select>
       </div>
@@ -323,7 +512,7 @@ export default function EditUniversity() {
       {/* Email */}
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-          University Email *
+          University Email
         </label>
         <div className="relative">
           <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
@@ -333,10 +522,9 @@ export default function EditUniversity() {
             type="email"
             id="email"
             name="email"
-            value={formData.email}
+            value={formData.email || ""}
             onChange={handleInputChange}
             placeholder="Enter university email address"
-            required
             className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
           />
         </div>
@@ -345,7 +533,7 @@ export default function EditUniversity() {
       {/* Address */}
       <div>
         <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-          Address *
+          Address
         </label>
         <div className="relative">
           <span className="absolute top-4 left-4 text-gray-500 dark:text-gray-400">
@@ -354,20 +542,19 @@ export default function EditUniversity() {
           <textarea
             id="address"
             name="address"
-            value={formData.address}
+            value={formData.address || ""}
             onChange={handleInputChange}
             placeholder="Enter complete university address"
             rows={3}
-            required
             className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 resize-none"
           />
         </div>
       </div>
 
-      {/* Google Map URL */}
+      {/* Map URL */}
       <div>
-        <label htmlFor="googleMapUrl" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-          Google Map URL (Embed URL)
+        <label htmlFor="map_url" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+          Google Map URL
         </label>
         <div className="relative">
           <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
@@ -375,28 +562,46 @@ export default function EditUniversity() {
           </span>
           <input
             type="url"
-            id="googleMapUrl"
-            name="googleMapUrl"
-            value={formData.googleMapUrl}
+            id="map_url"
+            name="map_url"
+            value={formData.map_url || ""}
             onChange={handleInputChange}
             placeholder="https://maps.google.com/embed?pb=..."
             className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
           />
         </div>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Paste the embed URL from Google Maps for the location iframe
-        </p>
+      </div>
+
+      {/* Location URL */}
+      <div>
+        <label htmlFor="location_url" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+          Location URL
+        </label>
+        <div className="relative">
+          <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+            <Link size={18} />
+          </span>
+          <input
+            type="url"
+            id="location_url"
+            name="location_url"
+            value={formData.location_url || ""}
+            onChange={handleInputChange}
+            placeholder="https://university.edu/location"
+            className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+          />
+        </div>
       </div>
 
       {/* Map Preview */}
-      {formData.googleMapUrl && (
+      {formData.map_url && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
             Map Preview
           </label>
           <div className="rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden">
             <iframe
-              src={formData.googleMapUrl}
+              src={formData.map_url}
               width="100%"
               height="200"
               style={{ border: 0 }}
@@ -412,186 +617,150 @@ export default function EditUniversity() {
 
   const renderMediaTab = () => (
     <div className="space-y-5">
-      {/* Logo Upload */}
+      {/* Logo URL */}
       <div>
         <label htmlFor="logo" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-          University Logo *
+          University Logo URL
         </label>
-        <div className="flex items-center gap-4">
-          {(formData.existingLogo || formData.logo) ? (
-            <div className="relative">
-              <div className="w-32 h-32 border-2 border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center bg-gray-50 dark:bg-gray-800">
-                {formData.logo ? (
-                  <div className="text-center">
-                    <FileText size={24} className="text-green-500 mb-2 mx-auto" />
-                    <p className="text-xs text-green-600 dark:text-green-400">New logo selected</p>
-                    <p className="text-xs text-gray-500 truncate px-2">{formData.logo.name}</p>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <FileText size={24} className="text-brand-500 mb-2 mx-auto" />
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Current logo</p>
-                  </div>
-                )}
-              </div>
+        <div className="space-y-3">
+          <div className="relative">
+            <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+              <Link size={18} />
+            </span>
+            <input
+              type="url"
+              id="logo"
+              name="logo"
+              value={formData.logo || ""}
+              onChange={(e) => handleMediaUrlChange('logo', e.target.value)}
+              placeholder="https://example.com/logo.png"
+              className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleUseDummyUrl('logo')}
+              className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Use Dummy Logo URL
+            </button>
+            {formData.logo && (
               <button
                 type="button"
                 onClick={() => handleRemoveFile('logo')}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                className="px-3 py-2 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
               >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                Remove Logo
               </button>
-            </div>
-          ) : (
-            <label className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-brand-300 dark:hover:border-brand-500 transition-colors">
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <FileText size={24} className="text-gray-400 mb-2" />
-                <p className="text-xs text-gray-500 dark:text-gray-400">Upload Logo</p>
-              </div>
-              <input
-                id="logo"
-                name="logo"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </label>
-          )}
-          <div className="flex-1">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Recommended: Square PNG or JPG, min 200x200px
-            </p>
-            {formData.logo && (
-              <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-                New file selected: {formData.logo.name}
-              </p>
             )}
           </div>
+          {formData.logo && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Current Logo URL:</p>
+              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                <p className="text-sm text-green-600 dark:text-green-400 break-all">{formData.logo}</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Image Upload */}
+      {/* Image URL */}
       <div>
         <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-          University Image
+          University Image URL
         </label>
-        <div className="flex items-center gap-4">
-          {(formData.existingImage || formData.image) ? (
-            <div className="relative">
-              <div className="w-48 h-32 border-2 border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center bg-gray-50 dark:bg-gray-800">
-                {formData.image ? (
-                  <div className="text-center">
-                    <FileText size={24} className="text-green-500 mb-2 mx-auto" />
-                    <p className="text-xs text-green-600 dark:text-green-400">New image selected</p>
-                    <p className="text-xs text-gray-500 truncate px-2">{formData.image.name}</p>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <FileText size={24} className="text-brand-500 mb-2 mx-auto" />
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Current image</p>
-                  </div>
-                )}
-              </div>
+        <div className="space-y-3">
+          <div className="relative">
+            <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+              <Link size={18} />
+            </span>
+            <input
+              type="url"
+              id="image"
+              name="image"
+              value={formData.image || ""}
+              onChange={(e) => handleMediaUrlChange('image', e.target.value)}
+              placeholder="https://example.com/university.jpg"
+              className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleUseDummyUrl('image')}
+              className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Use Dummy Image URL
+            </button>
+            {formData.image && (
               <button
                 type="button"
                 onClick={() => handleRemoveFile('image')}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                className="px-3 py-2 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
               >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                Remove Image
               </button>
-            </div>
-          ) : (
-            <label className="flex flex-col items-center justify-center w-48 h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-brand-300 dark:hover:border-brand-500 transition-colors">
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <FileText size={24} className="text-gray-400 mb-2" />
-                <p className="text-xs text-gray-500 dark:text-gray-400">Upload Image</p>
-              </div>
-              <input
-                id="image"
-                name="image"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </label>
-          )}
-          <div className="flex-1">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Recommended: Landscape JPG, min 800x600px
-            </p>
-            {formData.image && (
-              <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-                New file selected: {formData.image.name}
-              </p>
             )}
           </div>
+          {formData.image && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Current Image URL:</p>
+              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                <p className="text-sm text-green-600 dark:text-green-400 break-all">{formData.image}</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Brochure Upload */}
+      {/* Brochure URL */}
       <div>
         <label htmlFor="brochure" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-          University Brochure (PDF)
+          University Brochure URL
         </label>
-        <div className="flex items-center gap-4">
-          {(formData.existingBrochure || formData.brochure) ? (
-            <div className="relative">
-              <div className="w-48 h-32 border-2 border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center bg-gray-50 dark:bg-gray-800">
-                {formData.brochure ? (
-                  <div className="text-center">
-                    <FileText size={24} className="text-green-500 mb-2 mx-auto" />
-                    <p className="text-xs text-green-600 dark:text-green-400">New brochure selected</p>
-                    <p className="text-xs text-gray-500 truncate px-2">{formData.brochure.name}</p>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <FileText size={24} className="text-brand-500 mb-2 mx-auto" />
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Current brochure</p>
-                  </div>
-                )}
-              </div>
+        <div className="space-y-3">
+          <div className="relative">
+            <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+              <Link size={18} />
+            </span>
+            <input
+              type="url"
+              id="brochure"
+              name="brochure"
+              value={formData.brochure || ""}
+              onChange={(e) => handleMediaUrlChange('brochure', e.target.value)}
+              placeholder="https://example.com/brochure.pdf"
+              className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleUseDummyUrl('brochure')}
+              className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Use Dummy Brochure URL
+            </button>
+            {formData.brochure && (
               <button
                 type="button"
                 onClick={() => handleRemoveFile('brochure')}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                className="px-3 py-2 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
               >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                Remove Brochure
               </button>
-            </div>
-          ) : (
-            <label className="flex flex-col items-center justify-center w-48 h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-brand-300 dark:hover:border-brand-500 transition-colors">
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <FileText size={24} className="text-gray-400 mb-2" />
-                <p className="text-xs text-gray-500 dark:text-gray-400">Upload PDF</p>
-              </div>
-              <input
-                id="brochure"
-                name="brochure"
-                type="file"
-                accept=".pdf"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </label>
-          )}
-          <div className="flex-1">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Upload university brochure in PDF format (max 10MB)
-            </p>
-            {formData.brochure && (
-              <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-                New file selected: {formData.brochure.name}
-              </p>
             )}
           </div>
+          {formData.brochure && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Current Brochure URL:</p>
+              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                <p className="text-sm text-green-600 dark:text-green-400 break-all">{formData.brochure}</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -601,7 +770,7 @@ export default function EditUniversity() {
     <div className="space-y-5">
       {/* Video Link */}
       <div>
-        <label htmlFor="videoLink" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+        <label htmlFor="video_link" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
           Video Link
         </label>
         <div className="relative">
@@ -610,22 +779,19 @@ export default function EditUniversity() {
           </span>
           <input
             type="url"
-            id="videoLink"
-            name="videoLink"
-            value={formData.videoLink}
+            id="video_link"
+            name="video_link"
+            value={formData.video_link || ""}
             onChange={handleInputChange}
             placeholder="https://youtube.com/embed/..."
             className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
           />
         </div>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Paste embed URL for university video tour or promotional video
-        </p>
       </div>
 
-      {/* Tuition Fee URL */}
+      {/* Tuition URL */}
       <div>
-        <label htmlFor="tuitionFeeUrl" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+        <label htmlFor="tuition_url" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
           Tuition Fee URL
         </label>
         <div className="relative">
@@ -634,9 +800,9 @@ export default function EditUniversity() {
           </span>
           <input
             type="url"
-            id="tuitionFeeUrl"
-            name="tuitionFeeUrl"
-            value={formData.tuitionFeeUrl}
+            id="tuition_url"
+            name="tuition_url"
+            value={formData.tuition_url || ""}
             onChange={handleInputChange}
             placeholder="https://university.edu/tuition-fees"
             className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
@@ -646,7 +812,7 @@ export default function EditUniversity() {
 
       {/* Partner Type */}
       <div>
-        <label htmlFor="partnerType" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+        <label htmlFor="kind_of_partner_id" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
           Kind of Partners
         </label>
         <div className="relative">
@@ -654,35 +820,35 @@ export default function EditUniversity() {
             <Users size={18} />
           </span>
           <select
-            id="partnerType"
-            name="partnerType"
-            value={formData.partnerType}
+            id="kind_of_partner_id"
+            name="kind_of_partner_id"
+            value={formData.kind_of_partner_id || ""}
             onChange={handleInputChange}
             className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 appearance-none"
           >
             <option value="">Select Partner Type</option>
-            {partnerTypes.map(type => (
-              <option key={type} value={type}>{type}</option>
+            {options.partnerTypes.map(type => (
+              <option key={type.id} value={type.id}>{type.name}</option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Collaboration */}
+      {/* Collaboration Type */}
       <div>
-        <label htmlFor="collaboration" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+        <label htmlFor="collaboration_type_id" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
           Collaboration Type
         </label>
         <select
-          id="collaboration"
-          name="collaboration"
-          value={formData.collaboration}
+          id="collaboration_type_id"
+          name="collaboration_type_id"
+          value={formData.collaboration_type_id || ""}
           onChange={handleInputChange}
           className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 appearance-none"
         >
           <option value="">Select Collaboration Type</option>
-          {collaborationTypes.map(type => (
-            <option key={type} value={type}>{type}</option>
+          {options.collaborationTypes.map(type => (
+            <option key={type.id} value={type.id}>{type.name}</option>
           ))}
         </select>
       </div>
@@ -752,6 +918,18 @@ export default function EditUniversity() {
           {/* Navigation and Submit Buttons */}
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex gap-3">
+              
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 sm:w-auto"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="flex gap-3">
+
               {activeTab !== "basic" && (
                 <button
                   type="button"
@@ -783,16 +961,9 @@ export default function EditUniversity() {
                   </svg>
                 </button>
               )}
-            </div>
 
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 sm:w-auto"
-              >
-                Cancel
-              </button>
+              {activeTab === "additional" && (
+              
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -813,6 +984,8 @@ export default function EditUniversity() {
                   </>
                 )}
               </button>
+
+              )}
             </div>
           </div>
         </form>

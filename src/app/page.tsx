@@ -6,6 +6,7 @@ import Footer from '@/components/site/Footer';
 import AgentPromo from '@/components/site/AgentPromo';
 import StudentPromo from '@/components/site/StudentPromo';
 import Brands from '@/components/site/Brands';
+import CTA from '@/components/site/CTA';
 
 
 export const metadata: Metadata = {
@@ -78,8 +79,9 @@ export default function HomePage() {
         <Header />
         <Hero />
         <Brands />
-        <AgentPromo />
+        <CTA />
         <StudentPromo />
+        <AgentPromo />
         <Footer />
        
       </main>

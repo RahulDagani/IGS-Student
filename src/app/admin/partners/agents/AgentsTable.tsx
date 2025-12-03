@@ -28,6 +28,8 @@ interface Agent {
   email: string;
   phoneNumber: string;
   status: "approved" | "pending approval" | "payment verification pending";
+  isPaymentVerified: boolean;
+  isApproved: boolean;
 }
 
 type SortField = keyof Agent | "";
@@ -71,7 +73,10 @@ export default function AgentTable() {
             businessName: apiAgent.business_name || "N/A",
             email: apiAgent.email,
             phoneNumber: apiAgent.phone || "N/A",
-            status: getAgentStatus(apiAgent.is_agent_verified, apiAgent.is_payment_verified)
+            status: getAgentStatus(apiAgent.is_agent_verified, apiAgent.is_payment_verified),
+            isApproved: apiAgent.is_agent_verified == 1 ? true : false,
+            isPaymentVerified: apiAgent.is_payment_verified == 1 ? true : false,
+
           }));
           
           setAgents(transformedAgents);
@@ -250,6 +255,8 @@ export default function AgentTable() {
                     { key: "email", label: "Email" },
                     { key: "phoneNumber", label: "Phone Number" },
                     { key: "status", label: "Status" },
+                    { key: "payment", label: "Payment" },
+
                     { key: "students", label: "Students" },
                   ].map(({ key, label }) => (
                     <TableCell
@@ -288,14 +295,43 @@ export default function AgentTable() {
                       <TableCell className="px-5 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
                         {agent.phoneNumber}
                       </TableCell>
+                      
+                      
+
                       <TableCell className="px-5 py-4 text-start">
+                        {agent.isApproved ? <Badge
+                          size="sm"
+                          color="success"
+                        >
+                          Approved
+                        </Badge>
+                        :
                         <Badge
                           size="sm"
-                          color={getStatusColor(agent.status)}
+                          color="error"
                         >
-                          {formatStatus(agent.status)}
-                        </Badge>
+                          Not Approved
+                        </Badge>}
+                        
                       </TableCell>
+
+                      <TableCell className="px-5 py-4 text-start">
+                        {agent.isPaymentVerified ? <Badge
+                          size="sm"
+                          color="primary"
+                        >
+                          Verified
+                        </Badge>
+                        :
+                        <Badge
+                          size="sm"
+                          color="warning"
+                        >
+                          Not Verified
+                        </Badge>}
+                        
+                      </TableCell>
+
                       <TableCell className="px-5 py-4 text-blue-500 text-start text-theme-sm dark:text-blue-400">
                         <Link 
                         href={`/admin/partners/agents/${agent.id}/students`}

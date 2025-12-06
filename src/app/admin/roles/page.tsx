@@ -205,12 +205,12 @@ export default function RolesAndPermissionsPage() {
                             {roles.filter(role => isSystemRole(role)).length}
                         </p>
                     </div> */}
-                    <div className="bg-[#111827] rounded-xl border border-white/10 p-4">
+                    {/* <div className="bg-[#111827] rounded-xl border border-white/10 p-4">
                         <h3 className="text-sm text-gray-400 mb-2">Custom Roles</h3>
                         <p className="text-2xl font-bold text-green-400">
                             {roles.filter(role => !isSystemRole(role)).length}
                         </p>
-                    </div>
+                    </div> */}
                 </div>
 
                 <div className="bg-[#111827] rounded-xl shadow-lg border border-white/10 p-6">

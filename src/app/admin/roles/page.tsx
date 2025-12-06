@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Printer, Edit, Trash2, X, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 interface Permission {
     id: string;
@@ -12,20 +13,35 @@ interface Permission {
 }
 
 interface Role {
-    id: string;
-    name: string;
-    description?: string;
-    isSystem: boolean;
-    permissions: Permission[];
+    id: number;
+    tenant_id: number;
+    role_name: string;
+    role_key: string;
+    created_at: string;
+    permissions_count: number;
+    modules: {
+        module_id: number;
+        module_name: string;
+        module_key: string;
+        permissions: string[];
+    }[];
 }
+
+interface ApiResponse {
+    success: boolean;
+    data: Role[];
+}
+
+const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
 export default function RolesAndPermissionsPage() {
     const [roles, setRoles] = useState<Role[]>([]);
     const [loading, setLoading] = useState(true);
     const [perPage, setPerPage] = useState<number>(10);
-    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<number | null>(null);
     const [success, setSuccess] = useState<string>("");
     const [error, setError] = useState<string>("");
+    const {token} = useAuth();
 
     const router = useRouter();
 
@@ -47,13 +63,18 @@ export default function RolesAndPermissionsPage() {
 
     const fetchRoles = async () => {
         try {
-            const response = await fetch("/api/setup/roles");
-            const data = await response.json();
+            const response = await fetch(`${BASE_URL}/tenant/roles`,{
+                headers:{
+                    "Authorization": `Bearer ${token}`
+                }
+            });
+            const data: ApiResponse = await response.json();
 
-            if (response.ok) {
-                setRoles(data);
+            if (data.success) {
+                setRoles(data.data);
+                showToast("Roles loaded successfully!", "success");
             } else {
-                showToast(data.error || "Failed to load roles", "error");
+                showToast("Failed to load roles", "error");
             }
         } catch (error) {
             console.error("Error fetching roles:", error);
@@ -73,7 +94,7 @@ export default function RolesAndPermissionsPage() {
         }
     };
 
-    const handleDelete = async (id: string, name: string) => {
+    const handleDelete = async (id: number, name: string) => {
         if (!confirm(`Are you sure you want to delete the role "${name}"?`)) {
             return;
         }
@@ -81,7 +102,8 @@ export default function RolesAndPermissionsPage() {
         setDeletingId(id);
 
         try {
-            const response = await fetch(`/api/setup/roles/${id}`, {
+            // Note: You'll need to replace this with your actual DELETE endpoint
+            const response = await fetch(`/api/tenant/roles/${id}`, {
                 method: "DELETE",
             });
 
@@ -100,6 +122,38 @@ export default function RolesAndPermissionsPage() {
         }
     };
 
+    // Format date
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    // Get permissions summary for display
+    const getPermissionsSummary = (role: Role) => {
+        let totalPermissions = 0;
+        const moduleNames: string[] = [];
+        
+        role.modules.forEach(module => {
+            totalPermissions += module.permissions.length;
+            moduleNames.push(module.module_name);
+        });
+        
+        return {
+            totalPermissions,
+            moduleNames: moduleNames.slice(0, 3) // Show first 3 modules
+        };
+    };
+
+    // Check if role is system role (you can customize this logic)
+    const isSystemRole = (role: Role) => {
+        const systemRoles = ['admin', 'super_admin', 'user'];
+        return systemRoles.includes(role.role_key.toLowerCase());
+    };
+
     if (loading) {
         return (
             <div className="flex min-h-screen bg-[#0f172a]">
@@ -112,10 +166,8 @@ export default function RolesAndPermissionsPage() {
 
     return (
         <div className="flex flex-col lg:flex-row min-h-screen bg-[#0f172a]">
-            {/* Sidebar */}
-
             {/* Main Content */}
-            <div className="flex-1 mt-6 ml-0 lg:ml-6 lg:mt-0 mb-6">
+            <div className="flex-1 mt-6  lg:mt-0 mb-6 ">
                 {/* Toast Notifications */}
                 {success && (
                     <div className="mb-6 p-4 bg-green-500/10 border border-green-500 rounded-lg flex justify-between items-center">
@@ -141,9 +193,29 @@ export default function RolesAndPermissionsPage() {
                     </div>
                 )}
 
+                {/* Summary Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-[#111827] rounded-xl border border-white/10 p-4">
+                        <h3 className="text-sm text-gray-400 mb-2">Total Roles</h3>
+                        <p className="text-2xl font-bold text-white">{roles.length}</p>
+                    </div>
+                    <div className="bg-[#111827] rounded-xl border border-white/10 p-4">
+                        <h3 className="text-sm text-gray-400 mb-2">System Roles</h3>
+                        <p className="text-2xl font-bold text-blue-400">
+                            {roles.filter(role => isSystemRole(role)).length}
+                        </p>
+                    </div>
+                    <div className="bg-[#111827] rounded-xl border border-white/10 p-4">
+                        <h3 className="text-sm text-gray-400 mb-2">Custom Roles</h3>
+                        <p className="text-2xl font-bold text-green-400">
+                            {roles.filter(role => !isSystemRole(role)).length}
+                        </p>
+                    </div>
+                </div>
+
                 <div className="bg-[#111827] rounded-xl shadow-lg border border-white/10 p-6">
                     {/* Header Section */}
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
                         <div>
                             <h2 className="text-2xl font-bold text-white">
                                 Roles & Permissions
@@ -155,8 +227,12 @@ export default function RolesAndPermissionsPage() {
 
                         <div className="flex items-center gap-3">
                             {/* Print Button */}
-                            <button className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-sm rounded-lg transition">
+                            <button 
+                                onClick={() => window.print()}
+                                className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-sm rounded-lg transition"
+                            >
                                 <Printer className="w-4 h-4" />
+                                Print
                             </button>
 
                             {/* Create Button */}
@@ -184,127 +260,141 @@ export default function RolesAndPermissionsPage() {
                                         Role Name
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
-                                        Description
+                                        Role Key
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
                                         Permissions
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                                        Modules
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                                        Created Date
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
                                         Type
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
-                                        Action
+                                        Actions
                                     </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-700">
-                                {roles.map((role, index) => (
-                                    <tr
-                                        key={role.id}
-                                        className="hover:bg-[#1F2937] transition-colors"
-                                    >
-                                        <td className="px-6 py-4 text-gray-300">
-                                            {index + 1}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <Users className="w-4 h-4 text-indigo-400" />
-                                                <span className="text-white font-medium">
-                                                    {role.name}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-300">
-                                            {role.description ||
-                                                "No description"}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-300">
-                                            <div className="flex flex-wrap gap-1">
-                                                {role.permissions
-                                                    .slice(0, 3)
-                                                    .map((perm) => (
+                                {roles.slice(0, perPage).map((role, index) => {
+                                    const permissionsSummary = getPermissionsSummary(role);
+                                    const systemRole = isSystemRole(role);
+                                    
+                                    return (
+                                        <tr
+                                            key={role.id}
+                                            className="hover:bg-[#1F2937] transition-colors"
+                                        >
+                                            <td className="px-6 py-4 text-gray-300">
+                                                {index + 1}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <Users className="w-4 h-4 text-indigo-400" />
+                                                    <span className="text-white font-medium">
+                                                        {role.role_name}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-300">
+                                                <code className="px-2 py-1 text-xs bg-gray-800 rounded">
+                                                    {role.role_key}
+                                                </code>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-sm text-gray-300">
+                                                        {permissionsSummary.totalPermissions} permissions
+                                                    </span>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {role.modules.map((module, idx) => (
+                                                            module.permissions.map((perm, permIdx) => (
+                                                                <span
+                                                                    key={`${module.module_id}-${permIdx}`}
+                                                                    className="px-2 py-1 text-xs bg-indigo-500/20 text-indigo-300 rounded border border-indigo-500/30"
+                                                                >
+                                                                    {module.module_key}.{perm}
+                                                                </span>
+                                                            ))
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-300">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {permissionsSummary.moduleNames.map((moduleName, idx) => (
                                                         <span
-                                                            key={perm.id}
-                                                            className="px-2 py-1 text-xs bg-indigo-500/20 text-indigo-300 rounded border border-indigo-500/30"
+                                                            key={idx}
+                                                            className="px-2 py-1 text-xs bg-purple-500/20 text-purple-300 rounded border border-purple-500/30"
                                                         >
-                                                            {perm.name}
+                                                            {moduleName}
                                                         </span>
                                                     ))}
-                                                {role.permissions.length >
-                                                    3 && (
-                                                    <span className="px-2 py-1 text-xs bg-gray-600 text-gray-300 rounded">
-                                                        +
-                                                        {role.permissions
-                                                            .length - 3}{" "}
-                                                        more
-                                                    </span>
-                                                )}
-                                                {role.permissions.length ===
-                                                    0 && (
-                                                    <span className="px-2 py-1 text-xs bg-gray-600 text-gray-300 rounded">
-                                                        No permissions
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span
-                                                className={`px-2 py-1 text-xs rounded-full ${
-                                                    role.isSystem
-                                                        ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
-                                                        : "bg-gray-500/20 text-gray-300 border border-gray-500/30"
-                                                }`}
-                                            >
-                                                {role.isSystem
-                                                    ? "System"
-                                                    : "Custom"}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                {role.name != "SUPER_ADMIN" ? (
+                                                    {role.modules.length > 3 && (
+                                                        <span className="px-2 py-1 text-xs bg-gray-600 text-gray-300 rounded">
+                                                            +{role.modules.length - 3} more
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-300">
+                                                {formatDate(role.created_at)}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span
+                                                    className={`px-2 py-1 text-xs rounded-full ${
+                                                        systemRole
+                                                            ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                                                            : "bg-green-500/20 text-green-300 border border-green-500/30"
+                                                    }`}
+                                                >
+                                                    {systemRole ? "System" : "Custom"}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={() =>
                                                             router.push(
-                                                                `/admin/setup/roles/edit/${role.id}`
+                                                                `/admin/roles/edit/${role.id}`
                                                             )
                                                         }
                                                         className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition"
-                                                        title={"Edit role"}
+                                                        title="Edit role"
                                                     >
                                                         <Edit className="w-4 h-4" />
                                                     </button>
-                                                ) : (
-                                                    <></>
-                                                )}
 
-                                                {!role.isSystem && (
-                                                    <button
-                                                        onClick={() =>
-                                                            handleDelete(
-                                                                role.id,
-                                                                role.name
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            deletingId ===
-                                                            role.id
-                                                        }
-                                                        className="p-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition disabled:opacity-50"
-                                                        title="Delete role"
-                                                    >
-                                                        {deletingId ===
-                                                        role.id ? (
-                                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                        ) : (
-                                                            <Trash2 className="w-4 h-4" />
-                                                        )}
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                                    {!systemRole && (
+                                                        <button
+                                                            onClick={() =>
+                                                                handleDelete(
+                                                                    role.id,
+                                                                    role.role_name
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                deletingId === role.id
+                                                            }
+                                                            className="p-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition disabled:opacity-50"
+                                                            title="Delete role"
+                                                        >
+                                                            {deletingId === role.id ? (
+                                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                            ) : (
+                                                                <Trash2 className="w-4 h-4" />
+                                                            )}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
 
@@ -330,10 +420,10 @@ export default function RolesAndPermissionsPage() {
                     </div>
 
                     {/* Footer Section */}
-                    <div className="mt-6 flex items-center justify-between border-t border-gray-700 pt-4">
+                    <div className="mt-6 flex flex-col sm:flex-row items-center justify-between border-t border-gray-700 pt-4 gap-4">
                         <div className="flex items-center gap-3">
                             <span className="text-sm text-gray-300">
-                                Per Page
+                                Rows per page
                             </span>
                             <select
                                 value={perPage}
@@ -342,17 +432,20 @@ export default function RolesAndPermissionsPage() {
                                 }
                                 className="text-sm rounded-md bg-[#111827] border border-gray-700 text-white px-2 py-1 focus:ring-2 focus:ring-indigo-500"
                             >
+                                <option value={5}>5</option>
                                 <option value={10}>10</option>
                                 <option value={20}>20</option>
                                 <option value={50}>50</option>
                             </select>
                         </div>
                         <div className="text-sm text-gray-400">
-                            Showing {roles.length} role
+                            Showing {Math.min(perPage, roles.length)} of {roles.length} role
                             {roles.length !== 1 ? "s" : ""}
                         </div>
                     </div>
                 </div>
+
+                
             </div>
         </div>
     );

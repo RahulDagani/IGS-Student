@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -9,78 +9,71 @@ import {
 } from "@/components/ui/table";
 import Badge from "@/components/ui/badge/Badge";
 import Link from "next/link";
-import { Edit, Trash, Plus, Mail, Phone, User, IdCard } from "lucide-react";
+import { Edit, Trash, Plus, Mail, Phone, User, IdCard, Loader } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 interface User {
   id: number;
-  name: string;
+  tenant_id: number;
   email: string;
-  employeeCode: string;
-  mobile: string;
-  role: "admin" | "manager" | "staff" | "viewer";
-  registeredBy: string;
-  createdAt: string;
-  status: "active" | "inactive";
+  phone: string;
+  role: string;
+  status: string;
+  email_verified: number;
+  created_by: string | null;
+  is_deleted: number;
+  created_at: string;
+  updated_at: string;
 }
 
-// Define the table data using the interface
-const tableData: User[] = [
-  {
-    id: 1,
-    name: "John Smith",
-    email: "john.smith@university.com",
-    employeeCode: "EMP001",
-    mobile: "+1 (555) 123-4567",
-    role: "admin",
-    registeredBy: "System",
-    createdAt: "2024-01-15",
-    status: "active",
-  },
-  {
-    id: 2,
-    name: "Sarah Johnson",
-    email: "sarah.j@university.com",
-    employeeCode: "EMP002",
-    mobile: "+1 (555) 234-5678",
-    role: "manager",
-    registeredBy: "John Smith",
-    createdAt: "2024-02-20",
-    status: "active",
-  },
-  {
-    id: 3,
-    name: "Mike Chen",
-    email: "mike.chen@university.com",
-    employeeCode: "EMP003",
-    mobile: "+1 (555) 345-6789",
-    role: "staff",
-    registeredBy: "Sarah Johnson",
-    createdAt: "2024-03-10",
-    status: "inactive",
-  },
-  {
-    id: 4,
-    name: "Emily Davis",
-    email: "emily.davis@university.com",
-    employeeCode: "EMP004",
-    mobile: "+1 (555) 456-7890",
-    role: "viewer",
-    registeredBy: "John Smith",
-    createdAt: "2024-01-28",
-    status: "active",
-  },
-  {
-    id: 5,
-    name: "Robert Wilson",
-    email: "robert.w@university.com",
-    employeeCode: "EMP005",
-    mobile: "+1 (555) 567-8901",
-    role: "staff",
-    registeredBy: "Sarah Johnson",
-    createdAt: "2024-04-05",
-    status: "active",
-  },
-];
+interface Pagination {
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
+interface UsersApiResponse {
+  success: boolean;
+  data: {
+    users: User[];
+    pagination: Pagination;
+  };
+}
+
+interface StatsApiResponse {
+  success: boolean;
+  data: {
+    overall_stats: {
+      total_users: number;
+      active_users: string;
+      inactive_users: string;
+      suspended_users: string;
+      verified_users: string;
+      unverified_users: string;
+    };
+    roles_distribution: {
+      role: string;
+      count: number;
+    }[];
+  };
+}
+interface StatsApiResponseData {
+  
+    overall_stats: {
+      total_users: number;
+      active_users: string;
+      inactive_users: string;
+      suspended_users: string;
+      verified_users: string;
+      unverified_users: string;
+    };
+    roles_distribution: {
+      role: string;
+      count: number;
+    }[];
+  
+}
 
 type SortField = keyof User | "";
 type SortDirection = "asc" | "desc";
@@ -88,7 +81,7 @@ type SortDirection = "asc" | "desc";
 interface FilterOptions {
   role: string;
   status: string;
-  registeredBy: string;
+  search: string;
 }
 
 interface FilterModalProps {
@@ -97,7 +90,7 @@ interface FilterModalProps {
   onApply: (filters: FilterOptions) => void;
   roles: string[];
   statuses: string[];
-  registeredByUsers: string[];
+  currentFilters: FilterOptions;
 }
 
 const FilterModal: React.FC<FilterModalProps> = ({
@@ -106,17 +99,21 @@ const FilterModal: React.FC<FilterModalProps> = ({
   onApply,
   roles,
   statuses,
-  registeredByUsers,
+  currentFilters,
 }) => {
-  const [selectedRole, setSelectedRole] = useState<string>("all");
-  const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [selectedRegisteredBy, setSelectedRegisteredBy] = useState<string>("all");
+  const [selectedRole, setSelectedRole] = useState<string>(currentFilters.role);
+  const [selectedStatus, setSelectedStatus] = useState<string>(currentFilters.status);
+
+  useEffect(() => {
+    setSelectedRole(currentFilters.role);
+    setSelectedStatus(currentFilters.status);
+  }, [currentFilters]);
 
   const handleApply = () => {
     const filters: FilterOptions = {
       role: selectedRole,
       status: selectedStatus,
-      registeredBy: selectedRegisteredBy,
+      search: currentFilters.search,
     };
     onApply(filters);
     onClose();
@@ -125,14 +122,16 @@ const FilterModal: React.FC<FilterModalProps> = ({
   const handleReset = () => {
     setSelectedRole("all");
     setSelectedStatus("all");
-    setSelectedRegisteredBy("all");
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex z-999999">
-      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div 
+        className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
             Filter Users
@@ -161,7 +160,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
               <option value="all">All Roles</option>
               {roles.map((role) => (
                 <option key={role} value={role}>
-                  {role.charAt(0).toUpperCase() + role.slice(1)}
+                  {role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                 </option>
               ))}
             </select>
@@ -180,26 +179,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
               <option value="all">All Status</option>
               {statuses.map((status) => (
                 <option key={status} value={status}>
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Registered By Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Registered By
-            </label>
-            <select
-              value={selectedRegisteredBy}
-              onChange={(e) => setSelectedRegisteredBy(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="all">All Users</option>
-              {registeredByUsers.map((user) => (
-                <option key={user} value={user}>
-                  {user}
+                  {status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                 </option>
               ))}
             </select>
@@ -225,7 +205,13 @@ const FilterModal: React.FC<FilterModalProps> = ({
   );
 };
 
+const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+
 export default function UsersTable() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [stats, setStats] = useState<StatsApiResponseData>();
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortField, setSortField] = useState<SortField>("");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -233,39 +219,110 @@ export default function UsersTable() {
   const [filters, setFilters] = useState<FilterOptions>({
     role: "all",
     status: "all",
-    registeredBy: "all",
+    search: "",
   });
+
+  const {token} = useAuth();
+
+  // Fetch users data
+  useEffect(() => {
+    fetchUsers();
+    fetchStats();
+  }, [filters]);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      let url = `${BASE_URL}/tenant/users?`;
+      const params = new URLSearchParams();
+      
+      if (filters.role !== "all") {
+        params.append("role", filters.role);
+      }
+      if (filters.status !== "all") {
+        params.append("status", filters.status);
+      }
+      if (filters.search) {
+        params.append("search", filters.search);
+      }
+      
+      url += params.toString();
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data: UsersApiResponse = await response.json();
+      
+      if (data.success) {
+        setUsers(data.data.users);
+        setPagination(data.data.pagination);
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/tenant/users/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data: StatsApiResponse = await response.json();
+      
+      if (data.success) {
+        setStats(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  };
 
   // Get unique values for filters
   const roles = useMemo(() => {
-    return Array.from(new Set(tableData.map(user => user.role)));
-  }, []);
+    if (stats?.roles_distribution) {
+      return stats.roles_distribution.map((item: {
+      role: string;
+      count: number;
+    }) => item.role);
+    }
+    return Array.from(new Set(users.map(user => user.role)));
+  }, [stats, users]);
 
   const statuses = useMemo(() => {
-    return Array.from(new Set(tableData.map(user => user.status)));
-  }, []);
+    return Array.from(new Set(users.map(user => user.status)));
+  }, [users]);
 
-  const registeredByUsers = useMemo(() => {
-    return Array.from(new Set(tableData.map(user => user.registeredBy)));
-  }, []);
-
-  // Filter and sort data
+  // Filter and sort data locally (or you can use server-side filtering)
   const filteredAndSortedData = useMemo(() => {
-    const filtered = tableData.filter((user) => {
-      const matchesSearch = 
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.employeeCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.mobile.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.registeredBy.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesRole = filters.role === "all" || user.role === filters.role;
-      const matchesStatus = filters.status === "all" || user.status === filters.status;
-      const matchesRegisteredBy = filters.registeredBy === "all" || user.registeredBy === filters.registeredBy;
-      
-      return matchesSearch && matchesRole && matchesStatus && matchesRegisteredBy;
-    });
+    let filtered = [...users];
+
+    // Apply local filters for role and status (if not already filtered by API)
+    if (filters.role !== "all") {
+      filtered = filtered.filter(user => user.role === filters.role);
+    }
+    if (filters.status !== "all") {
+      filtered = filtered.filter(user => user.status === filters.status);
+    }
+
+    // Apply local search
+    if (searchTerm) {
+      filtered = filtered.filter((user) => {
+        return (
+          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user.status.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      });
+    }
 
     // Sorting
     if (sortField) {
@@ -277,19 +334,23 @@ export default function UsersTable() {
           aValue = aValue.toLowerCase();
           bValue = bValue.toLowerCase();
         }
+
+        if(aValue && bValue){
+          if (aValue < bValue) {
+            return sortDirection === "asc" ? -1 : 1;
+          }
+          if (aValue > bValue) {
+            return sortDirection === "asc" ? 1 : -1;
+          }
+        }
         
-        if (aValue < bValue) {
-          return sortDirection === "asc" ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortDirection === "asc" ? 1 : -1;
-        }
+        
         return 0;
       });
     }
 
     return filtered;
-  }, [searchTerm, filters, sortField, sortDirection]);
+  }, [users, filters, searchTerm, sortField, sortDirection]);
 
   const handleSort = (field: keyof User) => {
     if (sortField === field) {
@@ -305,27 +366,33 @@ export default function UsersTable() {
     return sortDirection === "asc" ? "↑" : "↓";
   };
 
-  const getRoleColor = (role: User["role"]) => {
-    switch (role) {
+  const getRoleColor = (role: string) => {
+    switch (role.toLowerCase()) {
       case "admin":
         return "error";
-      case "manager":
+      case "agent":
         return "warning";
-      case "staff":
+      case "student":
         return "info";
-      case "viewer":
+      case "agent_student":
         return "primary";
       default:
         return "primary";
     }
   };
 
-  const getStatusColor = (status: User["status"]) => {
-    switch (status) {
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
       case "active":
         return "success";
       case "inactive":
         return "error";
+      case "suspended":
+        return "error";
+      case "pending_invite":
+        return "warning";
+      case "pending_verification":
+        return "warning";
       default:
         return "primary";
     }
@@ -339,27 +406,88 @@ export default function UsersTable() {
     });
   };
 
-  const handleApplyFilters = (newFilters: FilterOptions) => {
-    setFilters(newFilters);
+  const formatRole = (role: string) => {
+    return role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
-  const hasActiveFilters = filters.role !== "all" || filters.status !== "all" || 
-                          filters.registeredBy !== "all";
+  const formatStatus = (status: string) => {
+    return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  };
+
+  const handleApplyFilters = (newFilters: FilterOptions) => {
+    // Update both local filters and trigger API call
+    setFilters(prev => ({
+      ...prev,
+      role: newFilters.role,
+      status: newFilters.status,
+    }));
+  };
+
+  const handleSearch = () => {
+    setFilters(prev => ({
+      ...prev,
+      search: searchTerm,
+    }));
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   const clearAllFilters = () => {
     setFilters({
       role: "all",
       status: "all",
-      registeredBy: "all",
+      search: "",
     });
+    setSearchTerm("");
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
-      console.log("Delete user:", id);
-      // Perform delete operation
+      try {
+        const response = await fetch(`${BASE_URL}/tenant/users/${id}`, {
+          method: "DELETE",
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Refresh users list
+          fetchUsers();
+          fetchStats();
+        } else {
+          alert(data.message || "Failed to delete user");
+        }
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        alert("Failed to delete user");
+      }
     }
   };
+
+  const hasActiveFilters = filters.role !== "all" || filters.status !== "all" || filters.search;
+
+  if (loading && users.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader className="w-8 h-8 animate-spin mx-auto mb-4 text-gray-400" />
+          <div className="text-gray-500 dark:text-gray-400">Loading users...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -368,28 +496,49 @@ export default function UsersTable() {
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">Total Users</div>
           <div className="text-2xl font-bold text-gray-800 dark:text-white">
-            {filteredAndSortedData.length}
+            {stats?.overall_stats?.total_users || 0}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">Active Users</div>
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {filteredAndSortedData.filter(u => u.status === 'active').length}
+            {stats?.overall_stats?.active_users || 0}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Admin Users</div>
-          <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-            {filteredAndSortedData.filter(u => u.role === 'admin').length}
+          <div className="text-sm text-gray-500 dark:text-gray-400">Verified Users</div>
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {stats?.overall_stats?.verified_users || 0}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">Roles</div>
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {Array.from(new Set(filteredAndSortedData.map(u => u.role))).length}
+          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+            {roles.length || 0}
           </div>
         </div>
       </div>
+
+      {/* Role Distribution */}
+      {stats?.roles_distribution && (
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Role Distribution</h3>
+          <div className="flex flex-wrap gap-2">
+            {stats.roles_distribution.map((item: {
+      role: string;
+      count: number;
+    }) => (
+              <Badge 
+                key={item.role} 
+                color={getRoleColor(item.role)}
+                size="sm"
+              >
+                {formatRole(item.role)}: {item.count}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search and Filter Controls */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
@@ -398,10 +547,11 @@ export default function UsersTable() {
           <div className="relative">
             <input
               type="text"
-              placeholder="Search by name, email, employee code, mobile, or role..."
+              placeholder="Search by email, phone, role, or status..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-14 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:bg-white/[0.03] dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[430px]"
+              onChange={handleSearchChange}
+              onKeyPress={handleSearchKeyPress}
+              className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-14 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:bg-white/[0.03] dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
             />
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg
@@ -418,6 +568,14 @@ export default function UsersTable() {
                 />
               </svg>
             </div>
+            <button
+              onClick={handleSearch}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            >
+              <span className="text-sm text-brand-500 hover:text-brand-600">
+                Search
+              </span>
+            </button>
           </div>
         </div>
 
@@ -454,17 +612,17 @@ export default function UsersTable() {
         <div className="flex flex-wrap gap-2">
           {filters.role !== "all" && (
             <Badge size="sm" color="primary">
-              Role: {filters.role}
+              Role: {formatRole(filters.role)}
             </Badge>
           )}
           {filters.status !== "all" && (
             <Badge size="sm" color="primary">
-              Status: {filters.status}
+              Status: {formatStatus(filters.status)}
             </Badge>
           )}
-          {filters.registeredBy !== "all" && (
+          {filters.search && (
             <Badge size="sm" color="primary">
-              Registered By: {filters.registeredBy}
+              Search: {filters.search}
             </Badge>
           )}
         </div>
@@ -480,14 +638,12 @@ export default function UsersTable() {
                 <TableRow>
                   {[
                     { key: "id", label: "ID" },
-                    { key: "name", label: "Name" },
                     { key: "email", label: "Email" },
-                    { key: "employeeCode", label: "Employee Code" },
-                    { key: "mobile", label: "Mobile" },
+                    { key: "phone", label: "Phone" },
                     { key: "role", label: "Role" },
-                    { key: "registeredBy", label: "Registered By" },
                     { key: "status", label: "Status" },
-                    { key: "createdAt", label: "Created At" },
+                    { key: "email_verified", label: "Verified" },
+                    { key: "created_at", label: "Created At" },
                     { key: "action", label: "Action" },
                   ].map(({ key, label }) => (
                     <TableCell
@@ -509,7 +665,13 @@ export default function UsersTable() {
 
               {/* Table Body */}
               <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                {filteredAndSortedData.length > 0 ? (
+                {loading ? (
+                  <TableRow>
+                    <TableCell className="px-5 py-8 text-center">
+                      <Loader className="w-6 h-6 animate-spin mx-auto text-gray-400" />
+                    </TableCell>
+                  </TableRow>
+                ) : filteredAndSortedData.length > 0 ? (
                   filteredAndSortedData.map((user) => (
                     <TableRow key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <TableCell className="px-5 py-4 text-start">
@@ -518,36 +680,23 @@ export default function UsersTable() {
                         </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-                            <User size={16} className="text-gray-600 dark:text-gray-400" />
-                          </div>
-                          <span className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                            {user.name}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
                         <div className="flex items-center gap-2">
                           <Mail size={14} className="text-gray-400" />
-                          <span className="text-gray-600 text-theme-sm dark:text-gray-400">
-                            {user.email}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="flex items-center gap-2">
-                          <IdCard size={14} className="text-gray-400" />
-                          <span className="text-gray-600 text-theme-sm dark:text-gray-400">
-                            {user.employeeCode}
-                          </span>
+                          <div>
+                            <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
+                              {user.email}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              Tenant: {user.tenant_id}
+                            </div>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
                         <div className="flex items-center gap-2">
                           <Phone size={14} className="text-gray-400" />
                           <span className="text-gray-600 text-theme-sm dark:text-gray-400">
-                            {user.mobile}
+                            {user.phone}
                           </span>
                         </div>
                       </TableCell>
@@ -556,25 +705,28 @@ export default function UsersTable() {
                           size="sm"
                           color={getRoleColor(user.role)}
                         >
-                          {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                          {formatRole(user.role)}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="text-gray-600 text-theme-sm dark:text-gray-400">
-                          {user.registeredBy}
-                        </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
                         <Badge
                           size="sm"
                           color={getStatusColor(user.status)}
                         >
-                          {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
+                          {formatStatus(user.status)}
                         </Badge>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${user.email_verified ? 'bg-green-500' : 'bg-gray-300'}`} />
+                          <span className={`text-theme-sm ${user.email_verified ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {user.email_verified ? 'Verified' : 'Not Verified'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-5 py-4 text-start">
                         <div className="text-gray-500 text-theme-sm dark:text-gray-400">
-                          {formatDate(user.createdAt)}
+                          {formatDate(user.created_at)}
                         </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
@@ -599,10 +751,7 @@ export default function UsersTable() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell
-                      
-                      className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400"
-                    >
+                    <TableCell  className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400">
                       No users found matching your criteria.
                     </TableCell>
                   </TableRow>
@@ -613,9 +762,42 @@ export default function UsersTable() {
         </div>
       </div>
 
-      {/* Results Count */}
-      <div className="text-sm text-gray-500 dark:text-gray-400">
-        Showing {filteredAndSortedData.length} of {tableData.length} users
+      {/* Results Count and Pagination */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="text-sm text-gray-500 dark:text-gray-400">
+          Showing {filteredAndSortedData.length} of {pagination?.total || 0} users
+          {pagination && pagination.total_pages > 1 && (
+            <span className="ml-2">
+              (Page {pagination.page} of {pagination.total_pages})
+            </span>
+          )}
+        </div>
+        
+        {pagination && pagination.total_pages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              disabled={pagination.page <= 1}
+              onClick={() => {
+                // Handle previous page
+              }}
+              className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="px-3 py-1 text-sm">
+              {pagination.page} / {pagination.total_pages}
+            </span>
+            <button
+              disabled={pagination.page >= pagination.total_pages}
+              onClick={() => {
+                // Handle next page
+              }}
+              className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filter Modal */}
@@ -625,7 +807,7 @@ export default function UsersTable() {
         onApply={handleApplyFilters}
         roles={roles}
         statuses={statuses}
-        registeredByUsers={registeredByUsers}
+        currentFilters={filters}
       />
     </div>
   );

@@ -199,12 +199,12 @@ export default function RolesAndPermissionsPage() {
                         <h3 className="text-sm text-gray-400 mb-2">Total Roles</h3>
                         <p className="text-2xl font-bold text-white">{roles.length}</p>
                     </div>
-                    <div className="bg-[#111827] rounded-xl border border-white/10 p-4">
+                    {/* <div className="bg-[#111827] rounded-xl border border-white/10 p-4">
                         <h3 className="text-sm text-gray-400 mb-2">System Roles</h3>
                         <p className="text-2xl font-bold text-blue-400">
                             {roles.filter(role => isSystemRole(role)).length}
                         </p>
-                    </div>
+                    </div> */}
                     <div className="bg-[#111827] rounded-xl border border-white/10 p-4">
                         <h3 className="text-sm text-gray-400 mb-2">Custom Roles</h3>
                         <p className="text-2xl font-bold text-green-400">
@@ -226,14 +226,7 @@ export default function RolesAndPermissionsPage() {
                         </div>
 
                         <div className="flex items-center gap-3">
-                            {/* Print Button */}
-                            <button 
-                                onClick={() => window.print()}
-                                className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-sm rounded-lg transition"
-                            >
-                                <Printer className="w-4 h-4" />
-                                Print
-                            </button>
+                            
 
                             {/* Create Button */}
                             <button

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { 
   Plus, 
@@ -10,10 +10,6 @@ import {
   Video, 
   Newspaper, 
   Link as LinkIcon,
-  Users,
-  User,
-  Building2,
-  Globe,
   Search,
   Eye,
   Download,
@@ -27,7 +23,6 @@ interface Resource {
   title: string
   description: string
   resource_type: 'video' | 'news' | 'guide' | 'link'
-  // audience_type: 'student' | 'agent' | 'university' | 'all'
   url: string
   thumbnail: string | null
   created_at: string
@@ -73,14 +68,64 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
-export default function ResourcesPage() {
+// Modal Component moved outside
+const Modal = React.memo(({ 
+  isOpen, 
+  onClose, 
+  children, 
+  title 
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  children: React.ReactNode,
+  title: string 
+}) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-99999 overflow-y-auto">
+      <div className="flex min-h-screen items-center justify-center p-4">
+        {/* Backdrop */}
+        <div 
+          className="fixed inset-0 bg-black/50 transition-opacity"
+          onClick={onClose}
+        />
+        
+        {/* Modal */}
+        <div className="relative z-99999 w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl transition-all">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 px-6 py-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {title}
+            </h3>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-800"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          {/* Content */}
+          <div className="px-6 py-4">
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+})
+
+Modal.displayName = 'Modal'
+
+export default function StudentResourcesPage() {
   const router = useRouter()
   const { token } = useAuth()
   
   const [resources, setResources] = useState<Resource[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const debouncedSearchTerm = useDebounce(searchTerm, 500) // 500ms delay
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
     limit: 20,
@@ -95,12 +140,11 @@ export default function ResourcesPage() {
   const [showViewModal, setShowViewModal] = useState(false)
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null)
   
-  // Form states - FIXED: Use separate states for add and edit forms
+  // Form states
   const [addFormData, setAddFormData] = useState({
     title: "",
     description: "",
     resource_type: "guide" as Resource['resource_type'],
-    // audience_type: "agent" as Resource['audience_type'],
     url: "",
     thumbnail: null as File | null
   })
@@ -109,7 +153,6 @@ export default function ResourcesPage() {
     title: "",
     description: "",
     resource_type: "guide" as Resource['resource_type'],
-    // audience_type: "agent" as Resource['audience_type'],
     url: "",
     thumbnail: null as File | null | string
   })
@@ -118,27 +161,19 @@ export default function ResourcesPage() {
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
 
   // Resource type options
-  const resourceTypes = [
+  const resourceTypes = useMemo(() => [
     { value: "video", label: "Video", icon: Video },
     { value: "news", label: "News", icon: Newspaper },
     { value: "guide", label: "Guide", icon: FileText },
     { value: "link", label: "Link", icon: LinkIcon }
-  ]
+  ], [])
 
-  // Audience type options
-  // const audienceTypes = [
-  //   { value: "student", label: "Student", icon: User },
-  //   { value: "agent", label: "Agent", icon: Users },
-  //   { value: "university", label: "University", icon: Building2 },
-  //   { value: "all", label: "All", icon: Globe }
-  // ]
-
-  // Fetch resources with useCallback to prevent unnecessary re-renders
+  // Fetch resources with useCallback
   const fetchResources = useCallback(async (page = 1, search = "") => {
     try {
       setLoading(true)
       const response = await fetch(
-        `${BASE_URL}/tenant/resources?audience=${"student"}&page=${page}&limit=20${search ? `&search=${search}` : ''}`,
+        `${BASE_URL}/tenant/resources?audience=student&page=${page}&limit=20${search ? `&search=${search}` : ''}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -163,7 +198,7 @@ export default function ResourcesPage() {
   }, [token])
 
   // Fetch single resource
-  const fetchResourceById = async (id: number) => {
+  const fetchResourceById = useCallback(async (id: number) => {
     try {
       const response = await fetch(
         `${BASE_URL}/tenant/resources/${id}`,
@@ -186,65 +221,62 @@ export default function ResourcesPage() {
       console.error('Error fetching resource:', error)
     }
     return null
-  }
+  }, [token])
 
   // Use debounced search term in useEffect
   useEffect(() => {
     fetchResources(1, debouncedSearchTerm)
   }, [debouncedSearchTerm, fetchResources])
 
-  // Handle search - only update local state
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle search
+  const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value)
-  }
+  }, [])
 
   // Handle pagination
-  const handlePageChange = (newPage: number) => {
+  const handlePageChange = useCallback((newPage: number) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
       fetchResources(newPage, debouncedSearchTerm)
     }
-  }
+  }, [pagination.totalPages, fetchResources, debouncedSearchTerm])
 
   // Reset add form
-  const resetAddForm = () => {
+  const resetAddForm = useCallback(() => {
     setAddFormData({
       title: "",
       description: "",
       resource_type: "guide",
-      // audience_type: "agent",
       url: "",
       thumbnail: null
     })
     setThumbnailPreview(null)
-  }
+  }, [])
 
   // Reset edit form
-  const resetEditForm = () => {
+  const resetEditForm = useCallback(() => {
     setEditFormData({
       title: "",
       description: "",
       resource_type: "guide",
-      // audience_type: "agent",
       url: "",
       thumbnail: null
     })
     setThumbnailPreview(null)
-  }
+  }, [])
 
   // Open Add Modal
-  const openAddModal = () => {
+  const openAddModal = useCallback(() => {
     resetAddForm()
     setShowAddModal(true)
-  }
+  }, [resetAddForm])
 
   // Open Edit Modal
-  const openEditModal = async (resource: Resource) => {
+  const openEditModal = useCallback(async (resource: Resource) => {
     setSelectedResource(resource)
     setEditFormData({
       title: resource.title,
       description: resource.description,
       resource_type: resource.resource_type,
-      // audience_type: resource.audience_type,
       url: resource.url,
       thumbnail: resource.thumbnail
     })
@@ -252,25 +284,25 @@ export default function ResourcesPage() {
       setThumbnailPreview(resource.thumbnail)
     }
     setShowEditModal(true)
-  }
+  }, [])
 
   // Open View Modal
-  const openViewModal = async (resource: Resource) => {
+  const openViewModal = useCallback(async (resource: Resource) => {
     const fullResource = await fetchResourceById(resource.id)
     if (fullResource) {
       setSelectedResource(fullResource)
       setShowViewModal(true)
     }
-  }
+  }, [fetchResourceById])
 
   // Open Delete Modal
-  const openDeleteModal = (resource: Resource) => {
+  const openDeleteModal = useCallback((resource: Resource) => {
     setSelectedResource(resource)
     setShowDeleteModal(true)
-  }
+  }, [])
 
   // Handle add form input changes
-  const handleAddInputChange = (
+  const handleAddInputChange = useCallback((
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target
@@ -278,10 +310,10 @@ export default function ResourcesPage() {
       ...prev,
       [name]: value
     }))
-  }
+  }, [])
 
   // Handle edit form input changes
-  const handleEditInputChange = (
+  const handleEditInputChange = useCallback((
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target
@@ -289,10 +321,10 @@ export default function ResourcesPage() {
       ...prev,
       [name]: value
     }))
-  }
+  }, [])
 
   // Handle thumbnail file change for add form
-  const handleAddThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAddThumbnailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       setAddFormData(prev => ({ ...prev, thumbnail: file }))
@@ -304,10 +336,10 @@ export default function ResourcesPage() {
       }
       reader.readAsDataURL(file)
     }
-  }
+  }, [])
 
   // Handle thumbnail file change for edit form
-  const handleEditThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEditThumbnailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       setEditFormData(prev => ({ ...prev, thumbnail: file }))
@@ -319,10 +351,10 @@ export default function ResourcesPage() {
       }
       reader.readAsDataURL(file)
     }
-  }
+  }, [])
 
   // Handle add form submit
-  const handleAddSubmit = async (e: React.FormEvent) => {
+  const handleAddSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
@@ -353,7 +385,7 @@ export default function ResourcesPage() {
       if (result.success) {
         setShowAddModal(false)
         resetAddForm()
-        fetchResources(1, debouncedSearchTerm) // Refresh list
+        fetchResources(1, debouncedSearchTerm)
       } else {
         throw new Error(result.message)
       }
@@ -363,10 +395,10 @@ export default function ResourcesPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }
+  }, [addFormData, token, resetAddForm, fetchResources, debouncedSearchTerm])
 
   // Handle edit submit
-  const handleEditSubmit = async (e: React.FormEvent) => {
+  const handleEditSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedResource) return
 
@@ -401,7 +433,7 @@ export default function ResourcesPage() {
       if (result.success) {
         setShowEditModal(false)
         resetEditForm()
-        fetchResources(1, debouncedSearchTerm) // Refresh list
+        fetchResources(1, debouncedSearchTerm)
       } else {
         throw new Error(result.message)
       }
@@ -411,10 +443,10 @@ export default function ResourcesPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }
+  }, [selectedResource, editFormData, token, resetEditForm, fetchResources, debouncedSearchTerm])
 
   // Handle delete
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!selectedResource) return
 
     try {
@@ -432,7 +464,7 @@ export default function ResourcesPage() {
       
       if (result.success) {
         setShowDeleteModal(false)
-        fetchResources(1, debouncedSearchTerm) // Refresh list
+        fetchResources(1, debouncedSearchTerm)
       } else {
         throw new Error(result.message)
       }
@@ -440,81 +472,25 @@ export default function ResourcesPage() {
       console.error('Error deleting resource:', error)
       alert(`Error deleting resource: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
-  }
+  }, [selectedResource, token, fetchResources, debouncedSearchTerm])
 
   // Get resource type icon
-  const getResourceTypeIcon = (type: Resource['resource_type']) => {
+  const getResourceTypeIcon = useCallback((type: Resource['resource_type']) => {
     const typeConfig = resourceTypes.find(t => t.value === type)
     return typeConfig ? React.createElement(typeConfig.icon, { size: 20 }) : <FileText size={20} />
-  }
-
-  // Get audience type icon
-  // const getAudienceTypeIcon = (type: Resource['audience_type']) => {
-  //   const typeConfig = audienceTypes.find(t => t.value === type)
-  //   return typeConfig ? React.createElement(typeConfig.icon, { size: 20 }) : <Users size={20} />
-  // }
+  }, [resourceTypes])
 
   // Format date
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     })
-  }
+  }, [])
 
-  // Modal Component
-  const Modal = React.memo(({ 
-    isOpen, 
-    onClose, 
-    children, 
-    title 
-  }: { 
-    isOpen: boolean, 
-    onClose: () => void, 
-    children: React.ReactNode,
-    title: string 
-  }) => {
-    if (!isOpen) return null
-
-    return (
-      <div className="fixed inset-0 z-99999 overflow-y-auto">
-        <div className="flex min-h-screen items-center justify-center p-4">
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black/50 transition-opacity"
-            onClick={onClose}
-          />
-          
-          {/* Modal */}
-          <div className="relative z-99999 w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl transition-all">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {title}
-              </h3>
-              <button
-                onClick={onClose}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-800"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            {/* Content */}
-            <div className="px-6 py-4">
-              {children}
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  })
-
-  Modal.displayName = 'Modal'
-
-  // Add Form
-  const AddResourceForm = React.memo(() => (
+  // Add Form Component
+  const AddResourceForm = useMemo(() => (
     <form onSubmit={handleAddSubmit} className="space-y-4">
       {/* Title */}
       <div>
@@ -567,26 +543,6 @@ export default function ResourcesPage() {
           ))}
         </select>
       </div>
-
-      {/* Audience Type */}
-      {/* <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Audience Type *
-        </label>
-        <select
-          name="audience_type"
-          value={addFormData.audience_type}
-          onChange={handleAddInputChange}
-          required
-          className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-        >
-          {audienceTypes.map(type => (
-            <option key={type.value} value={type.value}>
-              {type.label}
-            </option>
-          ))}
-        </select>
-      </div> */}
 
       {/* URL */}
       <div>
@@ -659,12 +615,10 @@ export default function ResourcesPage() {
         </button>
       </div>
     </form>
-  ))
+  ), [addFormData, handleAddSubmit, handleAddInputChange, handleAddThumbnailChange, isSubmitting, resourceTypes, thumbnailPreview])
 
-  AddResourceForm.displayName = 'AddResourceForm'
-
-  // Edit Form
-  const EditResourceForm = React.memo(() => (
+  // Edit Form Component
+  const EditResourceForm = useMemo(() => (
     <form onSubmit={handleEditSubmit} className="space-y-4">
       {/* Title */}
       <div>
@@ -717,26 +671,6 @@ export default function ResourcesPage() {
           ))}
         </select>
       </div>
-
-      {/* Audience Type */}
-      {/* <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Audience Type *
-        </label>
-        <select
-          name="audience_type"
-          value={editFormData.audience_type}
-          onChange={handleEditInputChange}
-          required
-          className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-        >
-          {audienceTypes.map(type => (
-            <option key={type.value} value={type.value}>
-              {type.label}
-            </option>
-          ))}
-        </select>
-      </div> */}
 
       {/* URL */}
       <div>
@@ -809,17 +743,15 @@ export default function ResourcesPage() {
         </button>
       </div>
     </form>
-  ))
-
-  EditResourceForm.displayName = 'EditResourceForm'
+  ), [editFormData, handleEditSubmit, handleEditInputChange, handleEditThumbnailChange, isSubmitting, resourceTypes, thumbnailPreview])
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Resources</h1>
-          <p className="text-gray-600 dark:text-gray-400">Manage your educational resources</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Student Resources</h1>
+          <p className="text-gray-600 dark:text-gray-400">Manage educational resources for students</p>
         </div>
         <button
           onClick={openAddModal}
@@ -860,7 +792,7 @@ export default function ResourcesPage() {
             <FileText className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No resources</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Get started by creating a new resource.
+              Get started by creating a new resource for students.
             </p>
             <button
               onClick={openAddModal}
@@ -882,9 +814,6 @@ export default function ResourcesPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Type
                     </th>
-                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Audience
-                    </th> */}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Created
                     </th>
@@ -927,26 +856,11 @@ export default function ResourcesPage() {
                           </span>
                         </div>
                       </td>
-                      {/* <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-gray-900 dark:text-white">
-                          {getAudienceTypeIcon(resource.audience_type)}
-                          <span className="text-sm text-gray-900 dark:text-white capitalize">
-                            {resource.audience_type}
-                          </span>
-                        </div>
-                      </td> */}
                       <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                         {formatDate(resource.created_at)}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          {/* <button
-                            onClick={() => openViewModal(resource)}
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-800"
-                            title="View"
-                          >
-                            <Eye size={16} />
-                          </button> */}
                           <button
                             onClick={() => openEditModal(resource)}
                             className="rounded-lg p-1.5 text-blue-400 hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-900/20"
@@ -1009,7 +923,7 @@ export default function ResourcesPage() {
         onClose={() => setShowAddModal(false)}
         title="Add New Resource"
       >
-        <AddResourceForm />
+        {AddResourceForm}
       </Modal>
 
       {/* Edit Modal */}
@@ -1018,7 +932,7 @@ export default function ResourcesPage() {
         onClose={() => setShowEditModal(false)}
         title="Edit Resource"
       >
-        <EditResourceForm />
+        {EditResourceForm}
       </Modal>
 
       {/* View Modal */}
@@ -1058,15 +972,6 @@ export default function ResourcesPage() {
                   </span>
                 </div>
               </div>
-              {/* <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Audience</p>
-                <div className="flex items-center gap-2 mt-1">
-                  {getAudienceTypeIcon(selectedResource.audience_type)}
-                  <span className="font-medium text-gray-900 dark:text-white capitalize">
-                    {selectedResource.audience_type}
-                  </span>
-                </div>
-              </div> */}
             </div>
 
             <div>

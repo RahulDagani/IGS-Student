@@ -287,141 +287,170 @@ const isActive = useCallback(
   (path?: string): boolean => {
     if (!path) return false;
 
+    // Remove /admin prefix from pathname for comparison
+    const cleanPathname = pathname.replace(/^\/admin/, '');
+    
+    // Normalize paths (remove trailing slashes)
+    const normalizedPath = path.replace(/\/$/, '');
+    const normalizedCurrent = cleanPathname.replace(/\/$/, '');
+    
     // Special case for home/dashboard
-    if (path === "/") {
-      return pathname === "/admin";
+    if (normalizedPath === "" || normalizedPath === "/") {
+      return normalizedCurrent === "" || normalizedCurrent === "/";
     }
 
-    // For other paths, check if the current pathname matches or starts with /admin + the given path
-    const targetPath = `/admin${path}`;
-    return pathname === targetPath || pathname.startsWith(`${targetPath}/`);
+    // For exact match
+    if (normalizedCurrent === normalizedPath) {
+      return true;
+    }
+
+    // For parent paths that should NOT be considered active for their children
+    // Only check if this is a direct child relationship
+    // This prevents /partners/agents from being active when on /partners/agents/students
+    if (normalizedCurrent.startsWith(`${normalizedPath}/`)) {
+      // Check if it's an immediate child (only one level deeper)
+      const pathSegments = normalizedPath.split('/').filter(Boolean);
+      const currentSegments = normalizedCurrent.split('/').filter(Boolean);
+      
+      // Only consider parent active if it's not a direct parent
+      // Actually, we want parent to NOT be active for children in sidebar highlighting
+      return false;
+    }
+
+    return false;
   },
   [pathname]
 );
 
 
   // Recursive component for nested menu items
-  const NavItemComponent: React.FC<{ 
-    item: NavItem; 
-    level?: number;
-    parentKey?: string;
-  }> = ({ item, level = 0, parentKey = '' }) => {
-    const itemKey = parentKey ? `${parentKey}-${item.name}` : item.name;
-    const hasSubItems = item.subItems && item.subItems.length > 0;
-    const isSubmenuOpen = openSubmenus.has(itemKey);
+const NavItemComponent: React.FC<{ 
+  item: NavItem; 
+  level?: number;
+  parentKey?: string;
+  section?: string; // Add section identifier
+}> = ({ item, level = 0, parentKey = '', section = '' }) => {
+  // Include section in the itemKey to make it unique
+  const itemKey = parentKey 
+    ? `${section}-${parentKey}-${item.name}` 
+    : `${section}-${item.name}`;
+    
+  const hasSubItems = item.subItems && item.subItems.length > 0;
+  const isSubmenuOpen = openSubmenus.has(itemKey);
 
-    return (
-      <li>
-        {hasSubItems ? (
-          <>
-            <button
-              onClick={() => handleSubmenuToggle(itemKey)}
-              className={`menu-item group w-full text-left ${
-                isSubmenuOpen ? "menu-item-active" : "menu-item-inactive"
-              } cursor-pointer ${
-                !isExpanded && !isHovered
-                  ? "lg:justify-center"
-                  : "lg:justify-start"
-              }`}
-              style={{ paddingLeft: `${level * 20 + 16}px` }}
-            >
-              <span className={isSubmenuOpen ? "menu-item-icon-active" : "menu-item-icon-inactive"}>
-                {item.icon}
-              </span>
-              {(isExpanded || isHovered || isMobileOpen) && (
-                <span className="menu-item-text">{item.name}</span>
-              )}
-              {(isExpanded || isHovered || isMobileOpen) && (
-                <ChevronDownIcon
-                  className={`ml-auto w-5 h-5 transition-transform duration-200 ${
-                    isSubmenuOpen ? "rotate-180 text-brand-500" : ""
-                  }`}
-                />
-              )}
-            </button>
-            
+  return (
+    <li>
+      {hasSubItems ? (
+        <>
+          <button
+            onClick={() => handleSubmenuToggle(itemKey)}
+            className={`menu-item group w-full text-left ${
+              isSubmenuOpen ? "menu-item-active" : "menu-item-inactive"
+            } cursor-pointer ${
+              !isExpanded && !isHovered
+                ? "lg:justify-center"
+                : "lg:justify-start"
+            }`}
+            style={{ paddingLeft: `${level * 20 + 16}px` }}
+          >
+            <span className={isSubmenuOpen ? "menu-item-icon-active" : "menu-item-icon-inactive"}>
+              {item.icon}
+            </span>
             {(isExpanded || isHovered || isMobileOpen) && (
-              <div
-                ref={(el) => { subMenuRefs.current[itemKey] = el; }}
-                className="overflow-hidden transition-all duration-300"
-                style={{
-                  height: isSubmenuOpen ? `${subMenuRefs.current[itemKey]?.scrollHeight || 0}px` : "0px",
-                }}
-              >
-                <ul className="flex flex-col gap-1 mt-1">
-                  {item.subItems!.map((subItem) => (
-                    <NavItemComponent 
-                      key={subItem.name} 
-                      item={subItem} 
-                      level={level + 1}
-                      parentKey={itemKey}
-                    />
-                  ))}
-                </ul>
-              </div>
+              <span className="menu-item-text">{item.name}</span>
             )}
-          </>
-        ) : (
-          item.path && (
-            <Link
-              href={"/admin" + item.path}
-              className={`menu-item group ${
-                isActive(item.path) ? "menu-item-active" : "menu-item-inactive"
-              }`}
-              style={{ paddingLeft: `${level * 20 + 16}px` }}
+            {(isExpanded || isHovered || isMobileOpen) && (
+              <ChevronDownIcon
+                className={`ml-auto w-5 h-5 transition-transform duration-200 ${
+                  isSubmenuOpen ? "rotate-180 text-brand-500" : ""
+                }`}
+              />
+            )}
+          </button>
+          
+          {(isExpanded || isHovered || isMobileOpen) && (
+            <div
+              ref={(el) => { subMenuRefs.current[itemKey] = el; }}
+              className="overflow-hidden transition-all duration-300"
+              style={{
+                height: isSubmenuOpen ? `${subMenuRefs.current[itemKey]?.scrollHeight || 0}px` : "0px",
+              }}
             >
-              <span className={isActive(item.path) ? "menu-item-icon-active" : "menu-item-icon-inactive"}>
-                {item.icon}
-              </span>
-              {(isExpanded || isHovered || isMobileOpen) && (
-                <span className="menu-item-text">{item.name}</span>
-              )}
-            </Link>
-          )
-        )}
-      </li>
-    );
-  };
-
-  const renderMainMenuItems = () => (
-    <ul className="flex flex-col gap-4">
-      {navItems.map((item) => (
-        <NavItemComponent key={item.name} item={item} />
-      ))}
-    </ul>
+              <ul className="flex flex-col gap-1 mt-1">
+                {item.subItems!.map((subItem) => (
+                  <NavItemComponent 
+                    key={subItem.name} 
+                    item={subItem} 
+                    level={level + 1}
+                    parentKey={itemKey}
+                    section={section}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      ) : (
+        item.path && (
+          <Link
+            href={"/admin" + item.path}
+            className={`menu-item group ${
+              isActive(item.path) ? "menu-item-active" : "menu-item-inactive"
+            }`}
+            style={{ paddingLeft: `${level * 20 + 16}px` }}
+          >
+            <span className={isActive(item.path) ? "menu-item-icon-active" : "menu-item-icon-inactive"}>
+              {item.icon}
+            </span>
+            {(isExpanded || isHovered || isMobileOpen) && (
+              <span className="menu-item-text">{item.name}</span>
+            )}
+          </Link>
+        )
+      )}
+    </li>
   );
+};
 
-  const renderPartnerItems = () => (
-    <ul className="flex flex-col gap-4">
-      {partnerItems.map((item) => (
-        <NavItemComponent key={item.name} item={item} />
-      ))}
-    </ul>
-  );
+const renderMainMenuItems = () => (
+  <ul className="flex flex-col gap-4">
+    {navItems.map((item) => (
+      <NavItemComponent key={item.name} item={item} section="main" />
+    ))}
+  </ul>
+);
 
-  const renderStudentItems = () => (
-    <ul className="flex flex-col gap-4">
-      {studentItems.map((item) => (
-        <NavItemComponent key={item.name} item={item} />
-      ))}
-    </ul>
-  );
+const renderPartnerItems = () => (
+  <ul className="flex flex-col gap-4">
+    {partnerItems.map((item) => (
+      <NavItemComponent key={item.name} item={item} section="partners" />
+    ))}
+  </ul>
+);
 
-  const renderUniversityItems = () => (
-    <ul className="flex flex-col gap-4">
-      {universityAndCoursesItems.map((item) => (
-        <NavItemComponent key={item.name} item={item} />
-      ))}
-    </ul>
-  );
+const renderStudentItems = () => (
+  <ul className="flex flex-col gap-4">
+    {studentItems.map((item) => (
+      <NavItemComponent key={item.name} item={item} section="students" />
+    ))}
+  </ul>
+);
 
-  const renderUserItems = () => (
-    <ul className="flex flex-col gap-4">
-      {userItems.map((item) => (
-        <NavItemComponent key={item.name} item={item} />
-      ))}
-    </ul>
-  );
+const renderUniversityItems = () => (
+  <ul className="flex flex-col gap-4">
+    {universityAndCoursesItems.map((item) => (
+      <NavItemComponent key={item.name} item={item} section="universities" />
+    ))}
+  </ul>
+);
+
+const renderUserItems = () => (
+  <ul className="flex flex-col gap-4">
+    {userItems.map((item) => (
+      <NavItemComponent key={item.name} item={item} section="users" />
+    ))}
+  </ul>
+);
 
   const renderOtherItems = () => (
     <ul className="flex flex-col gap-4">
@@ -431,7 +460,7 @@ const isActive = useCallback(
         const isSubmenuOpen = openSubmenus.has(itemKey);
 
         return (
-          <li key={item.name}>
+          <li key={itemKey}>
             {hasSubItems ? (
               <>
                 <button
@@ -530,50 +559,82 @@ const isActive = useCallback(
   };
 
   // Auto-open submenus based on current path
-  useEffect(() => {
-    const findAndOpenParentMenus = (items: NavItem[], currentPath: string, parentKeys: string[] = []): boolean => {
-      for (const item of items) {
-        const itemKey = parentKeys.length > 0 ? `${parentKeys.join('-')}-${item.name}` : item.name;
-        
-        if (item.path === currentPath) {
-          // Open all parent menus
-          parentKeys.forEach((key, index) => {
-            const parentKey = parentKeys.slice(0, index + 1).join('-');
-            setOpenSubmenus(prev => new Set(prev).add(parentKey));
-          });
+  // Auto-open submenus based on current path
+// Auto-open submenus based on current path
+useEffect(() => {
+  const findAndOpenParentMenus = (
+    items: NavItem[], 
+    currentPath: string, 
+    parentKeys: string[] = [], 
+    section: string = ''
+  ): boolean => {
+    for (const item of items) {
+      const itemKey = parentKeys.length > 0 
+        ? `${section}-${parentKeys.join('-')}-${item.name}` 
+        : `${section}-${item.name}`;
+      
+      // Remove /admin prefix from currentPath for comparison
+      const cleanCurrentPath = currentPath.replace(/^\/admin/, '');
+      
+      if (item.path === cleanCurrentPath) {
+        // Open all parent menus
+        parentKeys.forEach((key, index) => {
+          const parentKey = parentKeys.slice(0, index + 1).join('-');
+          setOpenSubmenus(prev => new Set(prev).add(`${section}-${parentKey}`));
+        });
+        return true;
+      }
+
+      if (item.subItems) {
+        const found = findAndOpenParentMenus(
+          item.subItems, 
+          currentPath, 
+          [...parentKeys, item.name],
+          section
+        );
+        if (found) {
+          setOpenSubmenus(prev => new Set(prev).add(itemKey));
           return true;
         }
-
-        if (item.subItems) {
-          const found = findAndOpenParentMenus(item.subItems, currentPath, [...parentKeys, item.name]);
-          if (found) {
-            setOpenSubmenus(prev => new Set(prev).add(itemKey));
-            return true;
-          }
-        }
       }
-      return false;
-    };
+    }
+    return false;
+  };
 
-    setOpenSubmenus(new Set());
+  setOpenSubmenus(new Set());
+  
+  // Find and open menus for all nav item groups with their respective sections
+  const menuGroups = [
+    { items: navItems, section: 'main' },
+    { items: partnerItems, section: 'partners' },
+    { items: studentItems, section: 'students' },
+    { items: universityAndCoursesItems, section: 'universities' },
+    { items: userItems, section: 'users' }
+  ];
+  
+  menuGroups.forEach(({ items, section }) => {
+    findAndOpenParentMenus(items, pathname, [], section);
+  });
+  
+  // Find and open menus for other items
+  othersItems.forEach((item, index) => {
+    const itemKey = `others-${index}`;
+    const cleanPathname = pathname.replace(/^\/admin/, '');
     
-    // Find and open menus for main nav items
-    findAndOpenParentMenus(navItems, pathname);
-    
-    // Find and open menus for other items
-    othersItems.forEach((item, index) => {
-      const itemKey = `others-${index}`;
-      if (item.path === pathname) {
+    if (item.path === cleanPathname) {
+      setOpenSubmenus(prev => new Set(prev).add(itemKey));
+    }
+    if (item.subItems) {
+      const hasActiveSubItem = item.subItems.some(subItem => {
+        const subItemPath = subItem.path;
+        return subItemPath === cleanPathname;
+      });
+      if (hasActiveSubItem) {
         setOpenSubmenus(prev => new Set(prev).add(itemKey));
       }
-      if (item.subItems) {
-        const hasActiveSubItem = item.subItems.some(subItem => subItem.path === pathname);
-        if (hasActiveSubItem) {
-          setOpenSubmenus(prev => new Set(prev).add(itemKey));
-        }
-      }
-    });
-  }, [pathname]);
+    }
+  });
+}, [pathname]);
 
   return (
     <aside

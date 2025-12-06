@@ -1,562 +1,621 @@
-"use client"
-import React, { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { User, Mail, Phone, IdCard, Shield, Eye, Edit, Trash, Plus } from "lucide-react";
+"use client";
 
-interface UserFormData {
-  name: string;
-  email: string;
-  employeeCode: string;
-  mobile: string;
-  role: "admin" | "manager" | "staff" | "viewer";
-  status: "active" | "inactive";
-  password: string;
-  confirmPassword: string;
+import { useState, useEffect } from "react";
+import {
+    ArrowLeft,
+    Save,
+    RotateCcw,
+    X,
+    Mail,
+    Phone,
+    Lock,
+    User,
+    Shield,
+    Eye,
+    EyeOff,
+    Loader,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+
+interface CreateUserPayload {
+    email: string;
+    phone: string;
+    password: string;
+    role: string;
+    status: string;
 }
 
-interface Permission {
-  moduleApp: string;
-  view: boolean;
-  add: boolean;
-  edit: boolean;
-  delete: boolean;
+interface CreateUserApiResponse {
+    success: boolean;
+    data?: {
+        id: number;
+        email: string;
+        phone: string;
+        role: string;
+        status: string;
+        created_at: string;
+        updated_at: string;
+    };
+    message?: string;
 }
 
-interface ModulePermissions {
-  platform: string;
-  modules: Permission[];
+interface RoleData {
+    id: number;
+    tenant_id: number;
+    role_name: string;
+    role_key: string;
+    created_at: string;
+    permissions_count: number;
 }
 
-// Mock function to fetch user data
-const fetchUser = async (id: string): Promise<UserFormData & { permissions?: ModulePermissions[] }> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  console.log(id)
-  const mockData = {
-    name: "John Smith",
-    email: "john.smith@university.com",
-    employeeCode: "EMP001",
-    mobile: "+1 (555) 123-4567",
-    role: "admin" as const,
-    status: "active" as const,
-    password: "",
-    confirmPassword: "",
-    permissions: [
-      {
-        platform: "Student Platform",
-        modules: [
-          { moduleApp: "Applications", view: true, add: true, edit: true, delete: false },
-          { moduleApp: "Wallet", view: true, add: false, edit: false, delete: false },
-          { moduleApp: "Students", view: true, add: true, edit: true, delete: true },
-        ]
-      },
-      {
-        platform: "Agent Platform",
-        modules: [
-          { moduleApp: "Agents", view: true, add: true, edit: true, delete: false },
-          { moduleApp: "Students", view: true, add: false, edit: false, delete: false },
-          { moduleApp: "Applications", view: true, add: false, edit: true, delete: false },
-          { moduleApp: "Wallets", view: true, add: false, edit: false, delete: false },
-        ]
-      },
-      {
-        platform: "University Platform",
-        modules: [
-          { moduleApp: "Universities", view: true, add: true, edit: true, delete: true },
-          { moduleApp: "Courses", view: true, add: true, edit: true, delete: false },
-        ]
-      }
-    ]
-  };
-  
-  return mockData;
-};
+interface RolesApiResponse {
+    success: boolean;
+    data: RoleData[];
+}
 
-const defaultPermissions: ModulePermissions[] = [
-  {
-    platform: "Student Platform",
-    modules: [
-      { moduleApp: "Applications", view: false, add: false, edit: false, delete: false },
-      { moduleApp: "Wallet", view: false, add: false, edit: false, delete: false },
-      { moduleApp: "Students", view: false, add: false, edit: false, delete: false },
-    ]
-  },
-  {
-    platform: "Agent Platform",
-    modules: [
-      { moduleApp: "Agents", view: false, add: false, edit: false, delete: false },
-      { moduleApp: "Students", view: false, add: false, edit: false, delete: false },
-      { moduleApp: "Applications", view: false, add: false, edit: false, delete: false },
-      { moduleApp: "Wallets", view: false, add: false, edit: false, delete: false },
-    ]
-  },
-  {
-    platform: "University Platform",
-    modules: [
-      { moduleApp: "Universities", view: false, add: false, edit: false, delete: false },
-      { moduleApp: "Courses", view: false, add: false, edit: false, delete: false },
-    ]
-  }
-];
+interface RoleOption {
+    value: string;
+    label: string;
+}
 
-// Define valid permission types
-type PermissionType = 'view' | 'add' | 'edit' | 'delete';
+interface StatusOption {
+    value: string;
+    label: string;
+}
 
-export default function AddEditUser() {
-  const router = useRouter();
-  const params = useParams();
-  const id = params.id as string;
-  const isEdit = Boolean(id);
-  
-  const [isLoading, setIsLoading] = useState(isEdit);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPermissions, setShowPermissions] = useState(false);
-  
-  const [formData, setFormData] = useState<UserFormData>({
-    name: "",
-    email: "",
-    employeeCode: "",
-    mobile: "",
-    role: "staff",
-    status: "active",
-    password: "",
-    confirmPassword: "",
-  });
+const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
-  const [permissions, setPermissions] = useState<ModulePermissions[]>(defaultPermissions);
+export default function AddUserPage() {
+    const [formData, setFormData] = useState({
+        email: "",
+        phone: "",
+        password: "",
+        confirmPassword: "",
+        role: "",
+        status: "active",
+    });
+    
+    const [availableRoles, setAvailableRoles] = useState<RoleOption[]>([]);
+    const [rolesLoading, setRolesLoading] = useState(true);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [success, setSuccess] = useState<string>("");
+    const [error, setError] = useState<string>("");
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    const loadUser = async () => {
-      if (isEdit) {
+    const router = useRouter();
+    const { token } = useAuth();
+
+    const availableStatuses: StatusOption[] = [
+        { value: "active", label: "Active" },
+        { value: "inactive", label: "Inactive" },
+        { value: "pending_verification", label: "Pending Verification" },
+        { value: "pending_invite", label: "Pending Invite" },
+        { value: "suspended", label: "Suspended" },
+    ];
+
+    // Fetch available roles on component mount
+    useEffect(() => {
+        fetchAvailableRoles();
+    }, []);
+
+    const fetchAvailableRoles = async () => {
         try {
-          const data = await fetchUser(id);
-          setFormData({
-            name: data.name,
-            email: data.email,
-            employeeCode: data.employeeCode,
-            mobile: data.mobile,
-            role: data.role,
-            status: data.status,
-            password: "",
-            confirmPassword: "",
-          });
-          if (data.permissions) {
-            setPermissions(data.permissions);
-          }
-          setShowPermissions(data.role === 'admin');
+            setRolesLoading(true);
+            const response = await fetch(`${BASE_URL}/tenant/getroles`, {
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            });
+            
+            const data: RolesApiResponse = await response.json();
+            
+            if (data.success) {
+                // Transform API data to RoleOption format
+                const roles: RoleOption[] = data.data.map(role => ({
+                    value: role.role_key, // Using role_key as value for API compatibility
+                    label: role.role_name
+                }));
+                
+                // Merge API roles with default roles, avoiding duplicates
+                const allRoles = [...roles];
+                
+                setAvailableRoles(allRoles);
+                
+                // Set default role if available
+                if (allRoles.length > 0 && !formData.role) {
+                    setFormData(prev => ({
+                        ...prev,
+                        role: allRoles[0].value
+                    }));
+                }
+            } else {
+                // Fallback to default roles if API fails
+                const defaultRoles = [
+                    { value: "student", label: "Student" },
+                    { value: "agent", label: "Agent" },
+                    { value: "admin", label: "Admin" },
+                    { value: "agent_student", label: "Agent Student" },
+                ];
+                setAvailableRoles(defaultRoles);
+                if (!formData.role) {
+                    setFormData(prev => ({
+                        ...prev,
+                        role: defaultRoles[0].value
+                    }));
+                }
+                console.error("Failed to fetch roles from API");
+            }
         } catch (error) {
-          console.error('Error loading user:', error);
+            console.error("Error fetching roles:", error);
+            // Fallback to default roles
+            const defaultRoles = [
+                { value: "student", label: "Student" },
+                { value: "agent", label: "Agent" },
+                { value: "admin", label: "Admin" },
+                { value: "agent_student", label: "Agent Student" },
+            ];
+            setAvailableRoles(defaultRoles);
+            if (!formData.role) {
+                setFormData(prev => ({
+                    ...prev,
+                    role: defaultRoles[0].value
+                }));
+            }
         } finally {
-          setIsLoading(false);
+            setRolesLoading(false);
         }
-      }
     };
 
-    loadUser();
-  }, [id, isEdit]);
+    const validateForm = () => {
+        const errors: Record<string, string> = {};
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+        // Email validation
+        if (!formData.email.trim()) {
+            errors.email = "Email is required";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            errors.email = "Please enter a valid email address";
+        }
 
-    // Show permissions table when role is set to admin
-    if (name === 'role') {
-      setShowPermissions(value === 'admin');
-    }
-  };
+        // Phone validation
+        if (!formData.phone.trim()) {
+            errors.phone = "Phone number is required";
+        }
 
-  const handlePermissionChange = (
-    platformIndex: number,
-    moduleIndex: number,
-    permissionType: PermissionType,
-    checked: boolean
-  ) => {
-    setPermissions(prev => {
-      const newPermissions = [...prev];
-      const moduleApp = newPermissions[platformIndex].modules[moduleIndex];
-      
-      // Use type assertion to ensure TypeScript knows this is valid
-      (moduleApp[permissionType] as boolean) = checked;
-      
-      return newPermissions;
-    });
-  };
+        // Password validation
+        if (!formData.password) {
+            errors.password = "Password is required";
+        }
 
-  const handleSelectAll = (platformIndex: number, permissionType: PermissionType, checked: boolean) => {
-    setPermissions(prev => {
-      const newPermissions = [...prev];
-      newPermissions[platformIndex].modules.forEach(moduleApp => {
-        // Use type assertion to ensure TypeScript knows this is valid
-        (moduleApp[permissionType] as boolean) = checked;
-      });
-      return newPermissions;
-    });
-  };
+        // Confirm password validation
+        if (!formData.confirmPassword) {
+            errors.confirmPassword = "Please confirm your password";
+        } else if (formData.password !== formData.confirmPassword) {
+            errors.confirmPassword = "Passwords do not match";
+        }
 
-  const handleSelectAllPlatform = (platformIndex: number, checked: boolean) => {
-    setPermissions(prev => {
-      const newPermissions = [...prev];
-      newPermissions[platformIndex].modules.forEach(moduleApp => {
-        moduleApp.view = checked;
-        moduleApp.add = checked;
-        moduleApp.edit = checked;
-        moduleApp.delete = checked;
-      });
-      return newPermissions;
-    });
-  };
+        // Role validation
+        if (!formData.role) {
+            errors.role = "Please select a role";
+        }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+        setValidationErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
 
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const submitData = {
-        ...formData,
-        ...(showPermissions && { permissions })
-      };
-      
-      console.log("User data:", submitData);
-      
-      // Redirect back to users list
-      router.push('/admin/users');
-      router.refresh();
-    } catch (error) {
-      console.error('Error saving user:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    const handleChange = (
+        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    ) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value,
+        }));
+        
+        // Clear validation error for this field
+        if (validationErrors[name]) {
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[name];
+                return newErrors;
+            });
+        }
+    };
 
-  if (isLoading) {
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!validateForm()) {
+            showToast("Please fix the errors in the form", "error");
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const payload: CreateUserPayload = {
+                email: formData.email,
+                phone: formData.phone,
+                password: formData.password,
+                role: formData.role,
+                status: formData.status,
+            };
+
+            const response = await fetch(`${BASE_URL}/tenant/users`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const data: CreateUserApiResponse = await response.json();
+
+            if (response.ok && data.success) {
+                showToast("User created successfully!", "success");
+                
+                // Reset form after successful creation
+                setTimeout(() => {
+                    resetForm();
+                    router.push("/admin/users");
+                }, 1500);
+            } else {
+                showToast(data.message || "Failed to create user", "error");
+            }
+        } catch (error) {
+            console.error("Error creating user:", error);
+            showToast("Failed to create user. Please try again.", "error");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const showToast = (message: string, type: "success" | "error") => {
+        if (type === "success") {
+            setSuccess(message);
+            setError("");
+        } else {
+            setError(message);
+            setSuccess("");
+        }
+    };
+
+    const resetForm = () => {
+        setFormData({
+            email: "",
+            phone: "",
+            password: "",
+            confirmPassword: "",
+            role: availableRoles.length > 0 ? availableRoles[0].value : "",
+            status: "active",
+        });
+        setValidationErrors({});
+        setShowPassword(false);
+        setShowConfirmPassword(false);
+    };
+
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex items-center justify-center p-12">
-          <div className="text-center">
-            <svg className="animate-spin h-8 w-8 text-brand-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading user data...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="px-5 py-4 sm:px-6 sm:py-5">
-        <h3 className="text-base font-medium text-gray-800 dark:text-white/90">
-          {isEdit ? "Edit User" : "Add New User"}
-        </h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {isEdit ? "Update user information and permissions." : "Create a new user account with appropriate permissions."}
-        </p>
-      </div>
-      
-      <div className="space-y-6 border-t border-gray-100 p-5 sm:p-6 dark:border-gray-800">
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-6">
-            {/* Basic Information */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-800 dark:text-white/90 mb-4">Basic Information</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Name */}
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-                    Full Name *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                      <User size={18} />
-                    </span>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="Enter full name"
-                      required
-                      className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                    />
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-                    Email Address *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                      <Mail size={18} />
-                    </span>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="Enter email address"
-                      required
-                      className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                    />
-                  </div>
-                </div>
-
-                {/* Employee Code */}
-                <div>
-                  <label htmlFor="employeeCode" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-                    Employee Code *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                      <IdCard size={18} />
-                    </span>
-                    <input
-                      type="text"
-                      id="employeeCode"
-                      name="employeeCode"
-                      value={formData.employeeCode}
-                      onChange={handleInputChange}
-                      placeholder="e.g., EMP001"
-                      required
-                      className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                    />
-                  </div>
-                </div>
-
-                {/* Mobile */}
-                <div>
-                  <label htmlFor="mobile" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-                    Mobile Number
-                  </label>
-                  <div className="relative">
-                    <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                      <Phone size={18} />
-                    </span>
-                    <input
-                      type="tel"
-                      id="mobile"
-                      name="mobile"
-                      value={formData.mobile}
-                      onChange={handleInputChange}
-                      placeholder="+1 (555) 123-4567"
-                      className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                    />
-                  </div>
-                </div>
-
-                {/* Role */}
-                <div>
-                  <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-                    Role *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                      <Shield size={18} />
-                    </span>
-                    <select
-                      id="role"
-                      name="role"
-                      value={formData.role}
-                      onChange={handleInputChange}
-                      required
-                      className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 appearance-none"
-                    >
-                      <option value="staff">Staff</option>
-                      <option value="admin">Admin</option>
-                      <option value="manager">Manager</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-                    Status
-                  </label>
-                  <select
-                    id="status"
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Password Section - Only show for add or when changing password */}
-            {!isEdit && (
-              <div>
-                <h4 className="text-sm font-medium text-gray-800 dark:text-white/90 mb-4">Password</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-                      Password *
-                    </label>
-                    <input
-                      type="password"
-                      id="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      placeholder="Enter password"
-                      required={!isEdit}
-                      className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-                      Confirm Password *
-                    </label>
-                    <input
-                      type="password"
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      placeholder="Confirm password"
-                      required={!isEdit}
-                      className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Permissions Section - Only show for admin role */}
-            {showPermissions && (
-              <div>
-                <h4 className="text-sm font-medium text-gray-800 dark:text-white/90 mb-4">Permissions</h4>
-                <div className="space-y-6">
-                  {permissions.map((platform, platformIndex) => (
-                    <div key={platform.platform} className="border border-gray-200 dark:border-gray-700 rounded-lg">
-                      <div className="bg-gray-50 dark:bg-gray-800 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center justify-between">
-                          <h5 className="font-medium text-gray-800 dark:text-white/90">{platform.platform}</h5>
-                          <button
-                            type="button"
-                            onClick={() => handleSelectAllPlatform(platformIndex, true)}
-                            className="text-xs text-brand-500 hover:text-brand-600"
-                          >
-                            Select All
-                          </button>
-                        </div>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b border-gray-200 dark:border-gray-700">
-                              <th className="text-left p-3 text-sm font-medium text-gray-700 dark:text-gray-300">Module</th>
-                              <th className="text-center p-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                <div className="flex items-center justify-center gap-1">
-                                  <Eye size={14} />
-                                  <span>View</span>
-                                </div>
-                              </th>
-                              <th className="text-center p-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                <div className="flex items-center justify-center gap-1">
-                                  <Plus size={14} />
-                                  <span>Add</span>
-                                </div>
-                              </th>
-                              <th className="text-center p-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                <div className="flex items-center justify-center gap-1">
-                                  <Edit size={14} />
-                                  <span>Edit</span>
-                                </div>
-                              </th>
-                              <th className="text-center p-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                <div className="flex items-center justify-center gap-1">
-                                  <Trash size={14} />
-                                  <span>Delete</span>
-                                </div>
-                              </th>
-                            </tr>
-                            <tr className="bg-gray-50 dark:bg-gray-800">
-                              <th className="text-left p-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                                Select All
-                              </th>
-                              {(['view', 'add', 'edit', 'delete'] as PermissionType[]).map((permissionType) => (
-                                <th key={permissionType} className="text-center p-3">
-                                  <input
-                                    type="checkbox"
-                                    checked={platform.modules.every(moduleApp => moduleApp[permissionType])}
-                                    onChange={(e) => handleSelectAll(platformIndex, permissionType, e.target.checked)}
-                                    className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
-                                  />
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {platform.modules.map((moduleApp, moduleIndex) => (
-                              <tr key={moduleApp.moduleApp} className="border-b border-gray-100 dark:border-gray-800 last:border-0">
-                                <td className="p-3 text-sm text-gray-700 dark:text-gray-300">{moduleApp.moduleApp}</td>
-                                {(['view', 'add', 'edit', 'delete'] as PermissionType[]).map((permissionType) => (
-                                  <td key={permissionType} className="text-center p-3">
-                                    <input
-                                      type="checkbox"
-                                      checked={moduleApp[permissionType]}
-                                      onChange={(e) => handlePermissionChange(platformIndex, moduleIndex, permissionType, e.target.checked)}
-                                      className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
-                                    />
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+        <div className="flex flex-col lg:flex-row min-h-screen bg-[#0f172a]">
+            <div className="flex-1 mt-6 lg:mt-0">
+                {/* Toast Notifications */}
+                {success && (
+                    <div className="mb-6 p-4 bg-green-500/10 border border-green-500 rounded-lg flex justify-between items-center">
+                        <p className="text-green-400 text-sm">{success}</p>
+                        <button
+                            onClick={() => setSuccess("")}
+                            className="text-green-400 hover:text-green-300"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+                )}
 
-          {/* Submit Buttons */}
-          <div className="flex gap-3 pt-6">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex-1 px-4 py-3 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-1 px-4 py-3 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:bg-brand-300 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? (
-                <div className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {isEdit ? "Updating..." : "Creating..."}
+                {error && (
+                    <div className="mb-6 p-4 bg-red-500/10 border border-red-500 rounded-lg flex justify-between items-center">
+                        <p className="text-red-400 text-sm">{error}</p>
+                        <button
+                            onClick={() => setError("")}
+                            className="text-red-400 hover:text-red-300"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
+
+                <div className="bg-[#111827] rounded-xl shadow-lg border border-white/10 p-6">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-white">
+                                Add New User
+                            </h2>
+                            <p className="text-gray-400 mt-1">
+                                Create a new user account
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => router.back()}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm rounded-lg transition"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                            Back to Users
+                        </button>
+                    </div>
+
+                    <form onSubmit={handleSubmit}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Email Input */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Email Address{" "}
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="email"
+                                        name="email"
+                                        value={formData.email}
+                                        onChange={handleChange}
+                                        placeholder="user@example.com"
+                                        className={`w-full pl-10 pr-4 py-2 bg-[#1F2937] border ${validationErrors.email ? 'border-red-500' : 'border-gray-700'} rounded-lg text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-colors`}
+                                    />
+                                </div>
+                                {validationErrors.email && (
+                                    <p className="text-red-400 text-sm">
+                                        {validationErrors.email}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Phone Input */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Phone Number{" "}
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type="tel"
+                                        name="phone"
+                                        value={formData.phone}
+                                        onChange={handleChange}
+                                        placeholder="+1234567890"
+                                        className={`w-full pl-10 pr-4 py-2 bg-[#1F2937] border ${validationErrors.phone ? 'border-red-500' : 'border-gray-700'} rounded-lg text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-colors`}
+                                    />
+                                </div>
+                                {validationErrors.phone && (
+                                    <p className="text-red-400 text-sm">
+                                        {validationErrors.phone}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Password Input */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Password{" "}
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        name="password"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        placeholder="Enter password"
+                                        className={`w-full pl-10 pr-12 py-2 bg-[#1F2937] border ${validationErrors.password ? 'border-red-500' : 'border-gray-700'} rounded-lg text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-colors`}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                                    >
+                                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    </button>
+                                </div>
+                                {validationErrors.password && (
+                                    <p className="text-red-400 text-sm">
+                                        {validationErrors.password}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Confirm Password Input */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Confirm Password{" "}
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <input
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        name="confirmPassword"
+                                        value={formData.confirmPassword}
+                                        onChange={handleChange}
+                                        placeholder="Confirm password"
+                                        className={`w-full pl-10 pr-12 py-2 bg-[#1F2937] border ${validationErrors.confirmPassword ? 'border-red-500' : 'border-gray-700'} rounded-lg text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-colors`}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                                    >
+                                        {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    </button>
+                                </div>
+                                {validationErrors.confirmPassword && (
+                                    <p className="text-red-400 text-sm">
+                                        {validationErrors.confirmPassword}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Role Selection */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Role{" "}
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    {rolesLoading ? (
+                                        <div className="w-full pl-10 pr-4 py-2 bg-[#1F2937] border border-gray-700 rounded-lg flex items-center">
+                                            <Loader className="w-4 h-4 animate-spin text-gray-400 mr-2" />
+                                            <span className="text-gray-400">Loading roles...</span>
+                                        </div>
+                                    ) : availableRoles.length > 0 ? (
+                                        <select
+                                            name="role"
+                                            value={formData.role}
+                                            onChange={handleChange}
+                                            className={`w-full pl-10 pr-4 py-2 bg-[#1F2937] border ${validationErrors.role ? 'border-red-500' : 'border-gray-700'} rounded-lg text-white focus:ring-2 focus:ring-indigo-500 outline-none appearance-none transition-colors`}
+                                        >
+                                            <option value="">Select a role</option>
+                                            {availableRoles.map((role) => (
+                                                <option key={role.value} value={role.value}>
+                                                    {role.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <div className="w-full pl-10 pr-4 py-2 bg-[#1F2937] border border-red-500 rounded-lg text-red-400">
+                                            No roles available. Please create roles first.
+                                        </div>
+                                    )}
+                                </div>
+                                {validationErrors.role && (
+                                    <p className="text-red-400 text-sm">
+                                        {validationErrors.role}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Status Selection */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Status{" "}
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <div className="relative">
+                                    <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <select
+                                        name="status"
+                                        value={formData.status}
+                                        onChange={handleChange}
+                                        className="w-full pl-10 pr-4 py-2 bg-[#1F2937] border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 outline-none appearance-none transition-colors"
+                                    >
+                                        {availableStatuses.map((status) => (
+                                            <option key={status.value} value={status.value}>
+                                                {status.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Available Roles Info */}
+                        {!rolesLoading && availableRoles.length > 0 && (
+                            <div className="mt-6 p-4 bg-gray-800/30 border border-gray-700 rounded-lg">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="text-sm font-medium text-gray-300">
+                                        Available Roles ({availableRoles.length})
+                                    </h4>
+                                    <span className="text-xs text-gray-400">
+                                        Click to select
+                                    </span>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {availableRoles.map((role) => (
+                                        <button
+                                            key={role.value}
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData(prev => ({ ...prev, role: role.value }));
+                                                if (validationErrors.role) {
+                                                    setValidationErrors(prev => {
+                                                        const newErrors = { ...prev };
+                                                        delete newErrors.role;
+                                                        return newErrors;
+                                                    });
+                                                }
+                                            }}
+                                            className={`px-3 py-2 text-xs rounded-lg border transition-colors ${
+                                                formData.role === role.value
+                                                    ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/50'
+                                                    : 'bg-gray-700/30 text-gray-400 border-gray-600 hover:bg-gray-600/30'
+                                            }`}
+                                        >
+                                            {role.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Footer Actions */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between mt-8 border-t border-gray-700 pt-6 gap-4">
+                            <button
+                                type="submit"
+                                disabled={loading || rolesLoading || availableRoles.length === 0 || !formData.role}
+                                className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
+                            >
+                                {loading ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                                        Creating User...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="w-4 h-4" />
+                                        Create User
+                                    </>
+                                )}
+                            </button>
+
+                            <div className="flex items-center gap-3 w-full sm:w-auto justify-center">
+                                <button
+                                    type="button"
+                                    onClick={() => router.back()}
+                                    className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition w-full sm:w-auto"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={resetForm}
+                                    className="flex items-center gap-2 px-6 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition w-full sm:w-auto"
+                                >
+                                    <RotateCcw className="w-4 h-4" />
+                                    Reset Form
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Form Notes */}
+                        <div className="mt-6 p-4 bg-gray-800/30 border border-gray-700 rounded-lg">
+                            <h4 className="text-sm font-medium text-gray-300 mb-2">Notes:</h4>
+                            <ul className="text-xs text-gray-400 space-y-1">
+                                <li>• All fields marked with * are required</li>
+                                <li>• Email must be unique and valid</li>
+                                <li>• Click the eye icon to show/hide password</li>
+                                <li>• User will receive an invitation email</li>
+                                <li>• Roles are loaded from the system</li>
+                                <li className={`${rolesLoading ? 'text-yellow-400' : 'text-gray-400'}`}>
+                                    • {rolesLoading ? 'Loading roles...' : `Loaded ${availableRoles.length} roles`}
+                                </li>
+                            </ul>
+                        </div>
+                    </form>
                 </div>
-              ) : (
-                isEdit ? "Update User" : "Create User"
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+            </div>
+        </div>
+    );
 }

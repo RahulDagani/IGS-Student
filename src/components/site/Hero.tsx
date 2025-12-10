@@ -42,7 +42,7 @@ export default function Hero() {
           {/* CTA Buttons */}
           <div className="flex gap-4 mt-8">
             <button className="bg-[#0566FF] text-white px-8 py-3 rounded-md font-medium hover:bg-blue-600 transition">
-              Join For Free
+              Apply Now
             </button>
             <button className="border border-gray-300 px-8 py-3 rounded-md font-medium text-gray-800 hover:bg-gray-50 transition">
               Browse Our Courses

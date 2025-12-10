@@ -147,16 +147,6 @@ const studentItems: NavItem[] = [
 
 const universityAndCoursesItems: NavItem[] = [
   {
-    name: "Universities",
-    icon: <University size={18} />,
-    path: "/universities",
-  },
-  {
-    name: "Courses",
-    icon: <LayoutDashboard size={18} />,
-    path: "/universities/courses",
-  },
-  {
     name: "Master Data",
     icon: <Filter size={18} />,
     subItems: [
@@ -193,6 +183,16 @@ const universityAndCoursesItems: NavItem[] = [
       
     ],
   },
+  {
+    name: "Universities",
+    icon: <University size={18} />,
+    path: "/universities",
+  },
+  {
+    name: "Courses",
+    icon: <LayoutDashboard size={18} />,
+    path: "/universities/courses",
+  }
 ]
 
 const userItems: NavItem[] = [

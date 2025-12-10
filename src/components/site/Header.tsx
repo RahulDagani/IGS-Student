@@ -23,10 +23,10 @@ export default function Header() {
           {/* <span className="text-[24px] font-semibold text-[#0E2A47]">ApplyTech</span> */}
           {/* Desktop Menu */}
         <nav className="hidden md:flex items-center ml-6 gap-8 text-[#0E2A47] font-medium">
-          <NavItem title="Home" />
-          <NavItem title="Courses" />
-          <NavItem title="Pages" />
-          <NavItem title="Accounts" />
+          <NavItem title="Home" link="/home"/>
+          <NavItem title="Universities" link="/universities"/>
+          <NavItem title="Collaborations" link="/collaborations"/>
+          <NavItem title="Contact" link="/contact"/>
         </nav>
         </div>
 
@@ -82,11 +82,13 @@ export default function Header() {
 }
 
 /* Components */
-const NavItem = ({ title }: { title: string }) => (
+const NavItem = ({ title, link }: { title: string, link: string }) => (
+  <Link href={`${link}`}>
   <div className="flex items-center gap-1 cursor-pointer hover:text-[#0566FF]">
     {title}
-    <ChevronDown size={16} />
+    {/* <ChevronDown size={16} /> */}
   </div>
+  </Link>
 );
 
 const MobileNavItem = ({ title }: { title: string }) => (

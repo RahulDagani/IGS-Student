@@ -462,17 +462,17 @@ export default function CoursesTable() {
     }
     
     // Add array parameters
-    filters.discipline_ids.forEach(id => params.append('discipline_id[]', id.toString()));
+    filters.discipline_ids.forEach(id => params.append('discipline_id', id.toString()));
     
     // Add single study level parameter (not array)
     if (filters.study_level_id) {
       params.append('study_level_id', filters.study_level_id.toString());
     }
     
-    filters.university_ids.forEach(id => params.append('university_id[]', id.toString()));
-    filters.country_codes.forEach(code => params.append('country_code[]', code));
-    filters.state_codes.forEach(code => params.append('state_code[]', code));
-    filters.city_codes.forEach(code => params.append('city_code[]', code));
+    filters.university_ids.forEach(id => params.append('university_id', id.toString()));
+    filters.country_codes.forEach(code => params.append('country_code', code));
+    filters.state_codes.forEach(code => params.append('state_code', code));
+    filters.city_codes.forEach(code => params.append('city_code', code));
     
     return params.toString();
   }, [filters, currentPage, limit, searchTerm]);

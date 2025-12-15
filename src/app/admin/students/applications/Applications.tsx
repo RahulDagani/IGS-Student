@@ -246,8 +246,8 @@ const FilterModal: React.FC<FilterModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999">
-      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4">
+    <div className="fixed inset-0 bg-black/70 flex z-99999">
+      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
             Apply Filters
@@ -271,7 +271,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
               disabled={loadingStatus}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mb-2 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="all">
                 {
@@ -289,7 +289,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 ">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select Student
@@ -1257,11 +1257,11 @@ export default function ApplicationsTable() {
             id: app.application.id,
             university: app.application.university_name,
             course: app.application.course_name,
-            intake: "Fall 2024", // You might want to get this from the API if available
+            intake: "", // You might want to get this from the API if available
             status: app.application.status_label,
-            assignedTo: app.application.assigned_to || "Not Assigned",
+            assignedTo: app.application.assigned_to || "",
             studentName: `${app.student_profile.first_name} ${app.student_profile.last_name}`,
-            studentEmail: "student@example.com", // You might want to get this from student data
+            studentEmail: "", // You might want to get this from student data
             country: app.application.university_country,
             degree: app.application.study_level_name,
             location: `${app.application.university_city}, ${app.application.university_state}`,

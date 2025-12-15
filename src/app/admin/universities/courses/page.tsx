@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -11,6 +11,7 @@ import Badge from "@/components/ui/badge/Badge";
 import Link from "next/link";
 import { Edit, Trash, Book, Building2, GraduationCap, Star, DollarSign } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { Country, State } from "country-state-city";
 
 interface Course {
   id: number;
@@ -107,82 +108,134 @@ type SortDirection = "asc" | "desc";
 
 interface FilterOptions {
   discipline_ids: number[];
-  study_level_ids: number[];
+  study_level_id: number | null; // Changed from array to single value
   university_ids: number[];
   country_codes: string[];
   state_codes: string[];
   city_codes: string[];
-  popular: string;
-  externalEvaluation: string;
+  // Removed popular and externalEvaluation filters
 }
 
 interface FilterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onApply: (filters: FilterOptions) => void;
+  onFilterChange: (filters: FilterOptions) => void;
   filtersData: ApiResponse['filters'] | null;
   appliedFilters: FilterOptions;
 }
 
+const getCountryName = (code: string | undefined | null) => {
+  if (!code) return '';
+  const country = Country.getCountryByCode(code);
+  return country ? country.name : code;
+};
+
+const getStateName = (code: string | undefined | null) => {
+  if (!code) return '';
+  const state = State.getStateByCode(code);
+  return state ? state.name : code;
+};
+
 const FilterModal: React.FC<FilterModalProps> = ({
   isOpen,
   onClose,
-  onApply,
+  onFilterChange,
   filtersData,
   appliedFilters,
 }) => {
-  const [selectedDisciplineIds, setSelectedDisciplineIds] = useState<number[]>(appliedFilters.discipline_ids);
-  const [selectedStudyLevelIds, setSelectedStudyLevelIds] = useState<number[]>(appliedFilters.study_level_ids);
-  const [selectedUniversityIds, setSelectedUniversityIds] = useState<number[]>(appliedFilters.university_ids);
-  const [selectedCountryCodes, setSelectedCountryCodes] = useState<string[]>(appliedFilters.country_codes);
-  const [selectedStateCodes, setSelectedStateCodes] = useState<string[]>(appliedFilters.state_codes);
-  const [selectedCityCodes, setSelectedCityCodes] = useState<string[]>(appliedFilters.city_codes);
-  const [selectedPopular, setSelectedPopular] = useState<string>(appliedFilters.popular);
-  const [selectedExternalEvaluation, setSelectedExternalEvaluation] = useState<string>(appliedFilters.externalEvaluation);
+  const [localFilters, setLocalFilters] = useState<FilterOptions>(appliedFilters);
 
-const handleCheckboxChange = <T extends number | string>(
-  array: T[],
-  setArray: React.Dispatch<React.SetStateAction<T[]>>,
-  value: T
-) => {
-  if (array.includes(value)) {
-    setArray(array.filter(item => item !== value));
-  } else {
-    setArray([...array, value]);
-  }
-};
+  // Initialize local filters when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setLocalFilters(appliedFilters);
+    }
+  }, [isOpen, appliedFilters]);
 
-  const handleApply = () => {
-    const filters: FilterOptions = {
-      discipline_ids: selectedDisciplineIds,
-      study_level_ids: selectedStudyLevelIds,
-      university_ids: selectedUniversityIds,
-      country_codes: selectedCountryCodes,
-      state_codes: selectedStateCodes,
-      city_codes: selectedCityCodes,
-      popular: selectedPopular,
-      externalEvaluation: selectedExternalEvaluation,
-    };
-    onApply(filters);
-    onClose();
+  const handleFilterChange = (newFilters: FilterOptions) => {
+    setLocalFilters(newFilters);
+    onFilterChange(newFilters);
+  };
+
+  const handleDisciplineChange = (disciplineId: number) => {
+    const newDisciplineIds = localFilters.discipline_ids.includes(disciplineId)
+      ? localFilters.discipline_ids.filter(id => id !== disciplineId)
+      : [...localFilters.discipline_ids, disciplineId];
+    
+    handleFilterChange({
+      ...localFilters,
+      discipline_ids: newDisciplineIds
+    });
+  };
+
+  const handleStudyLevelChange = (studyLevelId: number | null) => {
+    handleFilterChange({
+      ...localFilters,
+      study_level_id: studyLevelId
+    });
+  };
+
+  const handleUniversityChange = (universityId: number) => {
+    const newUniversityIds = localFilters.university_ids.includes(universityId)
+      ? localFilters.university_ids.filter(id => id !== universityId)
+      : [...localFilters.university_ids, universityId];
+    
+    handleFilterChange({
+      ...localFilters,
+      university_ids: newUniversityIds
+    });
+  };
+
+  const handleCountryChange = (countryCode: string) => {
+    const newCountryCodes = localFilters.country_codes.includes(countryCode)
+      ? localFilters.country_codes.filter(code => code !== countryCode)
+      : [...localFilters.country_codes, countryCode];
+    
+    handleFilterChange({
+      ...localFilters,
+      country_codes: newCountryCodes
+    });
+  };
+
+  const handleStateChange = (stateCode: string) => {
+    const newStateCodes = localFilters.state_codes.includes(stateCode)
+      ? localFilters.state_codes.filter(code => code !== stateCode)
+      : [...localFilters.state_codes, stateCode];
+    
+    handleFilterChange({
+      ...localFilters,
+      state_codes: newStateCodes
+    });
+  };
+
+  const handleCityChange = (cityCode: string) => {
+    const newCityCodes = localFilters.city_codes.includes(cityCode)
+      ? localFilters.city_codes.filter(code => code !== cityCode)
+      : [...localFilters.city_codes, cityCode];
+    
+    handleFilterChange({
+      ...localFilters,
+      city_codes: newCityCodes
+    });
   };
 
   const handleReset = () => {
-    setSelectedDisciplineIds([]);
-    setSelectedStudyLevelIds([]);
-    setSelectedUniversityIds([]);
-    setSelectedCountryCodes([]);
-    setSelectedStateCodes([]);
-    setSelectedCityCodes([]);
-    setSelectedPopular("all");
-    setSelectedExternalEvaluation("all");
+    const resetFilters: FilterOptions = {
+      discipline_ids: [],
+      study_level_id: null,
+      university_ids: [],
+      country_codes: [],
+      state_codes: [],
+      city_codes: [],
+    };
+    handleFilterChange(resetFilters);
   };
 
   if (!isOpen || !filtersData) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex z-999999 p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-[400px] max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 flex z-999999 justify-center align-middle p-4 px-6 overflow-y-auto">
+      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-[500px] max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
             Filter Courses
@@ -200,43 +253,39 @@ const handleCheckboxChange = <T extends number | string>(
         <div className="grid grid-cols-1 gap-6">
           {/* Study Levels Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
               Study Levels
             </label>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
+            <select
+              value={localFilters.study_level_id ?? ""}
+              onChange={(e) => {
+                const value = e.target.value ? Number(e.target.value) : null;
+                handleStudyLevelChange(value);
+              }}
+              className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm text-gray-700 focus:border-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+            >
+              <option value="">Select study level</option>
               {filtersData.studyLevels.map((level) => (
-                <div key={level.id} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`study-level-${level.id}`}
-                    checked={selectedStudyLevelIds.includes(level.id)}
-                    onChange={() => handleCheckboxChange(selectedStudyLevelIds, setSelectedStudyLevelIds, level.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                  />
-                  <label
-                    htmlFor={`study-level-${level.id}`}
-                    className="ml-2 text-sm text-gray-700 dark:text-gray-300"
-                  >
-                    {level.name}
-                  </label>
-                </div>
+                <option key={level.id} value={level.id}>
+                  {level.name}
+                </option>
               ))}
-            </div>
+            </select>
           </div>
 
           {/* Disciplines Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
               Disciplines
             </label>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
+            <div className="grid grid-cols-2 gap-6 max-h-40 overflow-y-auto">
               {filtersData.disciplines.map((discipline) => (
                 <div key={discipline.id} className="flex items-center">
                   <input
                     type="checkbox"
                     id={`discipline-${discipline.id}`}
-                    checked={selectedDisciplineIds.includes(discipline.id)}
-                    onChange={() => handleCheckboxChange(selectedDisciplineIds, setSelectedDisciplineIds, discipline.id)}
+                    checked={localFilters.discipline_ids.includes(discipline.id)}
+                    onChange={() => handleDisciplineChange(discipline.id)}
                     className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
                   />
                   <label
@@ -250,52 +299,28 @@ const handleCheckboxChange = <T extends number | string>(
             </div>
           </div>
 
-          {/* Universities Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Universities
-            </label>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {filtersData.universities.map((university) => (
-                <div key={university.id} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`university-${university.id}`}
-                    checked={selectedUniversityIds.includes(university.id)}
-                    onChange={() => handleCheckboxChange(selectedUniversityIds, setSelectedUniversityIds, university.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                  />
-                  <label
-                    htmlFor={`university-${university.id}`}
-                    className="ml-2 text-sm text-gray-700 dark:text-gray-300"
-                  >
-                    {university.university}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
+          
 
           {/* Countries Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
               Countries
             </label>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
+            <div className="grid grid-cols-2 gap-6 max-h-40 overflow-y-auto">
               {filtersData.locations.countries.map((country) => (
                 <div key={country.country_code} className="flex items-center">
                   <input
                     type="checkbox"
                     id={`country-${country.country_code}`}
-                    checked={selectedCountryCodes.includes(country.country_code)}
-                    onChange={() => handleCheckboxChange(selectedCountryCodes, setSelectedCountryCodes, country.country_code)}
+                    checked={localFilters.country_codes.includes(country.country_code)}
+                    onChange={() => handleCountryChange(country.country_code)}
                     className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
                   />
                   <label
                     htmlFor={`country-${country.country_code}`}
                     className="ml-2 text-sm text-gray-700 dark:text-gray-300"
                   >
-                    {country.country_code}
+                    {getCountryName(country.country_code)}
                   </label>
                 </div>
               ))}
@@ -304,17 +329,17 @@ const handleCheckboxChange = <T extends number | string>(
 
           {/* States Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
               States
             </label>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
+            <div className="grid grid-cols-2 gap-6 max-h-40 overflow-y-auto">
               {filtersData.locations.states.map((state) => (
                 <div key={state.state_code} className="flex items-center">
                   <input
                     type="checkbox"
                     id={`state-${state.state_code}`}
-                    checked={selectedStateCodes.includes(state.state_code)}
-                    onChange={() => handleCheckboxChange(selectedStateCodes, setSelectedStateCodes, state.state_code)}
+                    checked={localFilters.state_codes.includes(state.state_code)}
+                    onChange={() => handleStateChange(state.state_code)}
                     className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
                   />
                   <label
@@ -328,19 +353,46 @@ const handleCheckboxChange = <T extends number | string>(
             </div>
           </div>
 
-          {/* Cities Filter */}
+
+          {/* Universities Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Universities
+            </label>
+            <div className="grid grid-cols-2 gap-6 max-h-40 overflow-y-auto">
+              {filtersData.universities.map((university) => (
+                <div key={university.id} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`university-${university.id}`}
+                    checked={localFilters.university_ids.includes(university.id)}
+                    onChange={() => handleUniversityChange(university.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
+                  />
+                  <label
+                    htmlFor={`university-${university.id}`}
+                    className="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    {university.university}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Cities Filter */}
+          {/* <div>
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
               Cities
             </label>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
+            <div className="grid grid-cols-2 gap-6 max-h-40 overflow-y-auto">
               {filtersData.locations.cities.map((city) => (
                 <div key={city.city_code} className="flex items-center">
                   <input
                     type="checkbox"
                     id={`city-${city.city_code}`}
-                    checked={selectedCityCodes.includes(city.city_code)}
-                    onChange={() => handleCheckboxChange(selectedCityCodes, setSelectedCityCodes, city.city_code)}
+                    checked={localFilters.city_codes.includes(city.city_code)}
+                    onChange={() => handleCityChange(city.city_code)}
                     className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
                   />
                   <label
@@ -352,109 +404,7 @@ const handleCheckboxChange = <T extends number | string>(
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Popular Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Popular Course
-            </label>
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="popular-all"
-                  name="popular"
-                  value="all"
-                  checked={selectedPopular === "all"}
-                  onChange={(e) => setSelectedPopular(e.target.value)}
-                  className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                />
-                <label htmlFor="popular-all" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  All Courses
-                </label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="popular-yes"
-                  name="popular"
-                  value="yes"
-                  checked={selectedPopular === "yes"}
-                  onChange={(e) => setSelectedPopular(e.target.value)}
-                  className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                />
-                <label htmlFor="popular-yes" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Popular Only
-                </label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="popular-no"
-                  name="popular"
-                  value="no"
-                  checked={selectedPopular === "no"}
-                  onChange={(e) => setSelectedPopular(e.target.value)}
-                  className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                />
-                <label htmlFor="popular-no" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Not Popular
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* External Evaluation Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              External Evaluation
-            </label>
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="external-all"
-                  name="external"
-                  value="all"
-                  checked={selectedExternalEvaluation === "all"}
-                  onChange={(e) => setSelectedExternalEvaluation(e.target.value)}
-                  className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                />
-                <label htmlFor="external-all" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  All Courses
-                </label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="external-yes"
-                  name="external"
-                  value="yes"
-                  checked={selectedExternalEvaluation === "yes"}
-                  onChange={(e) => setSelectedExternalEvaluation(e.target.value)}
-                  className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                />
-                <label htmlFor="external-yes" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Required
-                </label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="external-no"
-                  name="external"
-                  value="no"
-                  checked={selectedExternalEvaluation === "no"}
-                  onChange={(e) => setSelectedExternalEvaluation(e.target.value)}
-                  className="h-4 w-4 border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                />
-                <label htmlFor="external-no" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Not Required
-                </label>
-              </div>
-            </div>
-          </div>
+          </div> */}
         </div>
 
         <div className="flex gap-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -465,10 +415,10 @@ const handleCheckboxChange = <T extends number | string>(
             Reset All
           </button>
           <button
-            onClick={handleApply}
-            className="flex-1 px-4 py-2 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10"
+            onClick={onClose}
+            className="flex-1 px-4 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-hidden focus:ring-2 focus:ring-gray-500/10"
           >
-            Apply Filters
+            Close
           </button>
         </div>
       </div>
@@ -488,40 +438,47 @@ export default function CoursesTable() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
   const [filters, setFilters] = useState<FilterOptions>({
     discipline_ids: [],
-    study_level_ids: [],
+    study_level_id: null,
     university_ids: [],
     country_codes: [],
     state_codes: [],
     city_codes: [],
-    popular: "all",
-    externalEvaluation: "all",
   });
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [limit] = useState<number>(10);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
   // Build query string from filters
-  const buildQueryString = () => {
+  const buildQueryString = useCallback(() => {
     const params = new URLSearchParams();
     
-    // Add array parameters
-    filters.discipline_ids.forEach(id => params.append('discipline_id[]', id.toString()));
-    filters.study_level_ids.forEach(id => params.append('study_level_id[]', id.toString()));
-    filters.university_ids.forEach(id => params.append('university_id[]', id.toString()));
-    filters.country_codes.forEach(code => params.append('country_code[]', code));
-    filters.state_codes.forEach(code => params.append('state_code[]', code));
-    filters.city_codes.forEach(code => params.append('city_code[]', code));
+    // Add pagination
+    params.append('page', currentPage.toString());
+    params.append('limit', limit.toString());
     
-    // Add single value parameters
-    if (filters.popular !== "all") {
-      params.append('is_popular', filters.popular === "yes" ? "1" : "0");
+    // Add search term
+    if (searchTerm) {
+      params.append('search', searchTerm);
     }
-    if (filters.externalEvaluation !== "all") {
-      params.append('external_evaluation', filters.externalEvaluation);
+    
+    // Add array parameters
+    filters.discipline_ids.forEach(id => params.append('discipline_id', id.toString()));
+    
+    // Add single study level parameter (not array)
+    if (filters.study_level_id) {
+      params.append('study_level_id', filters.study_level_id.toString());
     }
+    
+    filters.university_ids.forEach(id => params.append('university_id', id.toString()));
+    filters.country_codes.forEach(code => params.append('country_code', code));
+    filters.state_codes.forEach(code => params.append('state_code', code));
+    filters.city_codes.forEach(code => params.append('city_code', code));
     
     return params.toString();
-  };
+  }, [filters, currentPage, limit, searchTerm]);
 
   // Fetch courses from API
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async () => {
     if (!token) {
       setError("Authentication token not found");
       setIsLoading(false);
@@ -566,6 +523,8 @@ export default function CoursesTable() {
 
         setCourses(transformedCourses);
         setApiResponse(result);
+        // Update current page from API response
+        setCurrentPage(result.page);
       } else {
         setCourses([]);
         setApiResponse(null);
@@ -578,32 +537,105 @@ export default function CoursesTable() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token, buildQueryString]);
 
   // Initial fetch
   useEffect(() => {
     fetchCourses();
-  }, []);
+  }, [fetchCourses]);
 
-  // Fetch courses when filters change
+  // Handle search with debounce
   useEffect(() => {
-    fetchCourses();
-  }, [filters]);
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
 
-  // Filter and sort data
-  const filteredAndSortedData = useMemo(() => {
-    const filtered = courses.filter((course) => {
-      return searchTerm === "" ||
-        course.courseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.universityName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.discipline.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.studyLevel.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.applicationFee.toLowerCase().includes(searchTerm.toLowerCase());
+    const timeout = setTimeout(() => {
+      setCurrentPage(1);
+      fetchCourses();
+    }, 500); // 500ms debounce
+
+    setSearchTimeout(timeout);
+
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTerm]);
+
+  // Handle filter changes
+  const handleFilterChange = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
+    setCurrentPage(1);
+  };
+
+  // Type-safe filter removal functions
+  const handleRemoveDisciplineFilter = (id: number) => {
+    setFilters(prev => ({
+      ...prev,
+      discipline_ids: prev.discipline_ids.filter(disciplineId => disciplineId !== id)
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleRemoveStudyLevelFilter = () => {
+    setFilters(prev => ({
+      ...prev,
+      study_level_id: null
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleRemoveUniversityFilter = (id: number) => {
+    setFilters(prev => ({
+      ...prev,
+      university_ids: prev.university_ids.filter(universityId => universityId !== id)
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleRemoveCountryFilter = (code: string) => {
+    setFilters(prev => ({
+      ...prev,
+      country_codes: prev.country_codes.filter(countryCode => countryCode !== code)
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleRemoveStateFilter = (code: string) => {
+    setFilters(prev => ({
+      ...prev,
+      state_codes: prev.state_codes.filter(stateCode => stateCode !== code)
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleRemoveCityFilter = (code: string) => {
+    setFilters(prev => ({
+      ...prev,
+      city_codes: prev.city_codes.filter(cityCode => cityCode !== code)
+    }));
+    setCurrentPage(1);
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      discipline_ids: [],
+      study_level_id: null,
+      university_ids: [],
+      country_codes: [],
+      state_codes: [],
+      city_codes: [],
     });
+    setCurrentPage(1);
+  };
 
-    // Sorting
+  const filteredAndSortedData = useMemo(() => {
+    // With real-time API filtering, we don't need client-side filtering anymore
+    // We can just return the courses from API
     if (sortField) {
-      filtered.sort((a, b) => {
+      return [...courses].sort((a, b) => {
         let aValue = a[sortField];
         let bValue = b[sortField];
         
@@ -622,8 +654,8 @@ export default function CoursesTable() {
       });
     }
 
-    return filtered;
-  }, [courses, searchTerm, sortField, sortDirection]);
+    return courses;
+  }, [courses, sortField, sortDirection]);
 
   const handleSort = (field: keyof Course) => {
     if (sortField === field) {
@@ -666,23 +698,6 @@ export default function CoursesTable() {
     });
   };
 
-  const handleApplyFilters = (newFilters: FilterOptions) => {
-    setFilters(newFilters);
-  };
-
-  const clearAllFilters = () => {
-    setFilters({
-      discipline_ids: [],
-      study_level_ids: [],
-      university_ids: [],
-      country_codes: [],
-      state_codes: [],
-      city_codes: [],
-      popular: "all",
-      externalEvaluation: "all",
-    });
-  };
-
   const handleDelete = async (id: number) => {
     if (confirm("Are you sure you want to delete this course?")) {
       try {
@@ -707,15 +722,17 @@ export default function CoursesTable() {
     }
   };
 
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
+
   const hasActiveFilters = 
     filters.discipline_ids.length > 0 ||
-    filters.study_level_ids.length > 0 ||
+    filters.study_level_id !== null ||
     filters.university_ids.length > 0 ||
     filters.country_codes.length > 0 ||
     filters.state_codes.length > 0 ||
-    filters.city_codes.length > 0 ||
-    filters.popular !== "all" ||
-    filters.externalEvaluation !== "all";
+    filters.city_codes.length > 0;
 
   // Helper function to get filter name by ID
   const getFilterName = (type: 'discipline' | 'studyLevel' | 'university', id: number): string => {
@@ -733,15 +750,26 @@ export default function CoursesTable() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500"></div>
-      </div>
-    );
-  }
+  // Helper to get study level name
+  const getStudyLevelName = (id: number): string => {
+    if (!apiResponse?.filters) return '';
+    return apiResponse.filters.studyLevels.find(s => s.id === id)?.name || '';
+  };
 
-  if (error) {
+  // Fetch courses when filters or page change
+  useEffect(() => {
+    fetchCourses();
+  }, [filters, currentPage, fetchCourses]);
+
+  // if (isLoading && currentPage === 1) {
+  //   return (
+  //     <div className="flex justify-center items-center h-64">
+  //       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500"></div>
+  //     </div>
+  //   );
+  // }
+
+  if (error && currentPage === 1) {
     return (
       <div className="text-center py-8">
         <div className="text-red-600 dark:text-red-400 mb-4">{error}</div>
@@ -832,7 +860,7 @@ export default function CoursesTable() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
             </svg>
-            Apply Filters
+            Filter Courses
           </button>
           <Link href="/admin/universities/courses/add">
             <button className="dark:border-green-500 h-11 px-4 rounded-lg border-2 border-green-500 bg-transparent text-sm text-green-500 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-green-500 dark:focus:border-brand-800 flex items-center gap-2">
@@ -852,38 +880,29 @@ export default function CoursesTable() {
             <Badge key={`discipline-${id}`} size="sm" color="primary">
               Discipline: {getFilterName('discipline', id)}
               <button 
-                onClick={() => setFilters(prev => ({
-                  ...prev,
-                  discipline_ids: prev.discipline_ids.filter(did => did !== id)
-                }))}
+                onClick={() => handleRemoveDisciplineFilter(id)}
                 className="ml-1 text-xs"
               >
                 ×
               </button>
             </Badge>
           ))}
-          {filters.study_level_ids.map(id => (
-            <Badge key={`study-level-${id}`} size="sm" color="primary">
-              Study Level: {getFilterName('studyLevel', id)}
+          {filters.study_level_id !== null && (
+            <Badge key={`study-level-${filters.study_level_id}`} size="sm" color="primary">
+              Study Level: {getStudyLevelName(filters.study_level_id)}
               <button 
-                onClick={() => setFilters(prev => ({
-                  ...prev,
-                  study_level_ids: prev.study_level_ids.filter(sid => sid !== id)
-                }))}
+                onClick={handleRemoveStudyLevelFilter}
                 className="ml-1 text-xs"
               >
                 ×
               </button>
             </Badge>
-          ))}
+          )}
           {filters.university_ids.map(id => (
             <Badge key={`university-${id}`} size="sm" color="primary">
               University: {getFilterName('university', id)}
               <button 
-                onClick={() => setFilters(prev => ({
-                  ...prev,
-                  university_ids: prev.university_ids.filter(uid => uid !== id)
-                }))}
+                onClick={() => handleRemoveUniversityFilter(id)}
                 className="ml-1 text-xs"
               >
                 ×
@@ -892,12 +911,9 @@ export default function CoursesTable() {
           ))}
           {filters.country_codes.map(code => (
             <Badge key={`country-${code}`} size="sm" color="primary">
-              Country: {code}
+              Country: {getCountryName(code)}
               <button 
-                onClick={() => setFilters(prev => ({
-                  ...prev,
-                  country_codes: prev.country_codes.filter(cc => cc !== code)
-                }))}
+                onClick={() => handleRemoveCountryFilter(code)}
                 className="ml-1 text-xs"
               >
                 ×
@@ -906,12 +922,9 @@ export default function CoursesTable() {
           ))}
           {filters.state_codes.map(code => (
             <Badge key={`state-${code}`} size="sm" color="primary">
-              State: {code}
+              State: {getStateName(code)}
               <button 
-                onClick={() => setFilters(prev => ({
-                  ...prev,
-                  state_codes: prev.state_codes.filter(sc => sc !== code)
-                }))}
+                onClick={() => handleRemoveStateFilter(code)}
                 className="ml-1 text-xs"
               >
                 ×
@@ -922,38 +935,13 @@ export default function CoursesTable() {
             <Badge key={`city-${code}`} size="sm" color="primary">
               City: {code}
               <button 
-                onClick={() => setFilters(prev => ({
-                  ...prev,
-                  city_codes: prev.city_codes.filter(cc => cc !== code)
-                }))}
+                onClick={() => handleRemoveCityFilter(code)}
                 className="ml-1 text-xs"
               >
                 ×
               </button>
             </Badge>
           ))}
-          {filters.popular !== "all" && (
-            <Badge size="sm" color="primary">
-              Popular: {filters.popular === "yes" ? "Yes" : "No"}
-              <button 
-                onClick={() => setFilters(prev => ({ ...prev, popular: "all" }))}
-                className="ml-1 text-xs"
-              >
-                ×
-              </button>
-            </Badge>
-          )}
-          {filters.externalEvaluation !== "all" && (
-            <Badge size="sm" color="primary">
-              External Evaluation: {filters.externalEvaluation === "yes" ? "Required" : "Not Required"}
-              <button 
-                onClick={() => setFilters(prev => ({ ...prev, externalEvaluation: "all" }))}
-                className="ml-1 text-xs"
-              >
-                ×
-              </button>
-            </Badge>
-          )}
         </div>
       )}
 
@@ -961,156 +949,162 @@ export default function CoursesTable() {
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
         <div className="max-w-full overflow-x-auto">
           <div className="min-w-[1400px]">
-            <Table>
-              {/* Table Header */}
-              <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-                <TableRow>
-                  {[
-                    { key: "id", label: "ID" },
-                    { key: "courseName", label: "Course Name" },
-                    { key: "universityName", label: "University" },
-                    { key: "discipline", label: "Discipline" },
-                    { key: "studyLevel", label: "Study Level" },
-                    { key: "applicationFee", label: "Application Fee" },
-                    { key: "externalEvaluation", label: "Ext. Evaluation" },
-                    { key: "popular", label: "Popular" },
-                    { key: "status", label: "Status" },
-                    { key: "createdAt", label: "Created At" },
-                    { key: "action", label: "Action" },
-                  ].map(({ key, label }) => (
-                    <TableCell
-                      key={key}
-                      isHeader
-                      className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => key !== "action" ? handleSort(key as keyof Course) : undefined}
-                    >
-                      <div className="flex items-center gap-1">
-                        {label}
-                        {key !== "action" && (
-                          <span className="text-xs">{getSortIcon(key as keyof Course)}</span>
-                        )}
-                      </div>
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHeader>
-
-              {/* Table Body */}
-              <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                {filteredAndSortedData.length > 0 ? (
-                  filteredAndSortedData.map((course) => (
-                    <TableRow key={course.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                          #{course.id}
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-                            <Book size={16} className="text-gray-600 dark:text-gray-400" />
-                          </div>
-                          <span className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                            {course.courseName}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="flex items-center gap-2">
-                          <Building2 size={14} className="text-gray-400" />
-                          <span className="text-gray-600 text-theme-sm dark:text-gray-400">
-                            {course.universityName}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <Badge size="sm" color="info">
-                          {course.discipline}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="flex items-center gap-2">
-                          <GraduationCap size={14} className="text-gray-400" />
-                          <Badge size="sm" color="primary">
-                            {course.studyLevel}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="flex items-center gap-2">
-                          <DollarSign size={14} className="text-gray-400" />
-                          <span className="text-gray-600 text-theme-sm dark:text-gray-400">
-                            {course.applicationFee}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <Badge
-                          size="sm"
-                          color={getExternalEvaluationColor(course.externalEvaluation)}
-                        >
-                          {course.externalEvaluation === "yes" ? "Required" : "Not Required"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <Badge
-                          size="sm"
-                          color={getPopularColor(course.popular)}
-                        >
-                          {course.popular === "yes" ? (
-                            <div className="flex items-center gap-1">
-                              <Star size={12} className="fill-current" />
-                              Popular
-                            </div>
-                          ) : (
-                            "Standard"
+            {isLoading && currentPage > 1 ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+              </div>
+            ) : (
+              <Table>
+                {/* Table Header */}
+                <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
+                  <TableRow>
+                    {[
+                      { key: "id", label: "ID" },
+                      { key: "courseName", label: "Course Name" },
+                      { key: "universityName", label: "University" },
+                      { key: "discipline", label: "Discipline" },
+                      { key: "studyLevel", label: "Study Level" },
+                      { key: "applicationFee", label: "Application Fee" },
+                      { key: "externalEvaluation", label: "Ext. Evaluation" },
+                      { key: "popular", label: "Popular" },
+                      { key: "status", label: "Status" },
+                      { key: "createdAt", label: "Created At" },
+                      { key: "action", label: "Action" },
+                    ].map(({ key, label }) => (
+                      <TableCell
+                        key={key}
+                        isHeader
+                        className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                        onClick={() => key !== "action" ? handleSort(key as keyof Course) : undefined}
+                      >
+                        <div className="flex items-center gap-1">
+                          {label}
+                          {key !== "action" && (
+                            <span className="text-xs">{getSortIcon(key as keyof Course)}</span>
                           )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <Badge
-                          size="sm"
-                          color={getStatusColor(course.status)}
-                        >
-                          {course.status.charAt(0).toUpperCase() + course.status.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="text-gray-500 text-theme-sm dark:text-gray-400">
-                          {formatDate(course.createdAt)}
                         </div>
                       </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/admin/universities/courses/edit/${course.id}`}
-                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                            title="Edit Course"
+                    ))}
+                  </TableRow>
+                </TableHeader>
+
+                {/* Table Body */}
+                <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                  {filteredAndSortedData.length > 0 ? (
+                    filteredAndSortedData.map((course) => (
+                      <TableRow key={course.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <TableCell className="px-5 py-4 text-start">
+                          <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
+                            #{course.id}
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-start">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                              <Book size={16} className="text-gray-600 dark:text-gray-400" />
+                            </div>
+                            <span className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
+                              {course.courseName}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-start">
+                          <div className="flex items-center gap-2">
+                            <Building2 size={14} className="text-gray-400" />
+                            <span className="text-gray-600 text-theme-sm dark:text-gray-400">
+                              {course.universityName}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-start">
+                          <Badge size="sm" color="info">
+                            {course.discipline}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-start">
+                          <div className="flex items-center gap-2">
+                            <GraduationCap size={14} className="text-gray-400" />
+                            <Badge size="sm" color="primary">
+                              {course.studyLevel}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-start">
+                          <div className="flex items-center gap-2">
+                            <DollarSign size={14} className="text-gray-400" />
+                            <span className="text-gray-600 text-theme-sm dark:text-gray-400">
+                              {course.applicationFee}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-start">
+                          <Badge
+                            size="sm"
+                            color={getExternalEvaluationColor(course.externalEvaluation)}
                           >
-                            <Edit size={18} />
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(course.id)}
-                            className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                            title="Delete Course"
+                            {course.externalEvaluation === "yes" ? "Required" : "Not Required"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-start">
+                          <Badge
+                            size="sm"
+                            color={getPopularColor(course.popular)}
                           >
-                            <Trash size={18} />
-                          </button>
-                        </div>
+                            {course.popular === "yes" ? (
+                              <div className="flex items-center gap-1">
+                                <Star size={12} className="fill-current" />
+                                Popular
+                              </div>
+                            ) : (
+                              "Standard"
+                            )}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-start">
+                          <Badge
+                            size="sm"
+                            color={getStatusColor(course.status)}
+                          >
+                            {course.status.charAt(0).toUpperCase() + course.status.slice(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-start">
+                          <div className="text-gray-500 text-theme-sm dark:text-gray-400">
+                            {formatDate(course.createdAt)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-start">
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/admin/universities/courses/edit/${course.id}`}
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                              title="Edit Course"
+                            >
+                              <Edit size={18} />
+                            </Link>
+                            <button
+                              onClick={() => handleDelete(course.id)}
+                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                              title="Delete Course"
+                            >
+                              <Trash size={18} />
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400"
+                      >
+                        No courses found matching your criteria.
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400"
-                    >
-                      No courses found matching your criteria.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </div>
       </div>
@@ -1125,25 +1119,22 @@ export default function CoursesTable() {
             </span>
           )}
         </div>
-        {apiResponse && (
+        {apiResponse && apiResponse.totalPages > 1 && (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                // Implement previous page logic
-                console.log('Previous page');
-              }}
+              onClick={() => handlePageChange(currentPage - 1)}
               disabled={!apiResponse.hasPrevPage}
-              className="px-3 py-1 rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
             >
               Previous
             </button>
+            <span className="px-3 py-1">
+              {currentPage} / {apiResponse.totalPages}
+            </span>
             <button
-              onClick={() => {
-                // Implement next page logic
-                console.log('Next page');
-              }}
+              onClick={() => handlePageChange(currentPage + 1)}
               disabled={!apiResponse.hasNextPage}
-              className="px-3 py-1 rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
             >
               Next
             </button>
@@ -1155,7 +1146,7 @@ export default function CoursesTable() {
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
-        onApply={handleApplyFilters}
+        onFilterChange={handleFilterChange}
         filtersData={apiResponse?.filters || null}
         appliedFilters={filters}
       />

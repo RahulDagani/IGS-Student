@@ -1,13 +1,14 @@
 "use client"
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Badge from "@/components/ui/badge/Badge";
-import { DockIcon, DollarSign, GraduationCap, MapPin, Calendar } from "lucide-react";
+import { DockIcon, DollarSign, GraduationCap, MapPin, Calendar, Book, Building2, Star } from "lucide-react";
 import { useAuth } from '@/context/AuthContext';
 import { useParams } from "next/navigation";
-import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Link from "next/link";
-import { Country, State, City } from "country-state-city";
+import { Country, State } from "country-state-city";
+import Image from "next/image";
 
+// Interfaces matching the API response structure
 interface Intake {
   intake_id: number;
   course_id: number;
@@ -60,10 +61,48 @@ interface Course {
   university_type_name: string;
   collaboration_type_name: string;
   intakes: Intake[];
-  // Add location fields if available in API
-  country_code?: string;
-  state_code?: string;
-  city_code?: string;
+  country_code: string;
+  state_code: string;
+  city_code: string;
+  university_logo: string;
+  university_logo_url: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  data: Course[];
+  filters: {
+    studyLevels: Array<{
+      id: number;
+      name: string;
+    }>;
+    disciplines: Array<{
+      id: number;
+      name: string;
+    }>;
+    universities: Array<{
+      id: number;
+      university: string;
+      country_code: string;
+      state_code: string;
+      city_code: string;
+    }>;
+    locations: {
+      countries: Array<{ country_code: string }>;
+      states: Array<{ state_code: string }>;
+      cities: Array<{ city_code: string }>;
+    };
+    tuitionRange: {
+      min: string;
+      max: string;
+    };
+  };
 }
 
 interface Student {
@@ -83,36 +122,326 @@ interface StudentsResponse {
   data: Student[];
 }
 
-interface ApiResponse {
-  success: boolean;
-  data: Course[];
-}
-
-type SortField = keyof Course | "";
-type SortDirection = "asc" | "desc";
-
+// Filter Options Interface
 interface FilterOptions {
-  university: string[];
-  course: string[];
-  studyLevel: string[];
-  discipline: string[];
-  country: string[];
-  state: string[];
+  discipline_ids: number[];
+  study_level_id: number | null;
+  university_ids: number[];
+  country_codes: string[];
+  state_codes: string[];
+  city_codes: string[];
+  search?: string;
 }
 
+// Filter Modal Component
 interface FilterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onApply: (filters: FilterOptions) => void;
-  universities: string[];
-  courses: string[];
-  disciplines: string[];
-  countries: string[];
-  states: string[];
-  studyLevels: string[];
+  onFilterChange: (filters: FilterOptions) => void;
+  filtersData: ApiResponse['filters'] | null;
+  appliedFilters: FilterOptions;
 }
 
-// Application Confirmation Modal Component - Updated to include student selection
+const getCountryName = (code: string | undefined | null) => {
+  if (!code) return '';
+  const country = Country.getCountryByCode(code);
+  return country ? country.name : code;
+};
+
+const getStateName = (code: string | undefined | null) => {
+  if (!code) return '';
+  const state = State.getStateByCode(code);
+  return state ? state.name : code;
+};
+
+const FilterModal: React.FC<FilterModalProps> = ({
+  isOpen,
+  onClose,
+  onFilterChange,
+  filtersData,
+  appliedFilters,
+}) => {
+  const [localFilters, setLocalFilters] = useState<FilterOptions>(appliedFilters);
+
+  // Initialize local filters when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setLocalFilters(appliedFilters);
+    }
+  }, [isOpen, appliedFilters]);
+
+  const handleFilterChange = (newFilters: FilterOptions) => {
+    setLocalFilters(newFilters);
+    onFilterChange(newFilters);
+  };
+
+  const handleDisciplineChange = (disciplineId: number) => {
+    const newDisciplineIds = localFilters.discipline_ids.includes(disciplineId)
+      ? localFilters.discipline_ids.filter(id => id !== disciplineId)
+      : [...localFilters.discipline_ids, disciplineId];
+    
+    handleFilterChange({
+      ...localFilters,
+      discipline_ids: newDisciplineIds
+    });
+  };
+
+  const handleStudyLevelChange = (studyLevelId: number | null) => {
+    handleFilterChange({
+      ...localFilters,
+      study_level_id: studyLevelId
+    });
+  };
+
+  const handleUniversityChange = (universityId: number) => {
+    const newUniversityIds = localFilters.university_ids.includes(universityId)
+      ? localFilters.university_ids.filter(id => id !== universityId)
+      : [...localFilters.university_ids, universityId];
+    
+    handleFilterChange({
+      ...localFilters,
+      university_ids: newUniversityIds
+    });
+  };
+
+  const handleCountryChange = (countryCode: string) => {
+    const newCountryCodes = localFilters.country_codes.includes(countryCode)
+      ? localFilters.country_codes.filter(code => code !== countryCode)
+      : [...localFilters.country_codes, countryCode];
+    
+    handleFilterChange({
+      ...localFilters,
+      country_codes: newCountryCodes
+    });
+  };
+
+  const handleStateChange = (stateCode: string) => {
+    const newStateCodes = localFilters.state_codes.includes(stateCode)
+      ? localFilters.state_codes.filter(code => code !== stateCode)
+      : [...localFilters.state_codes, stateCode];
+    
+    handleFilterChange({
+      ...localFilters,
+      state_codes: newStateCodes
+    });
+  };
+
+  const handleCityChange = (cityCode: string) => {
+    const newCityCodes = localFilters.city_codes.includes(cityCode)
+      ? localFilters.city_codes.filter(code => code !== cityCode)
+      : [...localFilters.city_codes, cityCode];
+    
+    handleFilterChange({
+      ...localFilters,
+      city_codes: newCityCodes
+    });
+  };
+
+  const handleReset = () => {
+    const resetFilters: FilterOptions = {
+      discipline_ids: [],
+      study_level_id: null,
+      university_ids: [],
+      country_codes: [],
+      state_codes: [],
+      city_codes: [],
+    };
+    handleFilterChange(resetFilters);
+  };
+
+  if (!isOpen || !filtersData) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex z-999999 justify-center items-center p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+            Filter Courses
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6">
+          {/* Study Levels Filter */}
+          <div>
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Study Levels
+            </label>
+            <select
+              value={localFilters.study_level_id ?? ""}
+              onChange={(e) => {
+                const value = e.target.value ? Number(e.target.value) : null;
+                handleStudyLevelChange(value);
+              }}
+              className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm text-gray-700 focus:border-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+            >
+              <option value="">Select study level</option>
+              {filtersData.studyLevels.map((level) => (
+                <option key={level.id} value={level.id}>
+                  {level.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Disciplines Filter */}
+          <div>
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Disciplines
+            </label>
+            <div className="grid grid-cols-2 gap-6 max-h-40 overflow-y-auto">
+              {filtersData.disciplines.map((discipline) => (
+                <div key={discipline.id} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`discipline-${discipline.id}`}
+                    checked={localFilters.discipline_ids.includes(discipline.id)}
+                    onChange={() => handleDisciplineChange(discipline.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
+                  />
+                  <label
+                    htmlFor={`discipline-${discipline.id}`}
+                    className="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    {discipline.name}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Countries Filter */}
+          <div>
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Countries
+            </label>
+            <div className="grid grid-cols-2 gap-6 max-h-40 overflow-y-auto">
+              {filtersData.locations.countries.map((country) => (
+                <div key={country.country_code} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`country-${country.country_code}`}
+                    checked={localFilters.country_codes.includes(country.country_code)}
+                    onChange={() => handleCountryChange(country.country_code)}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
+                  />
+                  <label
+                    htmlFor={`country-${country.country_code}`}
+                    className="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    {getCountryName(country.country_code)}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* States Filter */}
+          <div>
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
+              States
+            </label>
+            <div className="grid grid-cols-2 gap-6 max-h-40 overflow-y-auto">
+              {filtersData.locations.states.map((state) => (
+                <div key={state.state_code} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`state-${state.state_code}`}
+                    checked={localFilters.state_codes.includes(state.state_code)}
+                    onChange={() => handleStateChange(state.state_code)}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
+                  />
+                  <label
+                    htmlFor={`state-${state.state_code}`}
+                    className="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    {state.state_code}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Cities Filter */}
+          <div>
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Cities
+            </label>
+            <div className="grid grid-cols-2 gap-6 max-h-40 overflow-y-auto">
+              {filtersData.locations.cities.map((city) => (
+                <div key={city.city_code} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`city-${city.city_code}`}
+                    checked={localFilters.city_codes.includes(city.city_code)}
+                    onChange={() => handleCityChange(city.city_code)}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
+                  />
+                  <label
+                    htmlFor={`city-${city.city_code}`}
+                    className="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    {city.city_code}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Universities Filter */}
+          <div>
+            <label className="block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Universities
+            </label>
+            <div className="grid grid-cols-2 gap-6 max-h-40 overflow-y-auto">
+              {filtersData.universities.map((university) => (
+                <div key={university.id} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`university-${university.id}`}
+                    checked={localFilters.university_ids.includes(university.id)}
+                    onChange={() => handleUniversityChange(university.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
+                  />
+                  <label
+                    htmlFor={`university-${university.id}`}
+                    className="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    {university.university}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={handleReset}
+            className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            Reset All
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10"
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Application Confirmation Modal Component
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -152,7 +481,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   if (!isOpen || !course) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-md">
         <div className="p-6">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
@@ -270,7 +599,7 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, onClose, type, message 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-md">
         <div className="p-6">
           <div className={`flex items-center justify-center w-12 h-12 rounded-full mx-auto mb-4 ${
@@ -310,254 +639,7 @@ const AlertModal: React.FC<AlertModalProps> = ({ isOpen, onClose, type, message 
   );
 };
 
-const FilterModal: React.FC<FilterModalProps> = ({
-  isOpen,
-  onClose,
-  onApply,
-  universities,
-  courses,
-  disciplines,
-  countries,
-  states,
-}) => {
-  
-  const [selectedStudyLevel, setSelectedStudyLevel] = useState<string>("");
-  const [selectedDisciplines, setSelectedDisciplines] = useState<string[]>([]);
-  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
-  const [selectedStates, setSelectedStates] = useState<string[]>([]);
-  const [selectedUniversities, setSelectedUniversities] = useState<string[]>([]);
-
-  const handleDisciplineChange = (discipline: string) => {
-    setSelectedDisciplines(prev =>
-      prev.includes(discipline)
-        ? prev.filter(d => d !== discipline)
-        : [...prev, discipline]
-    );
-  };
-
-  const handleCountryChange = (country: string) => {
-    setSelectedCountries(prev =>
-      prev.includes(country)
-        ? prev.filter(c => c !== country)
-        : [...prev, country]
-    );
-  };
-
-  const handleStateChange = (state: string) => {
-    setSelectedStates(prev =>
-      prev.includes(state)
-        ? prev.filter(s => s !== state)
-        : [...prev, state]
-    );
-  };
-
-  const handleUniversityChange = (university: string) => {
-    setSelectedUniversities(prev =>
-      prev.includes(university)
-        ? prev.filter(u => u !== university)
-        : [...prev, university]
-    );
-  };
-
-  const handleApply = () => {
-    const filters: FilterOptions = {
-      university: selectedUniversities,
-      course: [],
-      studyLevel: selectedStudyLevel ? [selectedStudyLevel] : [],
-      discipline: selectedDisciplines,
-      country: selectedCountries,
-      state: selectedStates,
-    };
-    onApply(filters);
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex z-99999">
-      <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-[500px] max-h-[90vh] overflow-y-auto">
-        <div className="modal-content">
-          <div className="modal-header flex justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-            <h5 className="modal-title text-lg font-semibold text-gray-800 dark:text-white">
-              Filter courses by
-            </h5>
-            <button 
-              type="button" 
-              className="btn-close text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              onClick={onClose}
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="modal-body p-6 space-y-6">
-            {/* Study Level */}
-            <div className="subject-area mb-3">
-              <label htmlFor="subjectArea" className="form-label fw-bold filter-heading block text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Study Level
-              </label>
-              <div className="input-group">
-                <select 
-                  className="form-select selected_study_level w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                  name="selected_study_level[]" 
-                  id="subjectArea" 
-                  value={selectedStudyLevel}
-                  onChange={(e) => setSelectedStudyLevel(e.target.value)}
-                >
-                  <option value="">Select Study Level</option>
-                  <option value="bachelors">Bachelors</option>
-                  <option value="masters">Masters</option>
-                  <option value="phd">PhD</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Discipline */}
-            <div className="mb-3">
-              <label className="form-label fw-bold filter-heading block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Discipline
-              </label>
-              <div className="row disciplines_select grid grid-cols-1 md:grid-cols-2 gap-3">
-                {disciplines.map((discipline) => (
-                  <div key={discipline} className="col-lg-6">
-                    <div className="form-check">
-                      <input 
-                        className="form-check-input"
-                        type="checkbox" 
-                        name="selected_discipline" 
-                        id={discipline}
-                        value={discipline}
-                        checked={selectedDisciplines.includes(discipline)}
-                        onChange={() => handleDisciplineChange(discipline)}
-                      />
-                      <label className="form-check-label ml-2 text-sm text-gray-700 dark:text-gray-300" htmlFor={discipline}>
-                        {discipline.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                      </label>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Study Destinations */}
-            <div className="mb-3">
-              <div className="d-flex justify-content-between align-items-center">
-                <label className="form-label fw-bold filter-heading block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Study destinations
-                </label>
-              </div>
-              <div className="row grid grid-cols-1 md:grid-cols-2 gap-3" id="country_list">
-                {countries.map((country) => (
-                  <div key={country} className="col-lg-6">
-                    <div className="form-check">
-                      <input 
-                        className="form-check-input"
-                        type="checkbox" 
-                        name="selected_country" 
-                        id={country}
-                        value={country}
-                        checked={selectedCountries.includes(country)}
-                        onChange={() => handleCountryChange(country)}
-                      />
-                      <label className="form-check-label ml-2 text-sm text-gray-700 dark:text-gray-300" htmlFor={country}>
-                        {country.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                      </label>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* States */}
-            <div className="mb-3 large-list-container">
-              <div className="d-flex justify-content-between align-items-center">
-                <label className="form-label fw-bold filter-heading block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  States
-                </label>
-                <button className="small show-all fw-bold text-sm text-brand-500 hover:text-brand-600">
-                  Show all <i className="bi bi-caret-down-fill"></i>
-                </button>
-              </div>
-              <div className="row large-list grid grid-cols-1 md:grid-cols-2 gap-3 max-h-40 overflow-y-auto" id="states_list">
-                {states.map((state) => (
-                  <div key={state} className="col-lg-6">
-                    <div className="form-check">
-                      <input 
-                        className="form-check-input"
-                        type="checkbox" 
-                        name="selected_state" 
-                        id={state}
-                        value={state}
-                        checked={selectedStates.includes(state)}
-                        onChange={() => handleStateChange(state)}
-                      />
-                      <label className="form-check-label ml-2 text-sm text-gray-700 dark:text-gray-300" htmlFor={state}>
-                        {state.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                      </label>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Institution */}
-            <div className="mb-3 large-list-container">
-              <div className="d-flex justify-content-between align-items-center">
-                <label className="form-label fw-bold filter-heading block text-lg font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Universities
-                </label>
-                <button className="small show-all fw-bold text-sm text-brand-500 hover:text-brand-600">
-                  Show all <i className="bi bi-caret-down-fill"></i>
-                </button>
-              </div>
-              <div className="row large-list grid grid-cols-1 md:grid-cols-2 gap-3 max-h-40 overflow-y-auto" id="university-list">
-                {universities.map((university) => (
-                  <div key={university} className="col-lg-6">
-                    <div className="form-check">
-                      <input 
-                        className="form-check-input"
-                        type="checkbox" 
-                        name="selected_university" 
-                        id={university}
-                        value={university}
-                        checked={selectedUniversities.includes(university)}
-                        onChange={() => handleUniversityChange(university)}
-                      />
-                      <label className="form-check-label ml-2 text-sm text-gray-700 dark:text-gray-300" htmlFor={university}>
-                        {university.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                      </label>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="modal-footer p-6 border-t border-gray-200 dark:border-gray-700 flex gap-3">
-            <button 
-              type="button" 
-              className="btn btn-outline-secondary flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-            <button 
-              type="button" 
-              className="btn btn-primary apply-filter d-flex flex-1 px-4 py-2 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10"
-              onClick={handleApply}
-            >
-              <span className="d-block me-2">Apply filters</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
+// Course Card Component
 const CourseCard: React.FC<{ 
   course: Course;
   onApply: (course: Course) => void;
@@ -610,14 +692,22 @@ const CourseCard: React.FC<{
   };
 
   return (
-    <div className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+    <div className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-md p-5 border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-shadow duration-300">
       {/* Top Section */}
       <div className="flex items-start justify-between">
         {/* University Info */}
         <div className="flex items-start gap-3">
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-md flex items-center justify-center text-white font-bold text-sm">
-            {getInitials(course.university_name)}
+          <div className="logo w-20 h-20">
+            <Image 
+            src={course.university_logo_url} 
+            alt={`${course.university_name} logo`}
+            height={80}
+            width={80}
+            />
           </div>
+          {/* <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-md flex items-center justify-center text-white font-bold text-sm">
+            {getInitials(course.university_name)}
+          </div> */}
           <div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-white leading-snug">
               {course.course_name}
@@ -625,6 +715,12 @@ const CourseCard: React.FC<{
             <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
               {course.university_name}
             </p>
+            {course.is_popular === 1 && (
+              <Badge size="sm" color="warning">
+                <Star size={12} className="mr-1" />
+                Popular
+              </Badge>
+            )}
           </div>
         </div>
       </div>
@@ -670,6 +766,17 @@ const CourseCard: React.FC<{
           <div>
             <span className="block">Discipline</span>
             <strong className="block font-semibold text-gray-800 dark:text-white">{course.discipline_name}</strong>
+          </div>
+        </div>
+
+        {/* Location */}
+        <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <Building2 size={18}/>
+          <div>
+            <span className="block">Location</span>
+            <strong className="block font-semibold text-gray-800 dark:text-white">
+              {getCountryName(course.country_code)}, {getStateName(course.state_code)}
+            </strong>
           </div>
         </div>
 
@@ -756,26 +863,20 @@ const CourseCard: React.FC<{
 const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
 export default function ProgramCards() {
-  const {token, logout} = useAuth()
-  const {id: student_user_id} = useParams();   
+  const { token, logout } = useAuth();
+  const { id: student_user_id } = useParams();   
   const [courses, setCourses] = useState<Course[]>([]);
+  const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [fetchingStudents, setFetchingStudents] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [studentError, setStudentError] = useState<string | null>(null);
-  const [sortField] = useState<SortField>("");
-  const [sortDirection] = useState<SortDirection>("asc");
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
-  const [filters, setFilters] = useState<FilterOptions>({
-    university: [],
-    course: [],
-    studyLevel: [],
-    discipline: [],
-    country: [],
-    state: [],
-  });
-
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  
   // Application states
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -784,41 +885,245 @@ export default function ProgramCards() {
   const [alertMessage, setAlertMessage] = useState('');
   const [isApplying, setIsApplying] = useState(false);
 
+  // Filters and pagination
+  const [filters, setFilters] = useState<FilterOptions>({
+    discipline_ids: [],
+    study_level_id: null,
+    university_ids: [],
+    country_codes: [],
+    state_codes: [],
+    city_codes: [],
+  });
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [limit] = useState<number>(10);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+
+  // Infinite scroll ref
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Build query string from filters
+  const buildQueryString = useCallback((page: number = 1) => {
+    const params = new URLSearchParams();
+    
+    // Add pagination
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
+    
+    // Add search term
+    if (searchTerm) {
+      params.append('search', searchTerm);
+    }
+    
+    // Add array parameters
+    filters.discipline_ids.forEach(id => params.append('discipline_id', id.toString()));
+    
+    // Add single study level parameter
+    if (filters.study_level_id) {
+      params.append('study_level_id', filters.study_level_id.toString());
+    }
+    
+    filters.university_ids.forEach(id => params.append('university_id', id.toString()));
+    filters.country_codes.forEach(code => params.append('country_code', code));
+    filters.state_codes.forEach(code => params.append('state_code', code));
+    filters.city_codes.forEach(code => params.append('city_code', code));
+    
+    return params.toString();
+  }, [filters, limit, searchTerm]);
+
   // Fetch courses from API
-  useEffect(() => {
-    const fetchCourses = async () => {
-      try {
+  const fetchCourses = useCallback(async (page: number = 1, append: boolean = false) => {
+    if (!token) {
+      setError("Authentication token not found");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
         setLoading(true);
-        const response = await fetch(`${BASE_URL}/agent/courses`, {
-          headers: {
-            'Authorization': `Bearer ${token}` // Adjust based on your auth setup
-          }
-        });
+      }
+      setError(null);
+      
+      const queryString = buildQueryString(page);
+      const url = `${BASE_URL}/agent/courses${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-        if (!response.ok) {
-          if (response.status === 403) {
-          logout(); // Handle 403 by logging out
-          return; // Exit early to prevent further processing
+      if (!response.ok) {
+        if (response.status === 403) {
+          logout();
+          return;
         }
-          throw new Error('Failed to fetch courses');
-        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-        const data: ApiResponse = await response.json();
-        
-        if (data.success) {
-          setCourses(data.data);
+      const result: ApiResponse = await response.json();
+      
+      if (result.success && result.data) {
+        if (append) {
+          // Append new courses to existing ones
+          setCourses(prev => [...prev, ...result.data]);
         } else {
-          throw new Error('Failed to load courses');
+          // Replace courses for first page
+          setCourses(result.data);
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
+        setApiResponse(result);
+        setCurrentPage(result.page);
+        setHasMore(result.hasNextPage);
+      } else {
+        if (!append) {
+          setCourses([]);
+        }
+        setApiResponse(null);
+      }
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+      setError('Failed to load courses. Please try again.');
+      if (!append) {
+        setCourses([]);
+        setApiResponse(null);
+      }
+    } finally {
+      setLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [token, buildQueryString, logout]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchCourses(1, false);
+  }, []);
+
+  // Handle search with debounce
+  useEffect(() => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    const timeout = setTimeout(() => {
+      setCurrentPage(1);
+      fetchCourses(1, false);
+    }, 500); // 500ms debounce
+
+    setSearchTimeout(timeout);
+
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
       }
     };
+  }, [searchTerm]);
 
-    fetchCourses();
-  }, []);
+  // Handle filter changes
+  const handleFilterChange = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
+    setCurrentPage(1);
+  };
+
+  // Type-safe filter removal functions
+  const handleRemoveDisciplineFilter = (id: number) => {
+    setFilters(prev => ({
+      ...prev,
+      discipline_ids: prev.discipline_ids.filter(disciplineId => disciplineId !== id)
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleRemoveStudyLevelFilter = () => {
+    setFilters(prev => ({
+      ...prev,
+      study_level_id: null
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleRemoveUniversityFilter = (id: number) => {
+    setFilters(prev => ({
+      ...prev,
+      university_ids: prev.university_ids.filter(universityId => universityId !== id)
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleRemoveCountryFilter = (code: string) => {
+    setFilters(prev => ({
+      ...prev,
+      country_codes: prev.country_codes.filter(countryCode => countryCode !== code)
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleRemoveStateFilter = (code: string) => {
+    setFilters(prev => ({
+      ...prev,
+      state_codes: prev.state_codes.filter(stateCode => stateCode !== code)
+    }));
+    setCurrentPage(1);
+  };
+
+  const handleRemoveCityFilter = (code: string) => {
+    setFilters(prev => ({
+      ...prev,
+      city_codes: prev.city_codes.filter(cityCode => cityCode !== code)
+    }));
+    setCurrentPage(1);
+  };
+
+  const clearAllFilters = () => {
+    const resetFilters: FilterOptions = {
+      discipline_ids: [],
+      study_level_id: null,
+      university_ids: [],
+      country_codes: [],
+      state_codes: [],
+      city_codes: [],
+    };
+    setFilters(resetFilters);
+    setCurrentPage(1);
+  };
+
+  // Fetch courses when filters or page change
+  useEffect(() => {
+    fetchCourses(currentPage, currentPage > 1);
+  }, [filters, currentPage]);
+
+  // Infinite scroll setup
+  useEffect(() => {
+    if (!hasMore || isLoadingMore) return;
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+          loadNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasMore, isLoadingMore]);
+
+  const loadNextPage = () => {
+    if (hasMore && !isLoadingMore) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
 
   // Fetch students when confirmation modal opens
   const fetchStudents = async () => {
@@ -908,137 +1213,53 @@ export default function ProgramCards() {
     setSelectedCourse(null);
   };
 
-  // Get unique values for filters from actual API data
-  const universities = useMemo(() => {
-    return Array.from(new Set(courses.map(course => course.university_name)));
-  }, [courses]);
-
-  const courseNames = useMemo(() => {
-    return Array.from(new Set(courses.map(course => course.course_name)));
-  }, [courses]);
-
-  const disciplines = useMemo(() => {
-    return Array.from(new Set(courses.map(course => course.discipline_name)));
-  }, [courses]);
-
-  const studyLevels = useMemo(() => {
-    return Array.from(new Set(courses.map(course => course.study_level_name.toLowerCase())));
-  }, [courses]);
-
-  // Get all countries from the country-state-city library
-  const countries = useMemo(() => {
-    return Country.getAllCountries()
-      .map(country => ({
-        code: country.isoCode,
-        name: country.name,
-        phonecode: country.phonecode
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(country => country.name);
-  }, []);
-
-  // Get all states from the country-state-city library (US states as example)
-  const states = useMemo(() => {
-    // You can filter by specific country if you have country data
-    // For now, let's show all states from all countries
-    const allStates = State.getAllStates();
-    return allStates
-      .map(state => state.name)
-      .sort((a, b) => a.localeCompare(b));
-  }, []);
-
-  // Filter and sort data
-  const filteredAndSortedData = useMemo(() => {
-    const filtered = courses.filter((course) => {
-      const matchesUniversity = filters.university.length === 0 || filters.university.includes(course.university_name);
-      const matchesCourse = filters.course.length === 0 || filters.course.includes(course.course_name);
-      const matchesStudyLevel = filters.studyLevel.length === 0 || filters.studyLevel.includes(course.study_level_name.toLowerCase());
-      const matchesDiscipline = filters.discipline.length === 0 || filters.discipline.includes(course.discipline_name.toLowerCase());
-      const matchesCountry = filters.country.length === 0; // Country filtering not available in API
-      const matchesState = filters.state.length === 0; // State filtering not available in API
-      
-      return matchesUniversity && matchesCourse && matchesStudyLevel && matchesDiscipline && matchesCountry && matchesState;
-    });
-
-    // Sorting
-    if (sortField) {
-      filtered.sort((a, b) => {
-        let aValue = a[sortField];
-        let bValue = b[sortField];
-        
-        if (aValue === undefined && bValue === undefined) return 0;
-        if (aValue === undefined) return sortDirection === "asc" ? 1 : -1;
-        if (bValue === undefined) return sortDirection === "asc" ? -1 : 1;
-        
-        if (typeof aValue === "string" && typeof bValue === "string") {
-          aValue = aValue.toLowerCase();
-          bValue = bValue.toLowerCase();
-        }
-
-        if(aValue && bValue){
-          if (aValue < bValue) {
-          return sortDirection === "asc" ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortDirection === "asc" ? 1 : -1;
-        }
-        }
-        
-        
-        return 0;
-      });
+  // Helper function to get filter name by ID
+  const getFilterName = (type: 'discipline' | 'studyLevel' | 'university', id: number): string => {
+    if (!apiResponse?.filters) return '';
+    
+    switch (type) {
+      case 'discipline':
+        return apiResponse.filters.disciplines.find(d => d.id === id)?.name || '';
+      case 'studyLevel':
+        return apiResponse.filters.studyLevels.find(s => s.id === id)?.name || '';
+      case 'university':
+        return apiResponse.filters.universities.find(u => u.id === id)?.university || '';
+      default:
+        return '';
     }
-
-    return filtered;
-  }, [courses, filters, sortField, sortDirection]);
-
-  const handleApplyFilters = (newFilters: FilterOptions) => {
-    setFilters(newFilters);
   };
 
-  const hasActiveFilters = Object.values(filters).some(filterArray => filterArray.length > 0);
+  const hasActiveFilters = 
+    filters.discipline_ids.length > 0 ||
+    filters.study_level_id !== null ||
+    filters.university_ids.length > 0 ||
+    filters.country_codes.length > 0 ||
+    filters.state_codes.length > 0 ||
+    filters.city_codes.length > 0;
 
-  const clearAllFilters = () => {
-    setFilters({
-      university: [],
-      course: [],
-      studyLevel: [],
-      discipline: [],
-      country: [],
-      state: [],
-    });
-  };
+  // if (loading && currentPage === 1) {
+  //   return (
+  //     <div className="flex justify-center items-center h-64">
+  //       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500"></div>
+  //     </div>
+  //   );
+  // }
 
-  const getActiveFilterCount = () => {
-    return Object.values(filters).reduce((count, filterArray) => count + filterArray.length, 0);
-  };
-
-  if (loading) {
+  if (error && currentPage === 1) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <svg className="animate-spin h-8 w-8 text-brand-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading courses...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <div className="text-red-500 text-lg mb-2">Error loading courses</div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{error}</p>
+      <div className="text-center py-8">
+        <div className="text-red-600 dark:text-red-400 mb-4">{error}</div>
+        <button 
+          onClick={() => fetchCourses(1, false)}
+          className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600"
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   return (
-    <>
-    
     <div className="space-y-6">
       {/* Search and Filter Controls */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
@@ -1050,54 +1271,124 @@ export default function ProgramCards() {
             Select a course to apply.
           </p>
         </div>
-        {/* Filter Button and Active Filters */}
-        <div className="flex items-center gap-3">
-          {hasActiveFilters && (
+        
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Search Input */}
+          {/* <div className="relative">
+            <input
+              type="text"
+              placeholder="Search courses..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full sm:w-64 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/10"
+            />
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div> */}
+
+          {/* Filter Button */}
+          <div className="flex items-center gap-3">
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                Clear All
+              </button>
+            )}
             <button
-              onClick={clearAllFilters}
-              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+              onClick={() => setIsFilterModalOpen(true)}
+              className="h-11 px-4 rounded-lg border border-gray-200 bg-transparent text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 flex items-center gap-2"
             >
-              Clear All
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
+              </svg>
+              Filter Courses
+              {hasActiveFilters && (
+                <span className="ml-1 bg-brand-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {filters.discipline_ids.length + 
+                   (filters.study_level_id ? 1 : 0) + 
+                   filters.university_ids.length + 
+                   filters.country_codes.length + 
+                   filters.state_codes.length + 
+                   filters.city_codes.length}
+                </span>
+              )}
             </button>
-          )}
-          <button
-            onClick={() => setIsFilterModalOpen(true)}
-            className="dark:bg-dark-900 h-11 px-4 rounded-lg border border-gray-200 bg-transparent text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
-            </svg>
-            Apply Filters {getActiveFilterCount() > 0 && `(${getActiveFilterCount()})`}
-          </button>
+          </div>
         </div>
       </div>
 
       {/* Active Filters Display */}
       {hasActiveFilters && (
-        <div className="flex flex-wrap gap-2">
-          {filters.studyLevel.map(level => (
-            <Badge key={level} size="sm" color="primary">
-              Study Level: {level}
+        <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+          {filters.discipline_ids.map(id => (
+            <Badge key={`discipline-${id}`} size="sm" color="primary">
+              Discipline: {getFilterName('discipline', id)}
+              <button 
+                onClick={() => handleRemoveDisciplineFilter(id)}
+                className="ml-1 text-xs hover:text-red-500"
+              >
+                ×
+              </button>
             </Badge>
           ))}
-          {filters.discipline.map(discipline => (
-            <Badge key={discipline} size="sm" color="primary">
-              Discipline: {discipline}
+          {filters.study_level_id !== null && (
+            <Badge key={`study-level-${filters.study_level_id}`} size="sm" color="primary">
+              Study Level: {getFilterName('studyLevel', filters.study_level_id)}
+              <button 
+                onClick={handleRemoveStudyLevelFilter}
+                className="ml-1 text-xs hover:text-red-500"
+              >
+                ×
+              </button>
+            </Badge>
+          )}
+          {filters.university_ids.map(id => (
+            <Badge key={`university-${id}`} size="sm" color="primary">
+              University: {getFilterName('university', id)}
+              <button 
+                onClick={() => handleRemoveUniversityFilter(id)}
+                className="ml-1 text-xs hover:text-red-500"
+              >
+                ×
+              </button>
             </Badge>
           ))}
-          {filters.country.map(country => (
-            <Badge key={country} size="sm" color="primary">
-              Country: {country}
+          {filters.country_codes.map(code => (
+            <Badge key={`country-${code}`} size="sm" color="primary">
+              Country: {getCountryName(code)}
+              <button 
+                onClick={() => handleRemoveCountryFilter(code)}
+                className="ml-1 text-xs hover:text-red-500"
+              >
+                ×
+              </button>
             </Badge>
           ))}
-          {filters.state.map(state => (
-            <Badge key={state} size="sm" color="primary">
-              State: {state}
+          {filters.state_codes.map(code => (
+            <Badge key={`state-${code}`} size="sm" color="primary">
+              State: {getStateName(code)}
+              <button 
+                onClick={() => handleRemoveStateFilter(code)}
+                className="ml-1 text-xs hover:text-red-500"
+              >
+                ×
+              </button>
             </Badge>
           ))}
-          {filters.university.map(university => (
-            <Badge key={university} size="sm" color="primary">
-              University: {university}
+          {filters.city_codes.map(code => (
+            <Badge key={`city-${code}`} size="sm" color="primary">
+              City: {code}
+              <button 
+                onClick={() => handleRemoveCityFilter(code)}
+                className="ml-1 text-xs hover:text-red-500"
+              >
+                ×
+              </button>
             </Badge>
           ))}
         </div>
@@ -1105,8 +1396,8 @@ export default function ProgramCards() {
 
       {/* Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredAndSortedData.length > 0 ? (
-          filteredAndSortedData.map((course) => (
+        {courses.length > 0 ? (
+          courses.map((course) => (
             <CourseCard 
               key={course.id} 
               course={course} 
@@ -1125,22 +1416,40 @@ export default function ProgramCards() {
         )}
       </div>
 
-      {/* Results Count */}
-      <div className="text-sm text-gray-500 dark:text-gray-400">
-        Showing {filteredAndSortedData.length} of {courses.length} courses
+      {/* Loading More Indicator */}
+      {isLoadingMore && (
+        <div className="flex justify-center py-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+        </div>
+      )}
+
+      {/* Infinite Scroll Sentinel */}
+      <div ref={loadMoreRef} className="h-1" />
+
+      {/* Results Count and Pagination Info */}
+      <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
+        <div>
+          Showing {courses.length} of {apiResponse?.total || 0} courses
+          {apiResponse && (
+            <span className="ml-2">
+              (Page {apiResponse.page} of {apiResponse.totalPages})
+            </span>
+          )}
+        </div>
+        {apiResponse && apiResponse.totalPages > 1 && (
+          <div className="text-sm">
+            {currentPage < apiResponse.totalPages ? 'Scroll to load more' : 'All courses loaded'}
+          </div>
+        )}
       </div>
 
       {/* Filter Modal */}
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
-        onApply={handleApplyFilters}
-        universities={universities}
-        courses={courseNames}
-        disciplines={disciplines}
-        countries={countries}
-        states={states}
-        studyLevels={studyLevels}
+        onFilterChange={handleFilterChange}
+        filtersData={apiResponse?.filters || null}
+        appliedFilters={filters}
       />
 
       {/* Confirmation Modal */}
@@ -1163,6 +1472,5 @@ export default function ProgramCards() {
         message={alertMessage}
       />
     </div>
-    </>
   );
 }

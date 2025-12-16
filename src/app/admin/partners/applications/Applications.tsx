@@ -311,7 +311,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 >
                   {filterOptions?.agents.map((agent) => (
                     <option key={agent.id} value={agent.id}>
-                      {agent.id === "all" ? agent.name : `${agent.name || agent.email || `Agent ${agent.id}`}`}
+                      {agent.id === "all" ? agent.name : `${agent.name || ""} (${agent.email})`}
                     </option>
                   ))}
                 </select>
@@ -329,7 +329,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 >
                   {filterOptions?.students.map((student) => (
                     <option key={student.id} value={student.id}>
-                      {student.id === "all" ? student.name : student.name || `Student ${student.id}`}
+                      {student.id === "all" ? student.name : `${student.name || ""} (${student.email})`}
                     </option>
                   ))}
                 </select>
@@ -1530,6 +1530,7 @@ export default function ApplicationsTable() {
     setLoading(prev => ({ ...prev, updatingStatus: true }));
     try {
       const { created_by, student_user_id } = selectedApplication;
+      console.log(`${created_by}/${student_user_id}/${applicationId}`)
       const response = await fetch(
         `${BASE_URL}/tenant/agent/application/status/${created_by}/${student_user_id}/${applicationId}`,
         {

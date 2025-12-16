@@ -305,7 +305,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 >
                   {filterOptions?.students.map((student) => (
                     <option key={student.id} value={student.id}>
-                      {student.id === "all" ? student.name : student.name || `Student ${student.id}`}
+                      {student.id === "all" ? student.name : `${student.name || ""} (${student.email})`}
                     </option>
                   ))}
                 </select>

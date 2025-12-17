@@ -311,7 +311,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 >
                   {filterOptions?.agents.map((agent) => (
                     <option key={agent.id} value={agent.id}>
-                      {agent.id === "all" ? agent.name : `${agent.name || agent.email || `Agent ${agent.id}`}`}
+                      {agent.id === "all" ? agent.name : `${agent.name || ""} (${agent.email})`}
                     </option>
                   ))}
                 </select>
@@ -329,7 +329,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 >
                   {filterOptions?.students.map((student) => (
                     <option key={student.id} value={student.id}>
-                      {student.id === "all" ? student.name : student.name || `Student ${student.id}`}
+                      {student.id === "all" ? student.name : `${student.name || ""} (${student.email})`}
                     </option>
                   ))}
                 </select>
@@ -471,9 +471,9 @@ const FilterModal: React.FC<FilterModalProps> = ({
               </button>
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-hidden focus:ring-2 focus:ring-gray-500/10"
+                className="flex-1 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10"
               >
-                Close
+                Apply
               </button>
             </div>
           </>
@@ -1301,7 +1301,15 @@ export default function ApplicationsTable() {
     // Add all filters
     Object.entries(filters).forEach(([key, value]) => {
       if (value && value !== "all") {
-        params.append(key, value);
+        if(key == "status"){
+            key = "applicationStatus"
+            params.append(key, value);
+          }else if(key == "study_level"){
+            key = "level"
+            params.append(key, value);
+          }else{
+            params.append(key, value);
+          }
       }
     });
     
@@ -1522,7 +1530,7 @@ export default function ApplicationsTable() {
     setLoading(prev => ({ ...prev, updatingStatus: true }));
     try {
       const { created_by, student_user_id } = selectedApplication;
-      
+      console.log(`${created_by}/${student_user_id}/${applicationId}`)
       const response = await fetch(
         `${BASE_URL}/tenant/agent/application/status/${created_by}/${student_user_id}/${applicationId}`,
         {

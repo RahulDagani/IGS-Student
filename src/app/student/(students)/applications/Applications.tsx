@@ -11,7 +11,7 @@ interface Application {
   university: string;
   course: string;
   intake: string;
-  status: "Applied" | "Received" | "Submitted to University" | "Documents Pending";
+  status: string;
   country?: string;
   degree?: string;
   location?: string;

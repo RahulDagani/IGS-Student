@@ -1,17 +1,18 @@
 "use client"
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Badge from "@/components/ui/badge/Badge";
 import { User, Upload, FileText, X, ArrowBigRight, ArrowLeft, ArrowRight } from "lucide-react";
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
+import { Country } from "country-state-city";
 
 interface Application {
   id: number;
   university: string;
   course: string;
   intake: string;
-  status: "Applied" | "Received" | "Submitted to University" | "Documents Pending";
+  status: string;
   country?: string;
   degree?: string;
   location?: string;
@@ -49,12 +50,13 @@ interface Application {
   };
 }
 
-// API Response Interfaces
+// New API Response Interfaces
 interface ApiApplication {
   application: {
     id: number;
     uuid: string;
     tenant_id: number;
+    agent_id: number;
     student_user_id: number;
     course_id: number;
     study_level_id: number;
@@ -62,6 +64,7 @@ interface ApiApplication {
     assigned_to: string | null;
     remarks: string | null;
     is_submitted_to_university: number;
+    role: string;
     created_by: number;
     created_at: string;
     updated_at: string | null;
@@ -78,18 +81,29 @@ interface ApiApplication {
     application_fee: string;
     currency_code: string;
     study_level_name: string;
+    discipline_id: number;
     discipline_name: string;
     university_name: string;
     university_slug: string;
+    university_id: number;
     university_logo: string | null;
     university_country: string;
     university_state: string;
     university_city: string;
+    intake_date: string | null;
+    intake_id: number | null;
+    submission_deadline: string | null;
+    seat_availability: string | null;
+    turnaround_time: string | null;
+    conversion_rate: string | null;
+    overall_score_label: string | null;
+    overall_score_intent: string | null;
   };
-    student_profile: {
+  student_profile: {
     id: number;
     uuid: string;
     tenant_id: number;
+    agent_id: number;
     user_id: number;
     passport_number: string;
     salutation: string | null;
@@ -152,28 +166,287 @@ interface ApiApplication {
   };
 }
 
+interface FilterOption {
+  id: string | number;
+  name: string;
+  email?: string;
+  start_date?: string;
+}
+
 interface ApiResponse {
   success: boolean;
   data: ApiApplication[];
+  filterOptions: {
+    students: FilterOption[];
+    universities: FilterOption[];
+    studyLevels: FilterOption[];
+    disciplines: FilterOption[];
+    courses: FilterOption[];
+    intakes: FilterOption[];
+    years: FilterOption[];
+    applicationStatus: FilterOption[];
+  };
+  appliedFilters: Record<string, any>;
+  count: number;
 }
 
 type SortField = keyof Application | "";
 type SortDirection = "asc" | "desc";
 
+// New Filter Options Interface
 interface FilterOptions {
-  university: string;
-  course: string;
+  student_id: string | number;
+  university_id: string | number;
+  study_level_id: string | number;
+  discipline_id: string | number;
+  course_id: string | number;
+  intake_id: string | number;
+  year_id: string | number;
+  application_status_id: string | number;
+  search?: string;
 }
 
+// Filter Modal Component
 interface FilterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onApply: (filters: FilterOptions) => void;
-  universities: string[];
-  courses: string[];
+  onFilterChange: (filters: FilterOptions) => void;
+  filterOptions: ApiResponse['filterOptions'] | null;
+  appliedFilters: FilterOptions;
 }
 
-// Document Upload Modal Component
+// Helper function to get country name
+const getCountryName = (code: string | undefined | null) => {
+  if (!code) return '';
+  const country = Country.getCountryByCode(code);
+  return country ? country.name : code;
+};
+
+const FilterModal: React.FC<FilterModalProps> = ({
+  isOpen,
+  onClose,
+  onFilterChange,
+  filterOptions,
+  appliedFilters,
+}) => {
+  const [localFilters, setLocalFilters] = useState<FilterOptions>(appliedFilters);
+
+  // Initialize local filters when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setLocalFilters(appliedFilters);
+    }
+  }, [isOpen, appliedFilters]);
+
+  const handleFilterChange = (newFilters: FilterOptions) => {
+    setLocalFilters(newFilters);
+    onFilterChange(newFilters);
+  };
+
+  const handleSelectChange = (key: keyof FilterOptions, value: string | number) => {
+    handleFilterChange({
+      ...localFilters,
+      [key]: value
+    });
+  };
+
+  const handleReset = () => {
+    const resetFilters: FilterOptions = {
+      student_id: "all",
+      university_id: "all",
+      study_level_id: "all",
+      discipline_id: "all",
+      course_id: "all",
+      intake_id: "all",
+      year_id: "all",
+      application_status_id: "all",
+    };
+    handleFilterChange(resetFilters);
+  };
+
+  if (!isOpen || !filterOptions) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+            Filter Applications
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Student Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Student
+            </label>
+            <select
+              value={localFilters.student_id}
+              onChange={(e) => handleSelectChange('student_id', e.target.value === "all" ? "all" : Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            >
+              {filterOptions.students.map((student) => (
+                <option key={student.id} value={student.id}>
+                  {student.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* University Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              University
+            </label>
+            <select
+              value={localFilters.university_id}
+              onChange={(e) => handleSelectChange('university_id', e.target.value === "all" ? "all" : Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            >
+              {filterOptions.universities.map((university) => (
+                <option key={university.id} value={university.id}>
+                  {university.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Study Level Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Study Level
+            </label>
+            <select
+              value={localFilters.study_level_id}
+              onChange={(e) => handleSelectChange('study_level_id', e.target.value === "all" ? "all" : Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            >
+              {filterOptions.studyLevels.map((level) => (
+                <option key={level.id} value={level.id}>
+                  {level.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Discipline Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Discipline
+            </label>
+            <select
+              value={localFilters.discipline_id}
+              onChange={(e) => handleSelectChange('discipline_id', e.target.value === "all" ? "all" : Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            >
+              {filterOptions.disciplines.map((discipline) => (
+                <option key={discipline.id} value={discipline.id}>
+                  {discipline.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Course Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Course
+            </label>
+            <select
+              value={localFilters.course_id}
+              onChange={(e) => handleSelectChange('course_id', e.target.value === "all" ? "all" : Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            >
+              {filterOptions.courses.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Intake Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Intake
+            </label>
+            <select
+              value={localFilters.intake_id}
+              onChange={(e) => handleSelectChange('intake_id', e.target.value === "all" ? "all" : Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            >
+              {filterOptions.intakes.map((intake) => (
+                <option key={intake.id} value={intake.id}>
+                  {intake.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Application Status
+            </label>
+            <select
+              value={localFilters.application_status_id}
+              onChange={(e) => handleSelectChange('application_status_id', e.target.value === "all" ? "all" : Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            >
+              {filterOptions.applicationStatus.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Year Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Year
+            </label>
+            <select
+              value={localFilters.year_id}
+              onChange={(e) => handleSelectChange('year_id', e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            >
+              {filterOptions.years.map((year) => (
+                <option key={year.id} value={year.id}>
+                  {year.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={handleReset}
+            className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            Reset All
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10"
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Document Upload Modal Component (same as before)
 interface DocumentUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -240,7 +513,6 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       if(documentType == "common"){
         xhr.open('PUT', `${BASE_URL}/agent/student/application/${studentId}/upload/common/document`);
       }else{
-
         xhr.open('PUT', `${BASE_URL}/agent/student/application/${applicationId}/upload/document`);
       }
 
@@ -302,7 +574,7 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
@@ -390,108 +662,6 @@ const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               Close
             </button>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const FilterModal: React.FC<FilterModalProps> = ({
-  isOpen,
-  onClose,
-  onApply,
-  universities,
-  courses,
-}) => {
-  const [selectedUniversity, setSelectedUniversity] = useState<string>("all");
-  const [selectedCourse, setSelectedCourse] = useState<string>("all");
-
-  const handleApply = () => {
-    const filters: FilterOptions = {
-      university: selectedUniversity,
-      course: selectedCourse,
-    };
-    onApply(filters);
-    onClose();
-  };
-
-  const handleReset = () => {
-    setSelectedUniversity("all");
-    setSelectedCourse("all");
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Apply Filters
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          {/* University Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Select University
-            </label>
-            <select
-              value={selectedUniversity}
-              onChange={(e) => setSelectedUniversity(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="all">All Universities</option>
-              {universities.map((university) => (
-                <option key={university} value={university}>
-                  {university}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Course Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Select Course
-            </label>
-            <select
-              value={selectedCourse}
-              onChange={(e) => setSelectedCourse(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="all">All Courses</option>
-              {courses.map((course) => (
-                <option key={course} value={course}>
-                  {course}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-6">
-          <button
-            onClick={handleReset}
-            className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            Reset
-          </button>
-          <button
-            onClick={handleApply}
-            className="flex-1 px-4 py-2 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10"
-          >
-            Apply Filters
-          </button>
         </div>
       </div>
     </div>
@@ -739,26 +909,23 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onContin
       </div>
 
       {/* Quick Action Buttons */}
-      {!isAllComplete && (
+     
         <div className="mt-3 flex gap-2">
-          {docStatus.commonDocs === 'pending' && (
+         
             <button 
               onClick={() => onContinue(application, 'common')}
               className="flex-1 px-3 py-1 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800 rounded"
             >
               Upload Common Docs
             </button>
-          )}
-          {docStatus.specificDocs === 'pending' && (
+         
             <button 
               onClick={() => onContinue(application, 'specific')}
               className="flex-1 px-3 py-1 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800 rounded"
             >
               Upload Specific Docs
             </button>
-          )}
         </div>
-      )}
     </div>
   );
 };
@@ -767,30 +934,87 @@ const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
 export default function ApplicationsTable() {
   const { token, logout } = useAuth();
-  console.log(token)
   const router = useRouter();
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sortField] = useState<SortField>("");
-  const [sortDirection] = useState<SortDirection>("asc");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
   const [isDocumentModalOpen, setIsDocumentModalOpen] = useState<boolean>(false);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [selectedDocumentType, setSelectedDocumentType] = useState<'common' | 'specific'>('specific');
-  const [appStudentId, setAppStudentId] = useState<number | null>(null);
+  
+  // New filters state
   const [filters, setFilters] = useState<FilterOptions>({
-    university: "all",
-    course: "all",
+    student_id: "all",
+    university_id: "all",
+    study_level_id: "all",
+    discipline_id: "all",
+    course_id: "all",
+    intake_id: "all",
+    year_id: "all",
+    application_status_id: "all",
   });
 
-  // Fetch applications from API
-  const fetchApplications = async () => {
+  // Build query string from filters
+  const buildQueryString = useCallback(() => {
+    const params = new URLSearchParams();
+    
+    // Add all filters that are not "all"
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== "all" && value !== undefined && value !== null && value !== "") {
+        if(key == "university_id"){
+          params.append("university", value.toString());
+
+        }else if(key == "discipline_id"){
+          params.append("discipline", value.toString());
+
+        }else if(key == "course_id"){
+          params.append("course", value.toString());
+
+        }else if(key == "intake_id"){
+          params.append("intake", value.toString());
+
+        }
+        else if(key == "year_id"){
+          params.append("year", value.toString());
+
+        }
+        else if(key == "application_status_id"){
+          params.append("applicationStatus", value.toString());
+
+        }
+        else if(key == "study_level_id"){
+          params.append("level", value.toString());
+
+        }
+        else{
+
+          params.append(key, value.toString());
+        }
+      }
+    });
+    
+    // Add search term
+    if (searchTerm) {
+      params.append('search', searchTerm);
+    }
+    
+    return params.toString();
+  }, [filters, searchTerm]);
+
+  // Fetch applications from API with dynamic filters
+  const fetchApplications = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${BASE_URL}/agent/student/application/all/applications`, {
+      const queryString = buildQueryString();
+      const url = `${BASE_URL}/agent/student/application/filters/dynamic${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         }
       });
 
@@ -814,11 +1038,41 @@ export default function ApplicationsTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, logout, buildQueryString]);
 
+  // Initial fetch
   useEffect(() => {
     fetchApplications();
-  }, [token, logout]);
+  }, []);
+
+  // Handle search with debounce
+  useEffect(() => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    const timeout = setTimeout(() => {
+      fetchApplications();
+    }, 500);
+
+    setSearchTimeout(timeout);
+
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTerm]);
+
+  // Handle filter changes
+  const handleFilterChange = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
+  };
+
+  // Fetch applications when filters change
+  useEffect(() => {
+    fetchApplications();
+  }, [filters]);
 
   // Transform API data to match the Application interface
   const tableData: Application[] = useMemo(() => {
@@ -827,7 +1081,7 @@ export default function ApplicationsTable() {
     return apiData.data.map((app) => {
       // Map status from API to our Application status
       const getStatus = (): Application["status"] => {
-        const statusKey = app.application.status_key;
+        const statusLabel = app.application.status_label;
         const profileStatus = app.profile_status;
         const commonDocsStatus = app.common_documents.status;
         const specificDocsStatus = app.specific_documents.status;
@@ -835,11 +1089,8 @@ export default function ApplicationsTable() {
         if (profileStatus === "incomplete" || commonDocsStatus === "incomplete" || specificDocsStatus === "incomplete") {
           return "Documents Pending";
         }
-        if (statusKey === "applied") return "Applied";
-        if (statusKey === "received") return "Received";
-        if (app.application.is_submitted_to_university === 1) return "Submitted to University";
         
-        return "Applied";
+        return statusLabel || "Applied";
       };
 
       // Format duration
@@ -851,28 +1102,20 @@ export default function ApplicationsTable() {
         return `${duration_min}-${duration_max} ${duration_unit}`;
       };
 
-      // Format intake from created_at
-      const formatIntake = (createdAt: string) => {
-        const date = new Date(createdAt);
-        const year = date.getFullYear();
-        const month = date.getMonth();
+      // Format intake from intake_date or created_at
+      const formatIntake = () => {
+        if (app.application.intake_date) {
+          const date = new Date(app.application.intake_date);
+          const year = date.getFullYear();
+          const month = date.toLocaleString('default', { month: 'short' });
+          return `${month} ${year}`;
+        }
         
-        // Determine intake based on month
-        if (month >= 8) return `Fall ${year + 1}`;
-        if (month >= 5) return `Summer ${year + 1}`;
-        return `Spring ${year + 1}`;
-      };
-
-      // Get country name from country code
-      const getCountryName = (countryCode: string) => {
-        const countryMap: { [key: string]: string } = {
-          'US': 'United States',
-          'CA': 'Canada',
-          'UK': 'United Kingdom',
-          'AU': 'Australia',
-          'IN': 'India'
-        };
-        return countryMap[countryCode] || countryCode;
+        // Fallback to created_at if no intake_date
+        const date = new Date(app.application.created_at);
+        const year = date.getFullYear();
+        const month = date.toLocaleString('default', { month: 'short' });
+        return `${month} ${year}`;
       };
 
       // Format location
@@ -885,16 +1128,22 @@ export default function ApplicationsTable() {
         return locationParts.join(', ') || 'Location not specified';
       };
 
+      // Format external evaluation requirement
+      const getExternalEvaluation = () => {
+        // Based on course or discipline, you can add logic here
+        return "Required (WES)";
+      };
+
       return {
         id: app.application.id,
         university: app.application.university_name,
         course: app.application.course_name,
-        intake: formatIntake(app.application.created_at),
+        intake: formatIntake(),
         status: getStatus(),
         country: getCountryName(app.application.university_country),
         degree: app.application.study_level_name,
         location: formatLocation(),
-        externalEvaluation: "Required (WES)",
+        externalEvaluation: getExternalEvaluation(),
         duration: formatDuration(),
         tuitionFee: app.application.tuition_fee,
         applicationFee: app.application.application_fee,
@@ -903,7 +1152,7 @@ export default function ApplicationsTable() {
         profile_status: app.profile_status,
         common_documents: app.common_documents,
         specific_documents: app.specific_documents,
-        // Placeholder language scores
+        // Language scores - you can fetch these from API if available
         ielts: 6.5 + (app.application.id % 3 * 0.5),
         pte: 60 + (app.application.id % 4 * 3),
         duolingo: 110 + (app.application.id % 5 * 5)
@@ -934,74 +1183,50 @@ export default function ApplicationsTable() {
     } else {
       // All steps are complete - show view details
       setSelectedApplication(application);
-      setSelectedDocumentType('specific'); // Use specific as default for view
+      setSelectedDocumentType('specific');
       setIsDocumentModalOpen(true);
     }
   };
 
-  // Handle upload success - this will refresh the data and update the status
+  // Handle upload success
   const handleUploadSuccess = () => {
-    fetchApplications(); // This will refresh the applications data and update the status
+    fetchApplications();
   };
 
-  // Get unique values for filters
-  const universities = useMemo(() => {
-    return Array.from(new Set(tableData.map(app => app.university)));
-  }, [tableData]);
-
-  const courses = useMemo(() => {
-    return Array.from(new Set(tableData.map(app => app.course)));
-  }, [tableData]);
-
-  // Filter and sort data
-  const filteredAndSortedData = useMemo(() => {
-    const filtered = tableData.filter((application) => {
-      const matchesUniversity = filters.university === "all" || application.university === filters.university;
-      const matchesCourse = filters.course === "all" || application.course === filters.course;
-      
-      return matchesUniversity && matchesCourse;
-    });
-
-    // Sorting
-    if (sortField) {
-      filtered.sort((a, b) => {
-        let aValue = a[sortField];
-        let bValue = b[sortField];
-        
-        // Handle undefined values
-        if (aValue === undefined && bValue === undefined) return 0;
-        if (aValue === undefined) return sortDirection === "asc" ? 1 : -1;
-        if (bValue === undefined) return sortDirection === "asc" ? -1 : 1;
-        
-        if (typeof aValue === "string" && typeof bValue === "string") {
-          aValue = aValue.toLowerCase();
-          bValue = bValue.toLowerCase();
-        }
-        
-        if (aValue < bValue) {
-          return sortDirection === "asc" ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortDirection === "asc" ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-
-    return filtered;
-  }, [tableData, filters, sortField, sortDirection]);
-
-  const handleApplyFilters = (newFilters: FilterOptions) => {
-    setFilters(newFilters);
+  // Handle remove filter
+  const handleRemoveFilter = (key: keyof FilterOptions) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: "all"
+    }));
   };
-
-  const hasActiveFilters = filters.university !== "all" || filters.course !== "all";
 
   const clearAllFilters = () => {
     setFilters({
-      university: "all",
-      course: "all",
+      student_id: "all",
+      university_id: "all",
+      study_level_id: "all",
+      discipline_id: "all",
+      course_id: "all",
+      intake_id: "all",
+      year_id: "all",
+      application_status_id: "all",
     });
+  };
+
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
+    return value !== "all" && value !== "" && value !== undefined && value !== null;
+  });
+
+  // Get filter display name
+  const getFilterDisplayName = (key: keyof FilterOptions, value: string | number) => {
+    if (!apiData?.filterOptions || value === "all") return '';
+    
+    const filterOptionGroup = apiData.filterOptions[key as keyof ApiResponse['filterOptions']];
+    if (!filterOptionGroup) return '';
+    
+    const option = filterOptionGroup.find(opt => opt.id === value);
+    return option?.name || '';
   };
 
   if (loading) {
@@ -1023,6 +1248,12 @@ export default function ApplicationsTable() {
       <div className="text-center py-12">
         <div className="text-red-500 text-lg mb-2">Error loading applications</div>
         <p className="text-sm text-gray-500 dark:text-gray-400">{error}</p>
+        <button 
+          onClick={fetchApplications}
+          className="mt-4 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -1045,7 +1276,7 @@ export default function ApplicationsTable() {
           <div className="flex gap-4 text-sm">
             <div className="text-center">
               <div className="text-lg font-semibold text-gray-800 dark:text-white">
-                {apiData.data?.length}
+                {apiData.count || 0}
               </div>
               <div className="text-gray-500 dark:text-gray-400">Total</div>
             </div>
@@ -1067,7 +1298,23 @@ export default function ApplicationsTable() {
 
       {/* Search and Filter Controls */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        {/* Filter Button and Active Filters */}
+       
+        {/* <div className="relative">
+          <input
+            type="text"
+            placeholder="Search applications..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full sm:w-64 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/10"
+          />
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+            <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+        </div> */}
+
+        {/* Filter Button */}
         <div className="flex items-center gap-3">
           {hasActiveFilters && (
             <button
@@ -1079,36 +1326,49 @@ export default function ApplicationsTable() {
           )}
           <button
             onClick={() => setIsFilterModalOpen(true)}
-            className="dark:bg-dark-900 h-11 px-4 rounded-lg border border-gray-200 bg-transparent text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 flex items-center gap-2"
+            className="h-11 px-4 rounded-lg border border-gray-200 bg-transparent text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
             </svg>
-            Apply Filters
+            Filter Applications
+            {hasActiveFilters && (
+              <span className="ml-1 bg-brand-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {Object.values(filters).filter(v => v !== "all" && v !== "" && v !== undefined && v !== null).length}
+              </span>
+            )}
           </button>
         </div>
       </div>
 
       {/* Active Filters Display */}
       {hasActiveFilters && (
-        <div className="flex flex-wrap gap-2">
-          {filters.university !== "all" && (
-            <Badge size="sm" color="primary">
-              University: {filters.university}
-            </Badge>
-          )}
-          {filters.course !== "all" && (
-            <Badge size="sm" color="primary">
-              Course: {filters.course}
-            </Badge>
-          )}
+        <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+          {Object.entries(filters).map(([key, value]) => {
+            if (value === "all" || value === "" || value === undefined || value === null) return null;
+            
+            const displayName = getFilterDisplayName(key as keyof FilterOptions, value);
+            if (!displayName) return null;
+            
+            return (
+              <Badge key={key} size="sm" color="primary">
+                {key.replace('_', ' ')}: {displayName}
+                <button 
+                  onClick={() => handleRemoveFilter(key as keyof FilterOptions)}
+                  className="ml-1 text-xs hover:text-red-500"
+                >
+                  ×
+                </button>
+              </Badge>
+            );
+          })}
         </div>
       )}
 
       {/* Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredAndSortedData.length > 0 ? (
-          filteredAndSortedData.map((application) => (
+        {tableData.length > 0 ? (
+          tableData.map((application) => (
             <ApplicationCard 
               key={application.id} 
               application={application}
@@ -1121,11 +1381,12 @@ export default function ApplicationsTable() {
               No applications found.
             </div>
             <p className="text-sm text-gray-400 dark:text-gray-500 mb-2">
-              Try adjusting your filters
+              {hasActiveFilters ? 'Try adjusting your filters' : 'Start by applying for a student'}
             </p>
             <Link
-            href={'/partner/students'}
-             className="flex justify-center text-sm text-blue-400 dark:text-blue-500 mt-3">
+              href={'/partner/students'}
+              className="flex justify-center text-sm text-blue-400 dark:text-blue-500 mt-3"
+            >
               <p>Apply for Students </p> <ArrowRight size={20} />
             </Link>
           </div>
@@ -1134,16 +1395,16 @@ export default function ApplicationsTable() {
 
       {/* Results Count */}
       <div className="text-sm text-gray-500 dark:text-gray-400">
-        Showing {filteredAndSortedData.length} of {tableData.length} applications
+        Showing {tableData.length} of {apiData?.count || 0} applications
       </div>
 
       {/* Filter Modal */}
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
-        onApply={handleApplyFilters}
-        universities={universities}
-        courses={courses}
+        onFilterChange={handleFilterChange}
+        filterOptions={apiData?.filterOptions || null}
+        appliedFilters={filters}
       />
 
       {/* Document Upload Modal */}

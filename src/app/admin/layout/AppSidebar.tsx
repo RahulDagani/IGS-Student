@@ -27,6 +27,7 @@ import {
   Newspaper,
   Mail,
   Wallet,
+  Layers,
 } from "lucide-react";
 
 
@@ -85,6 +86,11 @@ const partnerItems: NavItem[] = [
     name: "Commissions",
     icon: <Percent size={18} />,
     path: "/partners/commissions",
+  },
+  {
+    name: "Slabs",
+    icon: <Layers size={18} />,
+    path: "/partners/slabs",
   },
   {
     name: "Setup ",

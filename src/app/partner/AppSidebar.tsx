@@ -88,6 +88,7 @@ const accountItems: NavItem[] = [
 
 const AppSidebar: React.FC = () => {
   const router = useRouter();
+  const {adminToken, adminReLoginFromAgent, user} = useAuth();
 
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
@@ -95,12 +96,31 @@ const AppSidebar: React.FC = () => {
   const [openSubmenus, setOpenSubmenus] = useState<Set<string>>(new Set());
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+    // Create computed navigation items based on adminToken
+  const [computedNavItems, setComputedNavItems] = useState<NavItem[]>(navItems);
+  
+  useEffect(() => {
+    // Update navigation items when adminToken changes
+    const updatedItems = [...navItems];
+    
+    if (adminToken) {
+      // Add "Go to Admin Panel" item when adminToken exists
+      updatedItems.unshift({
+        name: "Go to Admin Panel",
+        icon: <ArrowLeft size={18} />,
+        path: "#",
+      });
+    }
+    
+    setComputedNavItems(updatedItems);
+  }, [adminToken]); // This effect runs when adminToken changes
+
+
   const isActive = useCallback((path: string | undefined): boolean => {
     if (!path) return false;
     return pathname === path;
   }, [pathname]);
 
-  const {adminToken, adminReLoginFromAgent, user} = useAuth();
 
   const isAgent = user ? user.role == "agent" : false;
 
@@ -227,32 +247,35 @@ const AppSidebar: React.FC = () => {
 
   const renderMainMenuItems = () => (
     <ul className="flex flex-col gap-4">
-      
-      {adminToken && <li>
-       {
-           <div
-              onClick={handleAdminReLogin}
-             className={`menu-item group cursor-pointer`}
-             style={{ paddingLeft: `16px` }}
-           >
-             <span className={"menu-item-icon-inactive"}>
-               <ArrowLeft size={19}/>
-             </span>
-
-             {(isExpanded || isHovered || isMobileOpen) && (
-               <span className="menu-item-text dark:text-white">{"Go To Admin Panel"}</span>
-             )}
-             
-               
-            
-           </div>
-         
-       }
-     </li>}
-        
-     {navItems.map((item) => (
-        <NavItemComponent key={item.name} item={item} />
-      ))}
+      {computedNavItems.map((item) => {
+        if (item.name === "Go to Admin Panel" && adminToken) {
+          return (
+            <li key={item.name}>
+              <div
+                onClick={handleAdminReLogin}
+                className={`menu-item group cursor-pointer`}
+                style={{ paddingLeft: `16px` }}
+              >
+                <span className={"menu-item-icon-inactive"}>
+                  <ArrowLeft size={19}/>
+                </span>
+                {(isExpanded || isHovered || isMobileOpen) && (
+                  <span className="menu-item-text dark:text-white">
+                    {item.name}
+                  </span>
+                )}
+              </div>
+            </li>
+          );
+        }
+        return (
+          <NavItemComponent 
+            key={item.name} 
+            item={item} 
+            section="main" 
+          />
+        );
+      })}
     </ul>
   );
 

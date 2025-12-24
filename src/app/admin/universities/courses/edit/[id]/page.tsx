@@ -38,8 +38,8 @@ interface CourseFormData {
   
   // Intakes
   intakes: {
-    start_date: string;
-    open_date: string;
+    intake_year: string;
+    intake_id: string;
     submission_deadline: string;
   }[];
 }
@@ -58,8 +58,8 @@ interface Intake {
   id: number;
   course_id: number;
   tenant_id: number;
-  start_date: string;
-  open_date: string;
+  intake_year: string;
+  intake_id: string;
   submission_deadline: string;
   seat_availability: string;
   turnaround_time: string;
@@ -76,6 +76,12 @@ interface EditCoursePageProps {
     id: string;
   }>;
 }
+
+interface IntakeOption {
+  id: number,
+  intake: string,
+}
+
 export default function EditCourse({ params }: EditCoursePageProps) {
   const resolvedParams = React.use(params);
   const courseId = resolvedParams.id;
@@ -86,6 +92,9 @@ export default function EditCourse({ params }: EditCoursePageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingOptions, setIsLoadingOptions] = useState(true);
   const [isLoadingDisciplines, setIsLoadingDisciplines] = useState(false);
+
+  const [intakeOptions, setIntakeOptions] = useState<IntakeOption[]>([]);
+  
   
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -125,8 +134,8 @@ export default function EditCourse({ params }: EditCoursePageProps) {
     
     // Intakes
     intakes: [{
-      start_date: "",
-      open_date: "",
+      intake_year: "",
+      intake_id: "",
       submission_deadline: "",
     }],
   });
@@ -137,7 +146,27 @@ export default function EditCourse({ params }: EditCoursePageProps) {
     setTimeout(() => setMessage(null), 5000);
   };
 
+      const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+
   
+      // Fetch intake options on component mount
+    useEffect(() => {
+      const fetchIntakeOptions = async () => {
+        
+        try {
+          const response = await fetch(`${BASE_URL}/tenant/option/apply_tenant_intakes`,
+            {headers: { 'Authorization': `Bearer ${token}` }});
+          const data = await response.json();
+          if (data.success) {
+            setIntakeOptions(data.data);
+          }
+        } catch (error) {
+          console.error('Error fetching intake options:', error);
+        } 
+      };
+  
+      fetchIntakeOptions();
+    }, []);
 
   // Add state to track when all data is loaded
 const [isDataLoaded, setIsDataLoaded] = useState(false);
@@ -152,7 +181,6 @@ useEffect(() => {
       setIsLoadingOptions(true);
       setIsDataLoaded(false);
       
-      const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
       // Fetch all options first
       const optionsPromises = [
@@ -241,13 +269,13 @@ useEffect(() => {
             // Intakes
             intakes: intakes?.length > 0 
               ? intakes.map((intake: Intake) => ({
-                  start_date: intake.start_date || "",
-                  open_date: intake.open_date || "",
+                  intake_year: intake.intake_year || "",
+                  intake_id: intake.intake_id || "",
                   submission_deadline: intake.submission_deadline || "",
                 }))
               : [{
-                  start_date: "",
-                  open_date: "",
+                  intake_year: "",
+                  intake_id: "",
                   submission_deadline: "",
                 }],
           });
@@ -357,8 +385,8 @@ useEffect(() => {
       intakes: [
         ...prev.intakes,
         {
-          start_date: "",
-          open_date: "",
+          intake_year: "",
+          intake_id: "",
           submission_deadline: "",
         }
       ]
@@ -392,7 +420,7 @@ useEffect(() => {
 
   // Validate intakes
   // for (const intake of formData.intakes) {
-  //   if (!intake.start_date || !intake.open_date || !intake.submission_deadline) {
+  //   if (!intake.intake_year || !intake.intake_id || !intake.submission_deadline) {
   //     showMessage('error', 'Please fill in all intake dates');
   //     return false;
   //   }
@@ -449,11 +477,11 @@ function formatDate(dateString: string) {
         about_course: formData.about_course,
         admission_requirements: formData.admission_requirements,
         intakes: formData.intakes.filter(intake => 
-          intake.start_date && intake.open_date && intake.submission_deadline
+          intake.intake_year && intake.intake_id && intake.submission_deadline
         ).map(intake => ({
       ...intake,
-      start_date: formatDate(intake.start_date),
-      open_date: formatDate(intake.open_date),
+      intake_year: intake.intake_year,
+      intake_id: intake.intake_id,
       submission_deadline: formatDate(intake.submission_deadline)
     })),
       };
@@ -1026,52 +1054,58 @@ function formatDate(dateString: string) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Start Date */}
-           
+
+            {/* Intake Year */}
             <div>
               <label
-                htmlFor={`start_date_${index}`}
+                htmlFor={`intake_year_${index}`}
                 className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
               >
-                Course Start date *
+                Intake Year *
               </label>
-              <DatePicker
-                selected={intake.start_date ? new Date(intake.start_date) : null}
-                onChange={(date) =>
-                  handleIntakeChange(
-                    index,
-                    "start_date",
-                    date?.toISOString().split("T")[0] || ""
-                  )
+              <select
+                id={`intake_year_${index}`}
+                value={intake.intake_year || ""}
+                onChange={(e) =>
+                  handleIntakeChange(index, "intake_year", e.target.value)
                 }
-                dateFormat="yyyy-MM-dd"
-                placeholderText="Select date"
                 className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              />
+              >
+                <option value="">Select year</option>
+                {[2025, 2026, 2027, 2028, 2029, 2030].map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* Open Date */}
+            {/* Intake Selection */}
             <div>
               <label
-                htmlFor={`open_date_${index}`}
+                htmlFor={`intake_id_${index}`}
                 className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
               >
-                Application open date *
+                Intake *
               </label>
-              <DatePicker
-                selected={intake.open_date ? new Date(intake.open_date) : null}
-                onChange={(date) =>
-                  handleIntakeChange(
-                    index,
-                    "open_date",
-                    date?.toISOString().split("T")[0] || ""
-                  )
+              <select
+                id={`intake_id_${index}`}
+                value={intake.intake_id || ""}
+                onChange={(e) =>
+                  handleIntakeChange(index, "intake_id", e.target.value)
                 }
-                dateFormat="yyyy-MM-dd"
-                placeholderText="Select date"
                 className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              />
+              >
+                <option value="">Select intake</option>
+                {intakeOptions?.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.intake}
+                  </option>
+                ))}
+              </select>
             </div>
+
+           
 
             {/* Submission Deadline */}
             <div>

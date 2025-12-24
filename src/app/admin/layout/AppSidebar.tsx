@@ -27,6 +27,8 @@ import {
   Newspaper,
   Mail,
   Wallet,
+  Layers,
+  Wallet2,
 } from "lucide-react";
 
 
@@ -85,6 +87,17 @@ const partnerItems: NavItem[] = [
     name: "Commissions",
     icon: <Percent size={18} />,
     path: "/partners/commissions",
+  },
+
+  {
+    name: "Slabs",
+    icon: <Layers size={18} />,
+    path: "/partners/slabs",
+  },
+  {
+    name: "Commission Payments",
+    icon: <Wallet2 size={18} />,
+    path: "/partners/commission-payments",
   },
   {
     name: "Setup ",
@@ -675,7 +688,7 @@ useEffect(() => {
           ) : (
            <Image
                 className=""
-                src="/images/logo/logo.png"
+                src="/images/site/igslogo.png"
                 alt="Logo"
                 width={32}
                 height={32}

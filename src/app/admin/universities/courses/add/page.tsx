@@ -387,20 +387,20 @@ export default function AddCourse() {
     }
 
     // Validate intakes
-    for (const intake of formData.intakes) {
-      if (!intake.intake_year || !intake.intake_id) {
-        showMessage('error', 'Please fill all intake information');
-        return false;
-      }
+    // for (const intake of formData.intakes) {
+    //   if (!intake.intake_year || !intake.intake_id) {
+    //     showMessage('error', 'Please fill all intake information');
+    //     return false;
+    //   }
 
-      // Validate deadlines for each intake
-      for (const deadline of intake.deadlines) {
-        if (!deadline.deadline_type_id || !deadline.deadline_date) {
-          showMessage('error', 'Please fill all deadline information');
-          return false;
-        }
-      }
-    }
+    //   // Validate deadlines for each intake
+    //   for (const deadline of intake.deadlines) {
+    //     if (!deadline.deadline_type_id || !deadline.deadline_date) {
+    //       showMessage('error', 'Please fill all deadline information');
+    //       return false;
+    //     }
+    //   }
+    // }
 
     return true;
   };
@@ -472,9 +472,15 @@ export default function AddCourse() {
       }
 
       const result = await response.json();
-      
-      // Redirect back to courses list
-      router.push('/admin/universities/courses');
+
+      const {id} = result;
+     
+      if(id){
+
+        router.push(`/admin/universities/courses/edit/${id}?tab=intakes`);
+      }else{
+        router.push(`/admin/universities/courses`);
+      }
       router.refresh();
     } catch (error) {
       console.error('Error adding course:', error);
@@ -488,7 +494,7 @@ export default function AddCourse() {
     { id: "basics", label: "Basics", icon: Book },
     { id: "scores", label: "Scores", icon: GraduationCap },
     { id: "details", label: "Details", icon: Calendar },
-    { id: "intakes", label: "Intakes", icon: Calendar },
+    // { id: "intakes", label: "Intakes", icon: Calendar },
   ];
 
   const renderBasicsTab = () => (
@@ -935,233 +941,233 @@ export default function AddCourse() {
     </div>
   );
 
-  const renderIntakesTab = () => (
-    <div className="space-y-5">
-      {formData.intakes.map((intake, intakeIndex) => (
-        <div
-          key={intakeIndex}
-          className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
-        >
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex justify-between w-[100%]">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Intake {intakeIndex + 1} 
-            </h4>
-              {/* Is Active */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id={`is_active_${intakeIndex}`}
-                checked={intake.is_active}
-                onChange={(e) =>
-                  handleIntakeChange(intakeIndex, "is_active", e.target.checked)
-                }
-                className="h-4 w-4 rounded border-gray-300 bg-transparent text-brand-600 focus:ring-brand-500/30 dark:border-gray-600 dark:bg-gray-800 dark:checked:bg-brand-500"
-              />
-              <label
-                htmlFor={`is_active_${intakeIndex}`}
-                className="ml-2 text-sm text-gray-700 dark:text-gray-300"
-              >
-                Active
-              </label>
-            </div>
-            </div>
+  // const renderIntakesTab = () => (
+  //   <div className="space-y-5">
+  //     {formData.intakes.map((intake, intakeIndex) => (
+  //       <div
+  //         key={intakeIndex}
+  //         className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+  //       >
+  //         <div className="flex justify-between items-center mb-4">
+  //           <div className="flex justify-between w-[100%]">
+  //             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+  //             Intake {intakeIndex + 1} 
+  //           </h4>
+  //             {/* Is Active */}
+  //           <div className="flex items-center">
+  //             <input
+  //               type="checkbox"
+  //               id={`is_active_${intakeIndex}`}
+  //               checked={intake.is_active}
+  //               onChange={(e) =>
+  //                 handleIntakeChange(intakeIndex, "is_active", e.target.checked)
+  //               }
+  //               className="h-4 w-4 rounded border-gray-300 bg-transparent text-brand-600 focus:ring-brand-500/30 dark:border-gray-600 dark:bg-gray-800 dark:checked:bg-brand-500"
+  //             />
+  //             <label
+  //               htmlFor={`is_active_${intakeIndex}`}
+  //               className="ml-2 text-sm text-gray-700 dark:text-gray-300"
+  //             >
+  //               Active
+  //             </label>
+  //           </div>
+  //           </div>
             
-            {formData.intakes.length > 1 && (
-              <button
-                type="button"
-                onClick={() => removeIntake(intakeIndex)}
-                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm"
-              >
-                Remove
-              </button>
-            )}
-          </div>
+  //           {formData.intakes.length > 1 && (
+  //             <button
+  //               type="button"
+  //               onClick={() => removeIntake(intakeIndex)}
+  //               className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm"
+  //             >
+  //               Remove
+  //             </button>
+  //           )}
+  //         </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {/* Intake Year */}
-            <div>
-              <label
-                htmlFor={`intake_year_${intakeIndex}`}
-                className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
-              >
-                Intake Year *
-              </label>
-              <select
-                id={`intake_year_${intakeIndex}`}
-                value={intake.intake_year || ""}
-                onChange={(e) =>
-                  handleIntakeChange(intakeIndex, "intake_year", e.target.value)
-                }
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              >
-                <option value="">Select year</option>
-                {[2025, 2026, 2027, 2028, 2029, 2030].map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
+  //         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+  //           {/* Intake Year */}
+  //           <div>
+  //             <label
+  //               htmlFor={`intake_year_${intakeIndex}`}
+  //               className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
+  //             >
+  //               Intake Year *
+  //             </label>
+  //             <select
+  //               id={`intake_year_${intakeIndex}`}
+  //               value={intake.intake_year || ""}
+  //               onChange={(e) =>
+  //                 handleIntakeChange(intakeIndex, "intake_year", e.target.value)
+  //               }
+  //               className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+  //             >
+  //               <option value="">Select year</option>
+  //               {[2025, 2026, 2027, 2028, 2029, 2030].map((year) => (
+  //                 <option key={year} value={year}>
+  //                   {year}
+  //                 </option>
+  //               ))}
+  //             </select>
+  //           </div>
 
-            {/* Intake Selection */}
-            <div>
-              <label
-                htmlFor={`intake_id_${intakeIndex}`}
-                className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
-              >
-                Intake *
-              </label>
-              <select
-                id={`intake_id_${intakeIndex}`}
-                value={intake.intake_id || ""}
-                onChange={(e) =>
-                  handleIntakeChange(intakeIndex, "intake_id", e.target.value)
-                }
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              >
-                <option value="">Select intake</option>
-                {intakeOptions?.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+  //           {/* Intake Selection */}
+  //           <div>
+  //             <label
+  //               htmlFor={`intake_id_${intakeIndex}`}
+  //               className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
+  //             >
+  //               Intake *
+  //             </label>
+  //             <select
+  //               id={`intake_id_${intakeIndex}`}
+  //               value={intake.intake_id || ""}
+  //               onChange={(e) =>
+  //                 handleIntakeChange(intakeIndex, "intake_id", e.target.value)
+  //               }
+  //               className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+  //             >
+  //               <option value="">Select intake</option>
+  //               {intakeOptions?.map((option) => (
+  //                 <option key={option.id} value={option.id}>
+  //                   {option.name}
+  //                 </option>
+  //               ))}
+  //             </select>
+  //           </div>
 
             
-          </div>
+  //         </div>
 
-          {/* Deadlines Section */}
-          <div className="mt-4">
-            <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Deadlines
-            </h5>
-            {intake.deadlines.map((deadline, deadlineIndex) => (
-              <div key={deadlineIndex} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded">
-                <div className="flex justify-between items-center md:col-span-4">
-                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                    Deadline {deadlineIndex + 1}
-                  </span>
-                  {intake.deadlines.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeDeadline(intakeIndex, deadlineIndex)}
-                      className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
+  //         {/* Deadlines Section */}
+  //         <div className="mt-4">
+  //           <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+  //             Deadlines
+  //           </h5>
+  //           {intake.deadlines.map((deadline, deadlineIndex) => (
+  //             <div key={deadlineIndex} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded">
+  //               <div className="flex justify-between items-center md:col-span-4">
+  //                 <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+  //                   Deadline {deadlineIndex + 1}
+  //                 </span>
+  //                 {intake.deadlines.length > 1 && (
+  //                   <button
+  //                     type="button"
+  //                     onClick={() => removeDeadline(intakeIndex, deadlineIndex)}
+  //                     className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+  //                   >
+  //                     Remove
+  //                   </button>
+  //                 )}
+  //               </div>
                 
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1 dark:text-gray-400">
-                    Deadline Type *
-                  </label>
-                  <select
-                    value={deadline.deadline_type_id || ""}
-                    onChange={(e) =>
-                      handleDeadlineChange(intakeIndex, deadlineIndex, "deadline_type_id", e.target.value)
-                    }
-                    className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
-                  >
-                    <option value="">Select type</option>
-                    {deadlineTypeOptions?.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+  //               <div>
+  //                 <label className="block text-xs font-medium text-gray-600 mb-1 dark:text-gray-400">
+  //                   Deadline Type *
+  //                 </label>
+  //                 <select
+  //                   value={deadline.deadline_type_id || ""}
+  //                   onChange={(e) =>
+  //                     handleDeadlineChange(intakeIndex, deadlineIndex, "deadline_type_id", e.target.value)
+  //                   }
+  //                   className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
+  //                 >
+  //                   <option value="">Select type</option>
+  //                   {deadlineTypeOptions?.map((option) => (
+  //                     <option key={option.id} value={option.id}>
+  //                       {option.name}
+  //                     </option>
+  //                   ))}
+  //                 </select>
+  //               </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1 dark:text-gray-400">
-                    Deadline Date *
-                  </label>
-                  <DatePicker
-                    selected={deadline.deadline_date ? new Date(deadline.deadline_date) : null}
-                    onChange={(date) =>
-                      handleDeadlineChange(
-                        intakeIndex,
-                        deadlineIndex,
-                        "deadline_date",
-                        date?.toISOString().split("T")[0] || ""
-                      )
-                    }
-                    dateFormat="yyyy-MM-dd"
-                    placeholderText="Select date"
-                    showYearDropdown
-                    showMonthDropdown
-                    dropdownMode="select"
-                    yearDropdownItemNumber={50}
-                    scrollableYearDropdown
-                    className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
-                  />
-                </div>
+  //               <div>
+  //                 <label className="block text-xs font-medium text-gray-600 mb-1 dark:text-gray-400">
+  //                   Deadline Date *
+  //                 </label>
+  //                 <DatePicker
+  //                   selected={deadline.deadline_date ? new Date(deadline.deadline_date) : null}
+  //                   onChange={(date) =>
+  //                     handleDeadlineChange(
+  //                       intakeIndex,
+  //                       deadlineIndex,
+  //                       "deadline_date",
+  //                       date?.toISOString().split("T")[0] || ""
+  //                     )
+  //                   }
+  //                   dateFormat="yyyy-MM-dd"
+  //                   placeholderText="Select date"
+  //                   showYearDropdown
+  //                   showMonthDropdown
+  //                   dropdownMode="select"
+  //                   yearDropdownItemNumber={50}
+  //                   scrollableYearDropdown
+  //                   className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
+  //                 />
+  //               </div>
 
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-600 mb-1 dark:text-gray-400">
-                    Notes
-                  </label>
-                  <input
-                    type="text"
-                    value={deadline.notes || ""}
-                    onChange={(e) =>
-                      handleDeadlineChange(intakeIndex, deadlineIndex, "notes", e.target.value)
-                    }
-                    placeholder="Optional notes"
-                    className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
-                  />
-                </div>
-              </div>
-            ))}
+  //               <div className="md:col-span-2">
+  //                 <label className="block text-xs font-medium text-gray-600 mb-1 dark:text-gray-400">
+  //                   Notes
+  //                 </label>
+  //                 <input
+  //                   type="text"
+  //                   value={deadline.notes || ""}
+  //                   onChange={(e) =>
+  //                     handleDeadlineChange(intakeIndex, deadlineIndex, "notes", e.target.value)
+  //                   }
+  //                   placeholder="Optional notes"
+  //                   className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white/90"
+  //                 />
+  //               </div>
+  //             </div>
+  //           ))}
 
-            <button
-              type="button"
-              onClick={() => addDeadline(intakeIndex)}
-              className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 mt-2"
-            >
-              <svg
-                className="w-3 h-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Add Deadline
-            </button>
-          </div>
-        </div>
-      ))}
+  //           <button
+  //             type="button"
+  //             onClick={() => addDeadline(intakeIndex)}
+  //             className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 mt-2"
+  //           >
+  //             <svg
+  //               className="w-3 h-3"
+  //               fill="none"
+  //               stroke="currentColor"
+  //               viewBox="0 0 24 24"
+  //             >
+  //               <path
+  //                 strokeLinecap="round"
+  //                 strokeLinejoin="round"
+  //                 strokeWidth={2}
+  //                 d="M12 4v16m8-8H4"
+  //               />
+  //             </svg>
+  //             Add Deadline
+  //           </button>
+  //         </div>
+  //       </div>
+  //     ))}
 
-      <button
-        type="button"
-        onClick={addIntake}
-        className="flex items-center gap-2 text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 text-sm font-medium"
-      >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4v16m8-8H4"
-          />
-        </svg>
-        Add Another Intake
-      </button>
-    </div>
-  );
+  //     <button
+  //       type="button"
+  //       onClick={addIntake}
+  //       className="flex items-center gap-2 text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 text-sm font-medium"
+  //     >
+  //       <svg
+  //         className="w-4 h-4"
+  //         fill="none"
+  //         stroke="currentColor"
+  //         viewBox="0 0 24 24"
+  //       >
+  //         <path
+  //           strokeLinecap="round"
+  //           strokeLinejoin="round"
+  //           strokeWidth={2}
+  //           d="M12 4v16m8-8H4"
+  //         />
+  //       </svg>
+  //       Add Another Intake
+  //     </button>
+  //   </div>
+  // );
 
   return (
     <>
@@ -1214,7 +1220,7 @@ export default function AddCourse() {
               {activeTab === "basics" && renderBasicsTab()}
               {activeTab === "scores" && renderScoresTab()}
               {activeTab === "details" && renderDetailsTab()}
-              {activeTab === "intakes" && renderIntakesTab()}
+              {/* {activeTab === "intakes" && renderIntakesTab()} */}
             </div>
 
             {/* Navigation and Submit Buttons */}
@@ -1244,7 +1250,7 @@ export default function AddCourse() {
                     Previous
                   </button>
                 )}
-                {activeTab !== "intakes" && (
+                {activeTab !== "details" && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1261,7 +1267,7 @@ export default function AddCourse() {
                     </svg>
                   </button>
                 )}
-                {activeTab === "intakes" && (
+                {activeTab === "details" && (
                   <button
                     type="submit"
                     disabled={isSubmitting || !token || isLoadingOptions}

@@ -1,11 +1,13 @@
 "use client"
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Book, Building2, GraduationCap, Calendar, Upload, DollarSign } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+
+import IntakesManager from "./IntakeManager"; 
 
 interface CourseFormData {
   // Basics
@@ -36,12 +38,6 @@ interface CourseFormData {
   about_course: string;
   admission_requirements: string;
   
-  // Intakes
-  intakes: {
-    intake_year: string;
-    intake_id: string;
-    submission_deadline: string;
-  }[];
 }
 
 interface University {
@@ -54,19 +50,20 @@ interface Option {
   name: string;
 }
 
-interface Intake {
+interface IntakeOption {
   id: number;
-  course_id: number;
-  tenant_id: number;
-  intake_year: string;
-  intake_id: string;
-  submission_deadline: string;
-  seat_availability: string;
-  turnaround_time: string;
-  conversion_rate: string;
-  overall_score_label: string;
-  overall_score_intent: string;
+  name: string;
+  slug: string;
   created_at: string;
+  updated_at: string;
+}
+
+interface DeadlineTypeOption {
+  id: number;
+  name: string;
+  slug: string;
+  created_at: string;
+  updated_at: string;
 }
 
 type Tab = "basics" | "scores" | "details" | "intakes";
@@ -77,24 +74,44 @@ interface EditCoursePageProps {
   }>;
 }
 
-interface IntakeOption {
-  id: number,
-  intake: string,
+interface CourseIntake {
+  id: number;
+  intake_id: number;
+  course_id: number;
+  tenant_id: number;
+  intake_year: number;
+  is_deleted: number;
+  created_at: string;
+  intake_name: string;
+  deadlines: {
+    id: number;
+    tenant_id: number;
+    course_intake_id: number;
+    deadline_type_id: number;
+    deadline_date: string;
+    extended_date: string | null;
+    notes: string;
+    is_deleted: number;
+    deadline_type: string;
+  }[];
 }
 
 export default function EditCourse({ params }: EditCoursePageProps) {
+  const searchParams = useSearchParams();
+  const activeTabFromUrl = searchParams.get("tab");
+
   const resolvedParams = React.use(params);
   const courseId = resolvedParams.id;
   const router = useRouter();
   const { token } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>("basics");
+  const [activeTab, setActiveTab] = useState<string>("basics");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingOptions, setIsLoadingOptions] = useState(true);
   const [isLoadingDisciplines, setIsLoadingDisciplines] = useState(false);
 
   const [intakeOptions, setIntakeOptions] = useState<IntakeOption[]>([]);
-  
+  const [deadlineTypeOptions, setDeadlineTypeOptions] = useState<DeadlineTypeOption[]>([]);
   
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -132,13 +149,13 @@ export default function EditCourse({ params }: EditCoursePageProps) {
     about_course: "",
     admission_requirements: "",
     
-    // Intakes
-    intakes: [{
-      intake_year: "",
-      intake_id: "",
-      submission_deadline: "",
-    }],
   });
+
+  useEffect(() => {
+    if (activeTabFromUrl) {
+      setActiveTab(activeTabFromUrl);
+    }
+  }, [activeTabFromUrl]);
 
   // Show message and auto-hide after 5 seconds
   const showMessage = (type: 'success' | 'error', text: string) => {
@@ -146,160 +163,129 @@ export default function EditCourse({ params }: EditCoursePageProps) {
     setTimeout(() => setMessage(null), 5000);
   };
 
-      const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
-
-  
-      // Fetch intake options on component mount
-    useEffect(() => {
-      const fetchIntakeOptions = async () => {
-        
-        try {
-          const response = await fetch(`${BASE_URL}/tenant/option/apply_tenant_intakes`,
-            {headers: { 'Authorization': `Bearer ${token}` }});
-          const data = await response.json();
-          if (data.success) {
-            setIntakeOptions(data.data);
-          }
-        } catch (error) {
-          console.error('Error fetching intake options:', error);
-        } 
-      };
-  
-      fetchIntakeOptions();
-    }, []);
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
   // Add state to track when all data is loaded
-const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-// Update your useEffect
-useEffect(() => {
-  const fetchData = async () => {
-    if (!token) return;
 
-    try {
-      setIsLoading(true);
-      setIsLoadingOptions(true);
-      setIsDataLoaded(false);
-      
+  // Update your useEffect
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!token) return;
 
-      // Fetch all options first
-      const optionsPromises = [
-        fetch(`${BASE_URL}/tenant/university/names`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }),
-        fetch(`${BASE_URL}/tenant/option/apply_tenant_study_levels`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }),
-        fetch(`${BASE_URL}/tenant/option/apply_tenant_disciplines`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }),
-      ];
-
-      
-
-      // Wait for all options to load first
-      const optionsResults = await Promise.all(optionsPromises);
-      
-      // Process options data
-      const [
-        universitiesRes,
-        studyLevelsRes,
-        disciplinesRes,
-      ] = optionsResults;
-
-      // Process universities response
-      if (universitiesRes.ok) {
+      try {
+        setIsLoading(true);
+        setIsLoadingOptions(true);
+        setIsDataLoaded(false);
         
-        const universitiesData = await universitiesRes.json();
-        setUniversities(universitiesData.data || []);
-      }
 
-      // Process study levels
-      if (studyLevelsRes.ok) {
-        const studyLevelsData = await studyLevelsRes.json();
-        setStudyLevels(studyLevelsData.data || []);
-      }
+        // Fetch all options first
+        const optionsPromises = [
+          fetch(`${BASE_URL}/tenant/university/names`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+          fetch(`${BASE_URL}/tenant/option/apply_tenant_study_levels`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+          fetch(`${BASE_URL}/tenant/option/apply_tenant_disciplines`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+        ];
 
-      // Process disciplines
-      if (disciplinesRes.ok) {
-        const disciplinesData = await disciplinesRes.json();
-        setDisciplines(disciplinesData.data || []);
-      }
-
-      // Now fetch course data after options are loaded
-      const courseRes = await fetch(`${BASE_URL}/tenant/course/${courseId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (courseRes.ok) {
-        const courseData = await courseRes.json();
-       
-        const course = courseData?.course;
-        const intakes = courseData?.intakes;
         
-        if (course) {
-          setFormData({
-            university_id: course.university_id?.toString() || "",
-            study_level_id: course.study_level_id?.toString() || "",
-            discipline_id: course.discipline_id?.toString() || "",
-            course_name: course.course_name || "",
-            is_popular: course.is_popular?.toString() || "0",
-            duration_min: course.duration_min?.toString() || "",
-            duration_max: course.duration_max?.toString() || "",
-            duration_unit: course.duration_unit || "months",
-            tuition_fee: course.tuition_fee?.toString() || "",
-            currency_code: course.currency_code || "USD",
-            application_fee: course.application_fee?.toString() || "",
-            
-            // Scores
-            gre_score: course.gre_score?.toString() || "",
-            gmat_score: course.gmat_score?.toString() || "",
-            ielts_score: course.ielts_score?.toString() || "",
-            toefl_score: course.toefl_score?.toString() || "",
-            pte_score: course.pte_score?.toString() || "",
-            sat_score: course.sat_score?.toString() || "",
-            act_score: course.act_score?.toString() || "",
-            duolingo_score: course.duolingo_score?.toString() || "",
-            gpa_score: course.gpa_score?.toString() || "",
-            
-            // Course Details
-            about_course: course.about_course || "",
-            admission_requirements: course.admission_requirements || "",
-            
-            // Intakes
-            intakes: intakes?.length > 0 
-              ? intakes.map((intake: Intake) => ({
-                  intake_year: intake.intake_year || "",
-                  intake_id: intake.intake_id || "",
-                  submission_deadline: intake.submission_deadline || "",
-                }))
-              : [{
-                  intake_year: "",
-                  intake_id: "",
-                  submission_deadline: "",
-                }],
-          });
+
+        // Wait for all options to load first
+        const optionsResults = await Promise.all(optionsPromises);
+        
+        // Process options data
+        const [
+          universitiesRes,
+          studyLevelsRes,
+          disciplinesRes,
+        ] = optionsResults;
+
+        // Process universities response
+        if (universitiesRes.ok) {
           
+          const universitiesData = await universitiesRes.json();
+          setUniversities(universitiesData.data || []);
         }
 
-        
-        
-        setIsDataLoaded(true);
-      } else {
-        throw new Error('Failed to fetch course data');
+        // Process study levels
+        if (studyLevelsRes.ok) {
+          const studyLevelsData = await studyLevelsRes.json();
+          setStudyLevels(studyLevelsData.data || []);
+        }
+
+        // Process disciplines
+        if (disciplinesRes.ok) {
+          const disciplinesData = await disciplinesRes.json();
+          setDisciplines(disciplinesData.data || []);
+        }
+
+        // Now fetch course data after options are loaded
+        const courseRes = await fetch(`${BASE_URL}/tenant/course/${courseId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (courseRes.ok) {
+          const {data: courseData} = await courseRes.json();
+      
+         
+          const course = courseData?.course;
+          const intakes = courseData?.intakes;
+     
+          if (course) {
+            setFormData({
+              university_id: course.university_id?.toString() || "",
+              study_level_id: course.study_level_id?.toString() || "",
+              discipline_id: course.discipline_id?.toString() || "",
+              course_name: course.course_name || "",
+              is_popular: course.is_popular?.toString() || "0",
+              duration_min: course.duration_min?.toString() || "",
+              duration_max: course.duration_max?.toString() || "",
+              duration_unit: course.duration_unit || "months",
+              tuition_fee: course.tuition_fee?.toString() || "",
+              currency_code: course.currency_code || "USD",
+              application_fee: course.application_fee?.toString() || "",
+              
+              // Scores
+              gre_score: course.gre_score?.toString() || "",
+              gmat_score: course.gmat_score?.toString() || "",
+              ielts_score: course.ielts_score?.toString() || "",
+              toefl_score: course.toefl_score?.toString() || "",
+              pte_score: course.pte_score?.toString() || "",
+              sat_score: course.sat_score?.toString() || "",
+              act_score: course.act_score?.toString() || "",
+              duolingo_score: course.duolingo_score?.toString() || "",
+              gpa_score: course.gpa_score?.toString() || "",
+              
+              // Course Details
+              about_course: course.about_course || "",
+              admission_requirements: course.admission_requirements || "",
+              
+            });
+            
+          }
+
+          
+          
+          setIsDataLoaded(true);
+        } else {
+          throw new Error('Failed to fetch course data');
+        }
+
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        showMessage('error', 'Failed to load course data. Please try again.');
+      } finally {
+        setIsLoading(false);
+        setIsLoadingOptions(false);
       }
+    };
 
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      showMessage('error', 'Failed to load course data. Please try again.');
-    } finally {
-      setIsLoading(false);
-      setIsLoadingOptions(false);
-    }
-  };
-
-  fetchData();
-}, [token, courseId]);
+    fetchData();
+  }, [token, courseId]);
 
   // Fetch disciplines when study_level_id changes
   const fetchDisciplines = async (studyLevelId: string) => {
@@ -311,7 +297,6 @@ useEffect(() => {
 
     try {
       setIsLoadingDisciplines(true);
-      const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
       const response = await fetch(
         `${BASE_URL}/tenant/course/get/disciplines/${studyLevelId}`,
@@ -348,8 +333,6 @@ useEffect(() => {
     }
   }, [formData.study_level_id, token]);
 
-
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     // If study level is changing, reset discipline_id
@@ -367,74 +350,31 @@ useEffect(() => {
     }
   };
 
-  const handleIntakeChange = (index: number, field: string, value: string) => {
-    const updatedIntakes = [...formData.intakes];
-    updatedIntakes[index] = {
-      ...updatedIntakes[index],
-      [field]: value
-    };
-    setFormData(prev => ({
-      ...prev,
-      intakes: updatedIntakes
-    }));
-  };
-
-  const addIntake = () => {
-    setFormData(prev => ({
-      ...prev,
-      intakes: [
-        ...prev.intakes,
-        {
-          intake_year: "",
-          intake_id: "",
-          submission_deadline: "",
-        }
-      ]
-    }));
-  };
-
-  const removeIntake = (index: number) => {
-    if (formData.intakes.length > 1) {
-      const updatedIntakes = formData.intakes.filter((_, i) => i !== index);
-      setFormData(prev => ({
-        ...prev,
-        intakes: updatedIntakes
-      }));
-    }
-  };
-
   const validateForm = () => {
-  const requiredFields = [
-    'university_id', 'study_level_id', 'discipline_id', 
-    'course_name', 'tuition_fee', 
-    'currency_code', 'application_fee', 'about_course', 
-    'admission_requirements'
-  ];
+    const requiredFields = [
+      'university_id', 'study_level_id', 'discipline_id', 
+      'course_name', 'tuition_fee', 
+      'currency_code', 'application_fee', 'about_course', 
+      'admission_requirements'
+    ];
 
-  for (const field of requiredFields) {
-    if (!formData[field as keyof CourseFormData]) {
-      showMessage('error', `Please fill in all required fields`);
-      return false;
+    for (const field of requiredFields) {
+      if (!formData[field as keyof CourseFormData]) {
+        showMessage('error', `Please fill in all required fields`);
+        return false;
+      }
     }
-  }
 
-  // Validate intakes
-  for (const intake of formData.intakes) {
-    if (!intake.intake_year || !intake.intake_id || !intake.submission_deadline) {
-      showMessage('error', 'Please fill in all intake Info');
-      return false;
-    }
-  }
 
-  return true;
-};
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
-    return;
-  }
+      return;
+    }
     
     if (!token) {
       showMessage('error', "Please log in to update the course");
@@ -443,16 +383,8 @@ useEffect(() => {
 
     setIsSubmitting(true);
 
-    // Helper function to format dates
-function formatDate(dateString: string) {
-  if (!dateString) return null;
-  
-  const date = new Date(dateString);
-  return date.toISOString().split('T')[0]; // Returns 'YYYY-MM-DD'
-}
-
     try {
-      // Prepare data for API
+      // Prepare data for API with new intakes structure
       const submitData = {
         university_id: parseInt(formData.university_id),
         study_level_id: parseInt(formData.study_level_id),
@@ -476,19 +408,10 @@ function formatDate(dateString: string) {
         gpa_score: formData.gpa_score ? parseFloat(formData.gpa_score) : null,
         about_course: formData.about_course,
         admission_requirements: formData.admission_requirements,
-        intakes: formData.intakes.filter(intake => 
-          intake.intake_year && intake.intake_id && intake.submission_deadline
-        ).map(intake => ({
-      ...intake,
-      intake_year: intake.intake_year,
-      intake_id: intake.intake_id,
-      submission_deadline: formatDate(intake.submission_deadline)
-    })),
+       
       };
 
-      const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
-
-      const response = await fetch(`${BASE_URL}/tenant/course/edit/${courseId}`, {
+      const response = await fetch(`${BASE_URL}/tenant/course/${courseId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1018,7 +941,7 @@ function formatDate(dateString: string) {
   );
 
   const renderIntakesTab = () => (
-    <div className="space-y-5">
+     <div className="space-y-5">
       {/* Message Alert */}
       {message && (
         <div className={`p-4 rounded-lg ${
@@ -1030,137 +953,10 @@ function formatDate(dateString: string) {
         </div>
       )}
 
-      
-
-      {formData.intakes.map((intake, index) => (
-        <div
-          key={index}
-          className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Intake {index + 1}
-            </h4>
-            {formData.intakes.length > 1 && (
-              <button
-                type="button"
-                onClick={() => removeIntake(index)}
-                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm"
-              >
-                Remove
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-            {/* Intake Year */}
-            <div>
-              <label
-                htmlFor={`intake_year_${index}`}
-                className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
-              >
-                Intake Year *
-              </label>
-              <select
-                id={`intake_year_${index}`}
-                value={intake.intake_year || ""}
-                onChange={(e) =>
-                  handleIntakeChange(index, "intake_year", e.target.value)
-                }
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              >
-                <option value="">Select year</option>
-                {[2025, 2026, 2027, 2028, 2029, 2030].map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Intake Selection */}
-            <div>
-              <label
-                htmlFor={`intake_id_${index}`}
-                className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
-              >
-                Intake *
-              </label>
-              <select
-                id={`intake_id_${index}`}
-                value={intake.intake_id || ""}
-                onChange={(e) =>
-                  handleIntakeChange(index, "intake_id", e.target.value)
-                }
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              >
-                <option value="">Select intake</option>
-                {intakeOptions?.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.intake}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-           
-
-            {/* Submission Deadline */}
-            <div>
-              <label
-                htmlFor={`submission_deadline_${index}`}
-                className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
-              >
-                Application submission Deadline*
-              </label>
-              <DatePicker
-                selected={
-                  intake.submission_deadline
-                    ? new Date(intake.submission_deadline)
-                    : null
-                }
-                onChange={(date) =>
-                  handleIntakeChange(
-                    index,
-                    "submission_deadline",
-                    date?.toISOString().split("T")[0] || ""
-                  )
-                }
-                dateFormat="yyyy-MM-dd"
-                placeholderText="Select date"
-                showYearDropdown
-  showMonthDropdown
-  dropdownMode="select"
-  yearDropdownItemNumber={50}
-  scrollableYearDropdown
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              />
-            </div>
-          </div>
-        </div>
-      ))}
-
-      <button
-        type="button"
-        onClick={addIntake}
-        className="flex items-center gap-2 text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 text-sm font-medium"
-      >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4v16m8-8H4"
-          />
-        </svg>
-        Add Another Intake
-      </button>
+      <IntakesManager 
+        courseId={courseId}
+        token={token}
+      />
     </div>
   );
 
@@ -1211,8 +1007,6 @@ function formatDate(dateString: string) {
           {/* Navigation and Submit Buttons */}
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex gap-3">
-              
-
               <button
                 type="button"
                 onClick={() => router.back()}
@@ -1220,7 +1014,6 @@ function formatDate(dateString: string) {
               >
                 Cancel
               </button>
-              
             </div>
 
             <div className="flex gap-3">
@@ -1281,7 +1074,6 @@ function formatDate(dateString: string) {
                 )}
               </button>
               )}
-              
             </div>
           </div>
         </form>

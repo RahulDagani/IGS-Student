@@ -334,7 +334,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 const value = e.target.value ? Number(e.target.value) : null;
                 handleStudyLevelChange(value);
               }}
-              className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm text-gray-700 focus:border-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+              className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
             >
               <option value="">Select study level</option>
               {filtersData.filters.studyLevels.map((level) => (
@@ -449,56 +449,62 @@ const FilterModal: React.FC<FilterModalProps> = ({
             </div>
           </div>
 
-          {/* Intake Year */}
-          <div>
-            <label
-              htmlFor={`intake_year`}
-              className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
-            >
-              Intake Year *
-            </label>    
-            <select
-              value={tempFilters.intake_year ?? ""}
-              onChange={(e) => {
-                const value = e.target.value ? Number(e.target.value) : null;
-                handleIntakeYearChange(value);
-              }}
-              className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm text-gray-700 focus:border-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-            >
-              <option value="">Select Intake Year</option>
-              {filtersData.filters.intakeYears.map((yearData) => (
-                <option key={yearData.intake_year} value={yearData.intake_year}>
-                  {yearData.intake_year}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-2" >
+
+            {/* Intake Year */}
+            <div>
+              <label
+                htmlFor={`intake_year`}
+                className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
+              >
+                Intake Year *
+              </label>    
+              <select
+                value={tempFilters.intake_year ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value ? Number(e.target.value) : null;
+                  handleIntakeYearChange(value);
+                }}
+                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              >
+                <option value="">Select Intake Year</option>
+                {filtersData.filters.intakeYears.map((yearData) => (
+                  <option key={yearData.intake_year} value={yearData.intake_year}>
+                    {yearData.intake_year}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Intake Selection */}
+            <div>
+              <label
+                htmlFor={`intake_id`}
+                className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
+              >
+                Intake *
+              </label>
+              <select
+                id={`intake_id`}
+                value={tempFilters.intake_id ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value ? Number(e.target.value) : null;
+                  handleIntakeChange(value);
+                }}
+                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              >
+                <option value="">Select intake</option>
+                {filtersData.filters.intakes.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.intake}
+                  </option>
+                ))}
+              </select>
+            </div>
+
           </div>
 
-          {/* Intake Selection */}
-          <div>
-            <label
-              htmlFor={`intake_id`}
-              className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300"
-            >
-              Intake *
-            </label>
-            <select
-              id={`intake_id`}
-              value={tempFilters.intake_id ?? ""}
-              onChange={(e) => {
-                const value = e.target.value ? Number(e.target.value) : null;
-                handleIntakeChange(value);
-              }}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-            >
-              <option value="">Select intake</option>
-              {filtersData.filters.intakes.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.intake}
-                </option>
-              ))}
-            </select>
-          </div>
+
         </div>
 
         <div className="flex gap-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">

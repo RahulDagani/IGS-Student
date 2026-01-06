@@ -13,7 +13,8 @@ import {
   Clock,
   AlertCircle,
   Building,
-  GraduationCap
+  GraduationCap,
+  Eye
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -207,7 +208,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
   };
 
   // Upload file function - handles both common and specific documents
-  const uploadFile = async (documentId: number, isCommon: boolean, applicationId: number | null) => {
+  const uploadFile = async (documentId: number, isCommon: boolean, applicationId: number | null, agentId: number) => {
     const file = selectedFile[documentId];
     if (!file) {
       setUploadErrors(prev => ({ 
@@ -219,6 +220,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
 
     const formData = new FormData();
     formData.append('document_id', documentId.toString());
+    formData.append('agent_id', String(agentId));
     formData.append('file', file);
 
     setUploading(prev => ({ ...prev, [documentId]: true }));
@@ -288,11 +290,12 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
   };
 
   // File input component
-  const FileInput = ({ documentId, isCommon, currentFileName, applicationId = null }: { 
+  const FileInput = ({ documentId, isCommon, currentFileName, applicationId = null, agentId }: { 
     documentId: number, 
     isCommon: boolean,
     currentFileName?: string,
     applicationId?: number | null,
+    agentId: number
   }) => {
     const isUploading = uploading[documentId];
     const progress = uploadProgress[documentId];
@@ -321,7 +324,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
           </label>
           
           <button
-            onClick={() => uploadFile(documentId, isCommon, applicationId)}
+            onClick={() => uploadFile(documentId, isCommon, applicationId, agentId)}
             disabled={isUploading || !selectedFileForDoc}
             className={`flex items-center gap-2 px-4 py-2 rounded-md ${
               isUploading || !selectedFileForDoc
@@ -446,6 +449,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
               isCommon={isCommon}
               currentFileName={fileName !== 'No file uploaded' ? fileName : undefined}
               applicationId={!isCommon ? doc.application_id : null}
+              agentId={doc.agent_id}
             />
           </div>
         </div>
@@ -456,9 +460,10 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
               href={doc.file_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-white dark:bg-gray-800 border dark:border-gray-600 px-3 py-1 rounded-md text-sm dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="bg-white dark:bg-gray-800 border flex items-center dark:border-gray-600 px-3 py-1 rounded-md text-sm dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             >
               {fileName}
+              <Eye size={16} className='ml-2'/>
             </a>
           </div>
         )}

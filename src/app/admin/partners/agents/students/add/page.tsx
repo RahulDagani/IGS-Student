@@ -156,7 +156,7 @@ export default function AddStudent() {
 
     try {      
       // API call to create student
-      const response = await fetch(`${BASE_URL}/agent/student/add`, {
+      const response = await fetch(`${BASE_URL}/tenant/agent/student/add`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -173,7 +173,7 @@ export default function AddStudent() {
       }else{
         setSuccess("Student created successfully!");
         setTimeout(()=>{setSuccess("")},3000)
-        router.push('/partner/students');
+        router.push(`/admin/partners/agents/editProfile/${result.data.id}`);
         router.refresh();
       }
       

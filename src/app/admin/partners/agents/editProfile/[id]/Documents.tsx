@@ -13,7 +13,8 @@ import {
   Clock,
   AlertCircle,
   Building,
-  GraduationCap
+  GraduationCap,
+  Eye
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -459,9 +460,10 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
               href={doc.file_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-white dark:bg-gray-800 border dark:border-gray-600 px-3 py-1 rounded-md text-sm dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="bg-white dark:bg-gray-800 border flex items-center dark:border-gray-600 px-3 py-1 rounded-md text-sm dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             >
               {fileName}
+              <Eye size={16} className='ml-2'/>
             </a>
           </div>
         )}

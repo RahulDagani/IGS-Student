@@ -528,7 +528,7 @@ export default function ApplicationsTable() {
           >
             Clear Filters
           </button>
-          <Link href="/partner/programs" className="shrink-0">
+          <Link href="/student/programs" className="shrink-0">
             <button className="h-11 px-4 rounded-lg border-2 border-green-500 bg-transparent text-sm text-green-500 shadow-theme-xs hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -991,7 +991,7 @@ export default function ApplicationsTable() {
                     applications.map((application) => (
                       <TableRow key={application.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <TableCell className="px-5 py-4 text-gray-700 text-theme-sm dark:text-gray-300 font-medium">
-                          <Link href={`/partner/editProfile/${application.student_user_id}?tab=applications&app=${application.id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                          <Link href={`/student/editProfile/${application.student_user_id}?tab=applications&app=${application.id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
                             {application.acknowledgement_no}
                           </Link>
                         </TableCell>
@@ -999,7 +999,7 @@ export default function ApplicationsTable() {
                           {formatDate(application.date_created)}
                         </TableCell>
                         <TableCell className="px-5 py-4 text-gray-700 text-theme-sm dark:text-gray-300 font-medium">
-                          <Link href={`/partner/editProfile/${application.student_user_id}`}>
+                          <Link href={`/student/editProfile/${application.student_user_id}`}>
                             {application.student_full_name || 'N/A'}
                           </Link>
                         </TableCell>

@@ -1,1605 +1,1133 @@
 "use client"
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import Badge from "@/components/ui/badge/Badge";
-import { User, Upload, FileText, X, ArrowBigRight, ArrowLeft, ArrowRight } from "lucide-react";
-import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import React, { useState, useMemo, useEffect } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import Link from "next/link";
-import { Country } from "country-state-city";
-
-import ApplicationFormModal from "./ApplicationFormModal";
-
+import { useAuth } from "@/context/AuthContext";
+import Select from "react-select";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 interface Application {
   id: number;
-  university: string;
-  course: string;
-  intake: string;
-  status: string;
-  country?: string;
-  degree?: string;
-  location?: string;
-  externalEvaluation?: string;
-  ielts?: number;
-  pte?: number;
-  duolingo?: number;
-  tuitionFee?: string;
-  applicationFee?: string;
-  currencyCode?: string;
-  duration?: string;
-  student_user_id?: number;
-  profile_status?: string;
-  common_documents?: {
-    list: Array<{
-      id: number;
-      document_name: string;
-      is_mandatory: number;
-      file_url: string | null;
-      uploaded_at: string | null;
-      status: string;
-    }>;
-    status: string;
-  };
-  specific_documents?: {
-    list: Array<{
-      id: number;
-      document_name: string;
-      is_mandatory: number;
-      file_url: string | null;
-      uploaded_at: string | null;
-      status: string;
-    }>;
-    status: string;
-  };
+  uuid: string;
+  tenant_id: number;
+  agent_id: number;
+  student_user_id: number;
+  course_id: number;
+  course_intake_id: number;
+  study_level_id: number;
+  current_status_id: number;
+  assigned_to: number | null;
+  remarks: string | null;
+  is_submitted_to_university: number;
+  role: string;
+  created_by: number;
+  created_at: string;
+  updated_at: string | null;
+  is_deleted: number;
+  acknowledgement_no: string;
+  date_created: string;
+  status_key: string;
+  status_label: string;
+  status_sort_order: number;
+  course_name: string;
+  course_slug: string;
+  duration_min: number;
+  duration_max: number;
+  duration_unit: string;
+  tuition_fee: string;
+  application_fee: string;
+  currency_code: string;
+  study_level_name: string;
+  discipline_id: number;
+  discipline_name: string;
+  university_name: string;
+  university_slug: string;
+  university_id: number;
+  university_logo: string;
+  university_country: string;
+  university_state: string;
+  university_city: string;
+  intake_id: number | null;
+  intake_year: string | null;
+  intake_name: string | null;
+  deadline_date: string | null;
+  deadline_type_id: number | null;
+  deadline_type_name: string | null;
+  student_full_name: string | null;
 }
 
-// API Response Interfaces
-interface ApiApplication {
-  application: {
-    id: number;
-    uuid: string;
-    tenant_id: number;
-    student_user_id: number;
-    course_id: number;
-    study_level_id: number;
-    current_status_id: number;
-    assigned_to: string | null;
-    remarks: string | null;
-    is_submitted_to_university: number;
-    role: string;
-    created_by: number | null;
-    created_at: string;
-    updated_at: string | null;
-    is_deleted: number;
-    status_key: string | null;
-    status_label: string | null;
-    status_sort_order: number | null;
-    course_name: string;
-    course_slug: string;
-    duration_min: number;
-    duration_max: number;
-    duration_unit: string;
-    tuition_fee: string;
-    application_fee: string;
-    currency_code: string;
-    study_level_name: string;
-    discipline_id: number;
-    discipline_name: string;
-    university_name: string;
-    university_slug: string;
-    university_id: number;
-    university_logo: string | null;
-    university_country: string;
-    university_state: string;
-    university_city: string;
-    intake_date: string | null;
-    intake_id: number | null;
-    submission_deadline: string | null;
-    seat_availability: string | null;
-    turnaround_time: string | null;
-    conversion_rate: string | null;
-    overall_score_label: string | null;
-    overall_score_intent: string | null;
-  };
-  student_profile: {
-    id: number;
-    uuid: string;
-    tenant_id: number;
-    user_id: number;
-    passport_number: string;
-    salutation: string | null;
-    first_name: string;
-    middle_name: string;
-    last_name: string;
-    alternate_email: string | null;
-    country_code: string | null;
-    state_code: string | null;
-    city_code: string | null;
-    alternate_phone_number: string | null;
-    dob: string;
-    gender: string | null;
-    citizenship: string | null;
-    address: string | null;
-    postal_code: string | null;
-    emergency_c_name: string | null;
-    emergency_c_relation: string | null;
-    emergency_c_email: string | null;
-    emergency_c_phone: string | null;
-    profile: string | null;
-    created_at: string;
-    updated_at: string;
-    is_deleted: number;
-  };
-  profile_status: string;
-  common_documents: {
-    list: Array<{
-      id: number;
-      student_id: number;
-      study_level_id: number;
-      document_name: string;
-      is_mandatory: number;
-      file_url: string | null;
-      uploaded_at: string | null;
-      uploaded_by: number | null;
-      status: string;
-      remarks: string | null;
-      is_deleted: number;
-      created_at: string;
-    }>;
-    status: string;
-  };
-  specific_documents: {
-    list: Array<{
-      id: number;
-      application_id: number;
-      document_name: string;
-      document_type: string;
-      is_mandatory: number;
-      file_url: string | null;
-      uploaded_at: string | null;
-      uploaded_by: number | null;
-      status: string;
-      remarks: string | null;
-      is_deleted: number;
-      created_at: string;
-    }>;
-    status: string;
-  };
+interface FilterOptionsData {
+  students: Array<{ id: string; name: string }>;
+  universities: Array<{ id: string | number; name: string }>;
+  countries: Array<{ id: string; code?: string; name: string }>;
+  studyLevels: Array<{ id: string | number; name: string }>;
+  disciplines: Array<{ id: string | number; name: string }>;
+  courses: Array<{ id: string | number; name: string }>;
+  intakeYears: Array<{ id: string; name: string; value: number }>;
+  deadlineTypes: Array<{ id: string | number; name: string }>;
+  intakes: Array<{ id: string; intake_name: string }>;
+  applicationStatus: Array<{ 
+    id: string | number; 
+    status_key?: string; 
+    status_label?: string;
+    name?: string;
+  }>;
 }
 
-interface FilterOption {
-  id: string | number;
-  name: string;
-  email?: string;
-  start_date?: string;
-}
-
-// Filter API Response Interface
-interface FilterApiResponse {
-  success: boolean;
-  data: {
-    filterOptions: {
-      universities: FilterOption[];
-      studyLevels: FilterOption[];
-      disciplines: FilterOption[];
-      courses: FilterOption[];
-      intakes: FilterOption[];
-      years: FilterOption[];
-      applicationStatus: FilterOption[];
-    };
-    appliedFilters: Record<string, any>;
-    count: number;
-  };
-}
-
-// Applications API Response Interface
-interface ApplicationsApiResponse {
-  success: boolean;
-  data: ApiApplication[];
-  pagination: {
-    page: number;
-    limit: number;
-    totalRecords: number;
-    totalPages: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
-}
-
-// Filter Options Interface
 interface FilterOptions {
-  university: string | number;
-  study_level_id: string | number;
-  discipline: string | number;
-  course: string | number;
-  intake: string | number;
-  year: string | number;
-  applicationStatus: string | number;
-  search?: string;
+  dateRange: [Date | null, Date | null];
+  countries: string[];
+  universities: string[];
+  intakes: string[];
+  years: string[];
+  statuses: string[];
+  acknowledgeNo: string;
+  programName: string;
+  studentName: string;
+  deadlineType: string | null;
+  deadlineDate: [Date | null, Date | null];
+  students: string[];
+  studyLevels: string[];
+  disciplines: string[];
+  courses: string[];
 }
 
-// Filter Modal Component
-interface FilterModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onFilterApply: (filters: FilterOptions) => void;
-  filterOptions: FilterApiResponse['data']['filterOptions'] | null;
-  appliedFilters: FilterOptions;
-  onFiltersChange: (filters: FilterOptions) => void;
+interface Pagination {
+  page: number;
+  limit: number;
+  totalRecords: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
 }
 
-// Helper function to get country name
-const getCountryName = (code: string | undefined | null) => {
-  if (!code) return '';
-  const country = Country.getCountryByCode(code);
-  return country ? country.name : code;
-};
+type SortField = keyof Application | "";
+type SortDirection = "asc" | "desc";
 
-const FilterModal: React.FC<FilterModalProps> = ({
-  isOpen,
-  onClose,
-  onFilterApply,
-  filterOptions,
-  appliedFilters,
-  onFiltersChange,
-}) => {
-  const [localFilters, setLocalFilters] = useState<FilterOptions>(appliedFilters);
-  const [isLoading, setIsLoading] = useState(false);
+export default function ApplicationsTable() {
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false); // New state for search button loading
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState<SortField>("");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [filterOptions, setFilterOptions] = useState<FilterOptionsData | null>(null);
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 10,
+    totalRecords: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
+  
+  // Filter states - these are now UI filters that will be applied only on search
+  const [uiFilters, setUiFilters] = useState<FilterOptions>({
+    dateRange: [null, null],
+    countries: [],
+    universities: [],
+    intakes: [],
+    years: [],
+    statuses: [],
+    acknowledgeNo: "",
+    programName: "",
+    studentName: "",
+    deadlineType: null,
+    deadlineDate: [null, null],
+    students: [],
+    studyLevels: [],
+    disciplines: [],
+    courses: [],
+  });
 
-  // Initialize local filters when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setLocalFilters(appliedFilters);
-    }
-  }, [isOpen, appliedFilters]);
+  // Active filters that are actually applied to the API
+  const [activeFilters, setActiveFilters] = useState<FilterOptions>({
+    dateRange: [null, null],
+    countries: [],
+    universities: [],
+    intakes: [],
+    years: [],
+    statuses: [],
+    acknowledgeNo: "",
+    programName: "",
+    studentName: "",
+    deadlineType: null,
+    deadlineDate: [null, null],
+    students: [],
+    studyLevels: [],
+    disciplines: [],
+    courses: [],
+  });
 
-  const handleSelectChange = (key: keyof FilterOptions, value: string | number) => {
-    const newFilters = {
-      ...localFilters,
-      [key]: value
-    };
-    setLocalFilters(newFilters);
-    // Immediately notify parent about filter change
-    onFiltersChange(newFilters);
-  };
-
-  const handleReset = () => {
-    const resetFilters: FilterOptions = {
-      university: "all",
-      study_level_id: "all",
-      discipline: "all",
-      course: "all",
-      intake: "all",
-      year: "all",
-      applicationStatus: "all",
-    };
-    setLocalFilters(resetFilters);
-    onFiltersChange(resetFilters);
-  };
-
-  const handleApply = () => {
-    onFilterApply(localFilters);
-    onClose();
-  };
-
-  if (!isOpen || !filterOptions) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Filter Applications
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* University Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              University
-            </label>
-            <select
-              value={localFilters.university}
-              onChange={(e) => handleSelectChange('university', e.target.value === "all" ? "all" : Number(e.target.value))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              {filterOptions.universities.map((university) => (
-                <option key={university.id} value={university.id}>
-                  {university.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Study Level Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Study Level
-            </label>
-            <select
-              value={localFilters.study_level_id}
-              onChange={(e) => handleSelectChange('study_level_id', e.target.value === "all" ? "all" : Number(e.target.value))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              {filterOptions.studyLevels.map((level) => (
-                <option key={level.id} value={level.id}>
-                  {level.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Discipline Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Discipline
-            </label>
-            <select
-              value={localFilters.discipline}
-              onChange={(e) => handleSelectChange('discipline', e.target.value === "all" ? "all" : Number(e.target.value))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              {filterOptions.disciplines.map((discipline) => (
-                <option key={discipline.id} value={discipline.id}>
-                  {discipline.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Course Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Course
-            </label>
-            <select
-              value={localFilters.course}
-              onChange={(e) => handleSelectChange('course', e.target.value === "all" ? "all" : Number(e.target.value))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              {filterOptions.courses.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Intake Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Intake
-            </label>
-            <select
-              value={localFilters.intake}
-              onChange={(e) => handleSelectChange('intake', e.target.value === "all" ? "all" : Number(e.target.value))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              {filterOptions.intakes.map((intake) => (
-                <option key={intake.id} value={intake.id}>
-                  {intake.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Application Status
-            </label>
-            <select
-              value={localFilters.applicationStatus}
-              onChange={(e) => handleSelectChange('applicationStatus', e.target.value === "all" ? "all" : Number(e.target.value))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              {filterOptions.applicationStatus.map((status) => (
-                <option key={status.id} value={status.id}>
-                  {status.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Year Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Year
-            </label>
-            <select
-              value={localFilters.year}
-              onChange={(e) => handleSelectChange('year', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              {filterOptions.years.map((year) => (
-                <option key={year.id} value={year.id}>
-                  {year.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={handleReset}
-            className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            Reset All
-          </button>
-          <button
-            onClick={handleApply}
-            className="flex-1 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10"
-          >
-            Apply Filters
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Document Upload Modal Component
-interface DocumentUploadModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  applicationId: number;
-  documents: Document[];
-  documentType: 'common' | 'specific';
-  onUploadSuccess: () => void;
-}
-
-interface Document {
-  id: number;
-  document_name: string;
-  is_mandatory: number;
-  file_url: string | null;
-  uploaded_at: string | null;
-  status: string;
-  remarks?: string | null;
-}
-
-const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
-  isOpen,
-  onClose,
-  applicationId,
-  documents,
-  documentType,
-  onUploadSuccess,
-}) => {
   const { token } = useAuth();
-  const [uploading, setUploading] = useState<{ [key: number]: boolean }>({});
-  const [uploadProgress, setUploadProgress] = useState<{ [key: number]: number }>({});
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
-  const handleFileUpload = async (documentId: number, file: File) => {
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('document_id', documentId.toString());
-    formData.append('file', file);
-
-    setUploading(prev => ({ ...prev, [documentId]: true }));
-    setUploadProgress(prev => ({ ...prev, [documentId]: 0 }));
-
-    try {
-      const xhr = new XMLHttpRequest();
-      
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const progress = (event.loaded / event.total) * 100;
-          setUploadProgress(prev => ({ ...prev, [documentId]: progress }));
+  // Fetch filter options from API
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const response = await fetch(`${BASE_URL}/student/application/filters/dynamic`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-      });
+        
+        const data = await response.json();
+        if (data.success) {
+          setFilterOptions(data.data.filterOptions);
+        }
+      } catch (err) {
+        console.error('Error fetching filter options:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch filter options');
+      }
+    };
 
-      const uploadPromise = new Promise((resolve, reject) => {
-        xhr.onload = () => {
-          if (xhr.status === 200) {
-            resolve(xhr.response);
-          } else {
-            reject(new Error('Upload failed'));
-          }
-        };
-        xhr.onerror = () => reject(new Error('Upload failed'));
-      });
+    if (token) {
+      fetchFilterOptions();
+    }
+  }, [token, BASE_URL]);
 
-      if(documentType === "common") {
-        xhr.open('PUT', `${BASE_URL}/student/upload/common/document`);
-      } else {
-        xhr.open('PUT', `${BASE_URL}/student/${applicationId}/upload/document`);
+  const fetchApplications = async (filtersToApply: FilterOptions = activeFilters) => {
+    try {
+      setLoading(true);
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      
+      // Add pagination params
+      params.append('page', pagination.page.toString());
+      params.append('limit', pagination.limit.toString());
+      
+      // Add filter params
+      if (filtersToApply.students.length > 0 && !filtersToApply.students.includes('all')) {
+        filtersToApply.students.forEach(student => {
+          params.append('student', student);
+        });
+      }
+      
+      if (filtersToApply.countries.length > 0 && !filtersToApply.countries.includes('all')) {
+        filtersToApply.countries.forEach(country => {
+          params.append('country_code', country);
+        });
+      }
+      
+      if (filtersToApply.universities.length > 0 && !filtersToApply.universities.includes('all')) {
+        filtersToApply.universities.forEach(university => {
+          params.append('university', university);
+        });
+      }
+      
+      if (filtersToApply.studyLevels.length > 0 && !filtersToApply.studyLevels.includes('all')) {
+        filtersToApply.studyLevels.forEach(level => {
+          params.append('level', level);
+        });
+      }
+      
+      if (filtersToApply.disciplines.length > 0 && !filtersToApply.disciplines.includes('all')) {
+        filtersToApply.disciplines.forEach(discipline => {
+          params.append('discipline', discipline);
+        });
+      }
+      
+      if (filtersToApply.courses.length > 0 && !filtersToApply.courses.includes('all')) {
+        filtersToApply.courses.forEach(course => {
+          params.append('course', course);
+        });
+      }
+      
+      if (filtersToApply.intakes.length > 0 && !filtersToApply.intakes.includes('all')) {
+        filtersToApply.intakes.forEach(intake => {
+          params.append('intake', intake);
+        });
+      }
+      
+      if (filtersToApply.years.length > 0 && !filtersToApply.years.includes('all')) {
+        filtersToApply.years.forEach(year => {
+          params.append('year', year);
+        });
+      }
+      
+      if (filtersToApply.statuses.length > 0 && !filtersToApply.statuses.includes('all')) {
+        filtersToApply.statuses.forEach(status => {
+          params.append('applicationStatus', status);
+        });
+      }
+      
+      if (filtersToApply.deadlineType && filtersToApply.deadlineType !== 'all') {
+        params.append('deadline_type', filtersToApply.deadlineType);
+      }
+      
+      if (filtersToApply.dateRange[0]) {
+        params.append('date_created_start', filtersToApply.dateRange[0].toISOString().split('T')[0]);
+      }
+      
+      if (filtersToApply.dateRange[1]) {
+        params.append('date_created_end', filtersToApply.dateRange[1].toISOString().split('T')[0]);
+      }
+      
+      if (filtersToApply.deadlineDate[0]) {
+        params.append('deadline_date_start', filtersToApply.deadlineDate[0].toISOString().split('T')[0]);
+      }
+      
+      if (filtersToApply.deadlineDate[1]) {
+        params.append('deadline_date_end', filtersToApply.deadlineDate[1].toISOString().split('T')[0]);
+      }
+      
+      if (filtersToApply.acknowledgeNo) {
+        params.append('acknowledgement_no', filtersToApply.acknowledgeNo);
+      }
+      
+      if (filtersToApply.programName) {
+        params.append('program_name', filtersToApply.programName);
+      }
+      
+      if (filtersToApply.studentName) {
+        params.append('student_name', filtersToApply.studentName);
       }
 
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.send(formData);
-
-      await uploadPromise;
-      onUploadSuccess();
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert('Failed to upload document. Please try again.');
+      const url = `${BASE_URL}/student/applications?${params.toString()}`;
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data.success) {
+        setApplications(data.data || []);
+        if (data.pagination) {
+          setPagination(data.pagination);
+        }
+      } else {
+        throw new Error(data.message || 'Failed to fetch applications');
+      }
+    } catch (err) {
+      console.error('Error fetching applications:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch applications');
     } finally {
-      setUploading(prev => ({ ...prev, [documentId]: false }));
-      setUploadProgress(prev => ({ ...prev, [documentId]: 0 }));
+      setLoading(false);
+      setSearchLoading(false); // Also stop search loading when fetch completes
     }
   };
 
-  const handleFileChange = (documentId: number, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file type
-      const allowedTypes = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'];
-      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-      
-      if (!allowedTypes.includes(fileExtension)) {
-        alert('Please select a valid file type (PDF, JPG, PNG, DOC, DOCX)');
-        return;
-      }
-
-      // Validate file size (10MB max)
-      if (file.size > 10 * 1024 * 1024) {
-        alert('File size must be less than 10MB');
-        return;
-      }
-
-      handleFileUpload(documentId, file);
+  // Fetch applications from API on initial load and page change
+  useEffect(() => {
+    if (token) {
+      fetchApplications(activeFilters);
     }
+  }, [token, BASE_URL, pagination.page, pagination.limit, activeFilters]);
+
+  // Handle UI filter changes - this only updates the UI state, not the API
+  const handleFilterChange = (filterType: keyof FilterOptions, value: any) => {
+    setUiFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }));
+  };
+
+  // Handle search button click - apply filters to API
+  const handleSearch = async () => {
+    // Set search loading to true
+    setSearchLoading(true);
+    
+    // Set active filters from UI filters and reset to page 1
+    setActiveFilters(uiFilters);
+    setPagination(prev => ({ ...prev, page: 1 }));
+    
+    // The useEffect will trigger fetchApplications with the new activeFilters
+  };
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+  };
+
+  // Handle limit change
+  const handleLimitChange = (newLimit: number) => {
+    setPagination(prev => ({ ...prev, limit: newLimit, page: 1 }));
+  };
+
+  // Format date to readable string
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const handleSort = (field: keyof Application) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortIcon = (field: keyof Application) => {
+    if (sortField !== field) return "↕️";
+    return sortDirection === "asc" ? "↑" : "↓";
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'uploaded': return 'text-green-600';
-      case 'pending': return 'text-yellow-600';
-      case 'rejected': return 'text-red-600';
-      case 'requested': return 'text-blue-600';
-      default: return 'text-gray-600';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'uploaded': return 'Uploaded';
-      case 'pending': return 'Pending';
-      case 'rejected': return 'Rejected';
-      case 'requested': return 'Requested';
-      default: return 'Pending';
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Upload {documentType === 'common' ? 'Common' : 'Specific'} Documents
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="p-6">
-          <div className="mb-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {documentType === 'common' 
-                ? 'These documents are common across all your applications.'
-                : 'These documents are specific to this university application.'
-              }
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {documents.map((doc) => (
-              <div key={doc.id} className="mb-4">
-                <label className="doc-card w-full cursor-pointer">
-                  <div className="upload-area border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 hover:border-brand-300 dark:hover:border-brand-500 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="doc-title font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                          {doc.document_name}
-                          {doc.is_mandatory === 1 && (
-                            <span className="text-red-500 text-sm">*</span>
-                          )}
-                        </div>
-                        <div className={`doc-status text-sm mt-1 ${getStatusColor(doc.status)}`}>
-                          {getStatusText(doc.status)}
-                          {uploading[doc.id] && (
-                            <span className="ml-2">
-                              Uploading... {Math.round(uploadProgress[doc.id])}%
-                            </span>
-                          )}
-                        </div>
-                        {doc.remarks && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {doc.remarks}
-                          </p>
-                        )}
-                        {doc.file_url && (
-                          <a
-                            href={doc.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-brand-500 text-sm hover:underline mt-1 inline-block"
-                          >
-                            View uploaded file
-                          </a>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {uploading[doc.id] ? (
-                          <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <>
-                            <Upload className="text-gray-400" size={16} />
-                            <FileText className="text-gray-400" size={20} />
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <input
-                    className="hidden"
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                    type="file"
-                    onChange={(e) => handleFileChange(doc.id, e)}
-                    disabled={uploading[doc.id]}
-                  />
-                </label>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6 flex justify-end">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Icons component for the card
-const CardIcons = {
-  GraduationCap: () => (
-    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14v6l9-5M12 20l-9-5" />
-    </svg>
-  ),
-  MapMarker: () => (
-    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  ),
-  FileAlt: () => (
-    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-  ),
-  Calendar: () => (
-    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-  ),
-  Dollar: () => (
-    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-    </svg>
-  )
-};
-
-interface ApplicationCardProps {
-  application: Application;
-  showApplicationForm: (studentId : number) => void;
-
-  onContinue: (application: Application, documentType?: 'common' | 'specific') => void;
-}
-
-const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onContinue, showApplicationForm }) => {
-  const getStatusColor = (status: Application["status"]) => {
-    switch (status) {
-      case "Applied":
-        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300";
-      case "Received":
-        return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300";
-      case "Submitted to University":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
-      case "Documents Pending":
-        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
-      default:
-        return "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300";
-    }
-  };
-
-  const getDocumentStatus = () => {
-    const commonFormComplete = application.profile_status === 'complete';
-    const commonDocsComplete = application.common_documents?.status === 'complete';
-    const specificDocsComplete = application.specific_documents?.status === 'complete';
-
-    return {
-      commonForm: commonFormComplete ? 'completed' : 'pending',
-      commonDocs: commonDocsComplete ? 'completed' : 'pending',
-      specificDocs: specificDocsComplete ? 'completed' : 'pending'
-    };
-  };
-
-  const docStatus = getDocumentStatus();
-  const getStepStatus = (step: 'commonForm' | 'commonDocs' | 'specificDocs') => {
-    if (step === 'commonForm') {
-      return application.profile_status === 'complete' ? 'completed' : 'pending';
-    }
-    if (step === 'commonDocs') {
-      return application.common_documents?.status === 'complete' ? 'completed' : 'pending';
-    }
-    if (step === 'specificDocs') {
-      return application.specific_documents?.status === 'complete' ? 'completed' : 'pending';
-    }
-    return 'pending';
-  };
-
-  const getStepIcon = (status: 'completed' | 'pending') => {
-    return status === 'completed' ? '✓' : '✕';
-  };
-
-  const getStepColor = (status: 'completed' | 'pending') => {
-    return status === 'completed' ? 'bg-green-100 text-green-500' : 'bg-red-100 text-red-500';
-  };
-
-  const handleFormModal = (studentId : number) => {
-    showApplicationForm(studentId);
-  }
-
-  const isAllComplete = docStatus.commonForm === 'completed' && 
-                       docStatus.commonDocs === 'completed' && 
-                       docStatus.specificDocs === 'completed';
-
-  return (
-    <div className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
-      {/* Status Badge */}
-      <div className="flex justify-end">
-        <span className={`text-xs font-semibold px-3 py-1 rounded-full mb-2 ${getStatusColor(application.status)}`}>
-          {application.status}
-        </span>
-      </div>
-      
-      {/* Top Section */}
-      <div className="flex items-start justify-between">
-        {/* University Info */}
-        <div className="flex items-start gap-3">
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-md flex items-center justify-center text-white font-bold text-sm">
-            {application.university.split(' ').map(word => word[0]).join('')}
-          </div>
-          <div>
-            <h2 className="text-base font-semibold text-gray-800 dark:text-white leading-snug">
-              {application.course}
-            </h2>
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-              {application.university}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {application.country}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4 space-y-3">
-        {/* Degree */}
-        <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <CardIcons.GraduationCap />
-          <span>
-            <strong className="font-semibold text-gray-800 dark:text-white">Degree:</strong>{" "}
-            {application.degree}
-          </span>
-        </div>
-
-        {/* Location */}
-        <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <CardIcons.MapMarker />
-          <span>
-            <strong className="font-semibold text-gray-800 dark:text-white">Location:</strong>{" "}
-            {application.location}
-          </span>
-        </div>
-
-        {/* Duration */}
-        {application.duration && (
-          <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <CardIcons.Calendar />
-            <span>
-              <strong className="font-semibold text-gray-800 dark:text-white">Duration:</strong>{" "}
-              {application.duration}
-            </span>
-          </div>
-        )}
-
-        {/* Tuition Fee */}
-        {application.tuitionFee && (
-          <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <CardIcons.Dollar />
-            <span>
-              <strong className="font-semibold text-gray-800 dark:text-white">Tuition:</strong>{" "}
-              {application.currencyCode} {application.tuitionFee}
-            </span>
-          </div>
-        )}
-
-        {/* External Evaluation */}
-        <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <CardIcons.FileAlt />
-          <span>
-            <strong className="font-semibold text-gray-800 dark:text-white">
-              External Evaluation:
-            </strong>{" "}
-            {application.externalEvaluation}
-          </span>
-        </div>
-      </div>
-
-      {/* Entry Requirements */}
-      <div className="mt-5">
-        <h3 className="text-sm font-semibold text-gray-800 dark:text-white mb-2">
-          ENTRY REQUIREMENTS
-        </h3>
-        <div className="flex gap-2 flex-wrap">
-          {application.ielts && (
-            <span className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full font-semibold text-gray-700 dark:text-gray-300">
-              IELTS: <span className="text-gray-900 dark:text-white">{application.ielts}</span>
-            </span>
-          )}
-          {application.pte && (
-            <span className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full font-semibold text-gray-700 dark:text-gray-300">
-              PTE: <span className="text-gray-900 dark:text-white">{application.pte}</span>
-            </span>
-          )}
-          {application.duolingo && (
-            <span className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full font-semibold text-gray-700 dark:text-gray-300">
-              Duolingo: <span className="text-gray-900 dark:text-white">{application.duolingo}</span>
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Status Steps */}
-      <div className="mt-4">
-        <p className={`text-sm font-semibold mb-3 ${
-          isAllComplete ? 'text-green-500' : 'text-red-500'
-        }`}>
-          {isAllComplete ? 'All documents submitted' : 'Pending'}
-        </p>
-        <div className="flex justify-between items-center text-center">
-          <div className="flex flex-col items-center cursor-pointer" onClick={()=>handleFormModal(application.student_user_id || 0)}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${getStepColor(getStepStatus('commonForm'))}`}>
-              <span className="text-lg font-bold">{getStepIcon(getStepStatus('commonForm'))}</span>
-            </div>
-            <p className="text-xs dark:text-white">Common Form</p>
-          </div>
-          <div className="flex flex-col items-center">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${getStepColor(getStepStatus('commonDocs'))}`}>
-              <span className="text-lg font-bold">{getStepIcon(getStepStatus('commonDocs'))}</span>
-            </div>
-            <p className="text-xs dark:text-white">Common Docs</p>
-          </div>
-          <div className="flex flex-col items-center">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${getStepColor(getStepStatus('specificDocs'))}`}>
-              <span className="text-lg font-bold">{getStepIcon(getStepStatus('specificDocs'))}</span>
-            </div>
-            <p className="text-xs dark:text-white">Specific Docs</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Buttons */}
-     <div className="mt-6 flex gap-3">
-        <button className="flex-1 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600 text-white font-semibold py-2 rounded-lg text-sm transition-all">
-          LIVE CHAT
-        </button>
-        {isAllComplete ? null : <button 
-          onClick={() => onContinue(application)}
-          className="flex-1 border border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-400 dark:text-indigo-400 dark:hover:bg-indigo-900/30 font-semibold py-2 rounded-lg text-sm transition-all"
-        >
-          {'Continue'}
-        </button>}
-        
-      </div>
-
-      {/* Quick Action Buttons */}
-      <div className="mt-3 flex gap-2">
-        <button 
-          onClick={() => onContinue(application, 'common')}
-          className="flex-1 px-3 py-1 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800 rounded"
-        >
-          Upload Common Docs
-        </button>
-        <button 
-          onClick={() => onContinue(application, 'specific')}
-          className="flex-1 px-3 py-1 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800 rounded"
-        >
-          Upload Specific Docs
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
-
-export default function StudentApplicationsTable() {
-  const { token, logout } = useAuth();
-  const router = useRouter();
-  const [filterData, setFilterData] = useState<FilterApiResponse | null>(null);
-  const [applicationsData, setApplicationsData] = useState<ApplicationsApiResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingFilters, setLoadingFilters] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
-  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState<boolean>(false);
-  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
-  const [selectedDocumentType, setSelectedDocumentType] = useState<'common' | 'specific'>('specific');
-
-    const [showApplicationFormModal, setShowApplicationFormModal] = useState<boolean>(false);
-    const [activeStudentId, setActiveStudentId] = useState<number>(0);
-  
-  
-    const handleCloseModal = () => {
-    setShowApplicationFormModal(false);
-    setActiveStudentId(0);
-  };
-
-  // New filters state
-  const [filters, setFilters] = useState<FilterOptions>({
-    university: "all",
-    study_level_id: "all",
-    discipline: "all",
-    course: "all",
-    intake: "all",
-    year: "all",
-    applicationStatus: "all",
-  });
-
-  // Track modal filters separately
-  const [modalFilters, setModalFilters] = useState<FilterOptions>(filters);
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const observerRef = useRef<HTMLDivElement>(null);
-
-  // Build query string for dynamic filters API
-  const buildFilterQueryString = useCallback((filtersToBuild: FilterOptions) => {
-    const params = new URLSearchParams();
+    const statusLower = status.toLowerCase();
     
-    // Add all filters that are not "all"
-    Object.entries(filtersToBuild).forEach(([key, value]) => {
-      if (value !== "all" && value !== undefined && value !== null && value !== "") {
-        params.append(key, value.toString());
-      }
-    });
-    
-    return params.toString();
-  }, []);
-
-  // Fetch filter options from API 1 with current modal filters
-  const fetchFilters = useCallback(async (currentModalFilters?: FilterOptions) => {
-    try {
-      setLoadingFilters(true);
-      const filtersToUse = currentModalFilters || filters;
-      const queryString = buildFilterQueryString(filtersToUse);
-      const url = `${BASE_URL}/student/application/filters/dynamic${queryString ? `?${queryString}` : ''}`;
-      
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 403) {
-          logout();
-          return;
-        }
-        throw new Error('Failed to fetch filter options');
-      }
-
-      const data: FilterApiResponse = await response.json();
-      
-      if (data.success) {
-        setFilterData(data);
-      } else {
-        throw new Error('Failed to load filter options');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoadingFilters(false);
+    if (statusLower.includes('approved') || statusLower.includes('admitted') || statusLower.includes('complete') || statusLower.includes('arrived')) {
+      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
+    } else if (statusLower.includes('pending') || statusLower.includes('incomplete') || statusLower.includes('received') || statusLower.includes('submitted')) {
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+    } else if (statusLower.includes('denied') || statusLower.includes('rejected') || statusLower.includes('withdrawn')) {
+      return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+    } else if (statusLower.includes('applied') || statusLower.includes('documents')) {
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+    } else if (statusLower.includes('visa') || statusLower.includes('i20')) {
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
     }
-  }, [token, logout, buildFilterQueryString, filters]);
-
-  // Build query string for applications API
-  const buildApplicationsQueryString = useCallback((page: number = 1, filtersToBuild: FilterOptions) => {
-    const params = new URLSearchParams();
-    
-    // Add page parameter
-    params.append('page', page.toString());
-    params.append('limit', '10');
-    
-    // Add all filters that are not "all"
-    Object.entries(filtersToBuild).forEach(([key, value]) => {
-      if (value !== "all" && value !== undefined && value !== null && value !== "") {
-        params.append(key, value.toString());
-      }
-    });
-    
-    // Add search term
-    if (searchTerm) {
-      params.append('search', searchTerm);
-    }
-    
-    return params.toString();
-  }, [searchTerm]);
-
-  // Fetch applications from API 2
-  const fetchApplications = useCallback(async (page: number = 1, loadMore: boolean = false, filtersToUse?: FilterOptions) => {
-    try {
-      if (loadMore) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
-      }
-      
-      const filtersToApply = filtersToUse || filters;
-      const queryString = buildApplicationsQueryString(page, filtersToApply);
-      const url = `${BASE_URL}/student/applications${queryString ? `?${queryString}` : ''}`;
-      
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 403) {
-          logout();
-          return;
-        }
-        throw new Error('Failed to fetch applications');
-      }
-
-      const data: ApplicationsApiResponse = await response.json();
-      
-      if (data.success) {
-        if (loadMore && applicationsData) {
-          // Append new data for infinite scroll
-          setApplicationsData(prev => ({
-            ...data,
-            data: [...(prev?.data || []), ...data.data]
-          }));
-        } else {
-          // Replace data for initial load or filter change
-          setApplicationsData(data);
-        }
-        setCurrentPage(page);
-        setHasMore(data.pagination.hasNextPage);
-      } else {
-        throw new Error('Failed to load applications');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [token, logout, buildApplicationsQueryString, filters, applicationsData]);
-
-  // Initial fetch of filters and applications
-  useEffect(() => {
-    fetchFilters();
-    fetchApplications(1, false, filters);
-  }, []);
-
-  // Handle search with debounce
-  useEffect(() => {
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
-
-    const timeout = setTimeout(() => {
-      setCurrentPage(1);
-      fetchApplications(1, false, filters);
-    }, 500);
-
-    setSearchTimeout(timeout);
-
-    return () => {
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-    };
-  }, [searchTerm]);
-
-  // Handle modal filters change - refetch dynamic filters
-  const handleModalFiltersChange = useCallback((newModalFilters: FilterOptions) => {
-    setModalFilters(newModalFilters);
-    // Refetch filters with new modal filters
-    fetchFilters(newModalFilters);
-  }, [fetchFilters]);
-
-  // Handle filter apply from modal
-  const handleFilterApply = (newFilters: FilterOptions) => {
-    // Update the main filters
-    setFilters(newFilters);
-    setModalFilters(newFilters);
-    
-    // Reset pagination and fetch applications with new filters
-    setCurrentPage(1);
-    fetchApplications(1, false, newFilters);
-    
-    // Close modal
-    setIsFilterModalOpen(false);
+    return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
   };
 
-  // Reset modal filters when modal opens
-  const handleModalOpen = () => {
-    setModalFilters(filters);
-    setIsFilterModalOpen(true);
-  };
+  // Prepare filter options for Select components
+  const countryOptions = filterOptions?.countries?.map(country => ({
+    value: country.code || country.id,
+    label: country.name
+  })) || [];
 
-  // Intersection Observer for infinite scroll
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
-          fetchApplications(currentPage + 1, true, filters);
-        }
-      },
-      { threshold: 0.5 }
-    );
+  const universityOptions = filterOptions?.universities?.map(univ => ({
+    value: univ.id.toString(),
+    label: univ.name
+  })) || [];
 
-    if (observerRef.current) {
-      observer.observe(observerRef.current);
-    }
+  const intakeOptions = filterOptions?.intakes?.map(intake => ({
+    value: intake.id,
+    label: intake.intake_name
+  })) || [];
 
-    return () => {
-      if (observerRef.current) {
-        observer.unobserve(observerRef.current);
-      }
-    };
-  }, [hasMore, loading, loadingMore, currentPage, fetchApplications]);
+  const yearOptions = filterOptions?.intakeYears?.map(year => ({
+    value: year.id,
+    label: year.name
+  })) || [];
 
-  // Transform API data to match the Application interface
-  const tableData: Application[] = useMemo(() => {
-    if (!applicationsData?.data) return [];
+  const statusOptions = filterOptions?.applicationStatus?.map(status => ({
+    value: status.id.toString(),
+    label: status.status_label || status.name || 'Unknown'
+  })) || [];
 
-    return applicationsData.data.map((app) => {
-      // Format duration
-      const formatDuration = () => {
-        const { duration_min, duration_max, duration_unit } = app.application;
-        if (duration_min === duration_max) {
-          return `${duration_min} ${duration_unit}`;
-        }
-        return `${duration_min}-${duration_max} ${duration_unit}`;
-      };
+  const deadlineTypeOptions = filterOptions?.deadlineTypes?.map(type => ({
+    value: type.id.toString(),
+    label: type.name
+  })) || [];
 
-      // Format intake from intake_date or created_at
-      const formatIntake = () => {
-        if (app.application.intake_date) {
-          const date = new Date(app.application.intake_date);
-          const year = date.getFullYear();
-          const month = date.toLocaleString('default', { month: 'short' });
-          return `${month} ${year}`;
-        }
-        
-        // Fallback to created_at if no intake_date
-        const date = new Date(app.application.created_at);
-        const year = date.getFullYear();
-        const month = date.toLocaleString('default', { month: 'short' });
-        return `${month} ${year}`;
-      };
+  const studyLevelOptions = filterOptions?.studyLevels?.map(level => ({
+    value: level.id.toString(),
+    label: level.name
+  })) || [];
 
-      // Format location
-      const formatLocation = () => {
-        const { university_city, university_state, university_country } = app.application;
-        const locationParts = [];
-        if (university_city && university_city !== 'STF') locationParts.push(university_city);
-        if (university_state && university_state !== 'CA') locationParts.push(university_state);
-        if (university_country) locationParts.push(getCountryName(university_country));
-        return locationParts.join(', ') || 'Location not specified';
-      };
+  const disciplineOptions = filterOptions?.disciplines?.map(discipline => ({
+    value: discipline.id.toString(),
+    label: discipline.name
+  })) || [];
 
-      // Format external evaluation requirement
-      const getExternalEvaluation = () => {
-        // Based on course or discipline, you can add logic here
-        return "Required (WES)";
-      };
+  const courseOptions = filterOptions?.courses?.map(course => ({
+    value: course.id.toString(),
+    label: course.name
+  })) || [];
 
-      return {
-        id: app.application.id,
-        university: app.application.university_name,
-        course: app.application.course_name,
-        intake: formatIntake(),
-        status: app.application.status_label || "Applied",
-        country: getCountryName(app.application.university_country),
-        degree: app.application.study_level_name,
-        location: formatLocation(),
-        externalEvaluation: getExternalEvaluation(),
-        duration: formatDuration(),
-        tuitionFee: app.application.tuition_fee,
-        applicationFee: app.application.application_fee,
-        currencyCode: app.application.currency_code,
-        student_user_id: app.application.student_user_id,
-        profile_status: app.profile_status,
-        common_documents: {
-          list: app.common_documents.list.map(doc => ({
-            id: doc.id,
-            document_name: doc.document_name,
-            is_mandatory: doc.is_mandatory,
-            file_url: doc.file_url,
-            uploaded_at: doc.uploaded_at,
-            status: doc.status
-          })),
-          status: app.common_documents.status
-        },
-        specific_documents: {
-          list: app.specific_documents.list.map(doc => ({
-            id: doc.id,
-            document_name: doc.document_name,
-            is_mandatory: doc.is_mandatory,
-            file_url: doc.file_url,
-            uploaded_at: doc.uploaded_at,
-            status: doc.status,
-            remarks: doc.remarks
-          })),
-          status: app.specific_documents.status
-        },
-        // Language scores - you can fetch these from API if available
-        ielts: 6.5 + (app.application.id % 3 * 0.5),
-        pte: 60 + (app.application.id % 4 * 3),
-        duolingo: 110 + (app.application.id % 5 * 5)
-      };
-    });
-  }, [applicationsData]);
+  const studentOptions = filterOptions?.students?.map(student => ({
+    value: student.id.toString(),
+    label: student.name
+  })) || [];
 
-  // Handle continue button click
-  const handleContinue = (application: Application, documentType?: 'common' | 'specific') => {
-    if (application.profile_status === 'incomplete') {
-      // Redirect to application form
-      router.push(`/student/application-form`);
-    } else if (application.common_documents?.status === 'incomplete' && !documentType) {
-      // Open common documents modal if no specific type provided
-      setSelectedApplication(application);
-      setSelectedDocumentType('common');
-      setIsDocumentModalOpen(true);
-    } else if (application.specific_documents?.status === 'incomplete' && !documentType) {
-      // Open specific documents modal if no specific type provided
-      setSelectedApplication(application);
-      setSelectedDocumentType('specific');
-      setIsDocumentModalOpen(true);
-    } else if (documentType) {
-      // Open the specified document type modal
-      setSelectedApplication(application);
-      setSelectedDocumentType(documentType);
-      setIsDocumentModalOpen(true);
-    } else {
-      // All steps are complete - show view details
-      setSelectedApplication(application);
-      setSelectedDocumentType('specific');
-      setIsDocumentModalOpen(true);
-    }
-  };
-
-  // Handle upload success
-  const handleUploadSuccess = () => {
-    fetchApplications(currentPage, false, filters);
-  };
-
-  // Handle remove filter
-  const handleRemoveFilter = (key: keyof FilterOptions) => {
-    const newFilters = {
-      ...filters,
-      [key]: "all"
-    };
-    setFilters(newFilters);
-    setModalFilters(newFilters);
-    setCurrentPage(1);
-    fetchApplications(1, false, newFilters);
-  };
-
+  // Clear all filters
   const clearAllFilters = () => {
-    const resetFilters: FilterOptions = {
-      university: "all",
-      study_level_id: "all",
-      discipline: "all",
-      course: "all",
-      intake: "all",
-      year: "all",
-      applicationStatus: "all",
+    const emptyFilters: FilterOptions = {
+      dateRange: [null, null],
+      countries: [],
+      universities: [],
+      intakes: [],
+      years: [],
+      statuses: [],
+      acknowledgeNo: "",
+      programName: "",
+      studentName: "",
+      deadlineType: null,
+      deadlineDate: [null, null],
+      students: [],
+      studyLevels: [],
+      disciplines: [],
+      courses: [],
     };
-    setFilters(resetFilters);
-    setModalFilters(resetFilters);
-    setCurrentPage(1);
-    fetchApplications(1, false, resetFilters);
+    
+    setUiFilters(emptyFilters);
+    setActiveFilters(emptyFilters);
+    setSearchTerm("");
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
-  const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
-    return value !== "all" && value !== "" && value !== undefined && value !== null;
-  });
-
-  // Get filter display name
-  const getFilterDisplayName = (key: keyof FilterOptions, value: string | number) => {
-    if (!filterData?.data.filterOptions || value === "all") return '';
-    
-    const filterOptionGroup = filterData.data.filterOptions[key as keyof FilterApiResponse['data']['filterOptions']];
-    if (!filterOptionGroup) return '';
-    
-    const option = filterOptionGroup.find(opt => opt.id === value);
-    return option?.name || option?.email || '';
-  };
-
-  const showApplicationForm = (studentId: number) => {
-    setShowApplicationFormModal(true);
-    setActiveStudentId(studentId);
-  }
-
-  if (loading && !loadingMore) {
+  if (loading && !applications.length) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <svg className="animate-spin h-8 w-8 text-brand-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading applications...</p>
-        </div>
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <div className="text-red-500 text-lg mb-2">Error loading applications</div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{error}</p>
-        <button 
-          onClick={() => {
-            setError(null);
-            fetchFilters();
-            fetchApplications(1, false, filters);
-          }}
-          className="mt-4 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600"
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+        <div className="flex items-center">
+          <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h3 className="ml-2 text-sm font-medium text-red-800 dark:text-red-400">Error loading applications</h3>
+        </div>
+        <p className="mt-2 text-sm text-red-700 dark:text-red-300">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-3 text-sm text-red-800 dark:text-red-400 underline"
         >
-          Retry
+          Try again
         </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
-            My Applications
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Track and manage all your university applications
-          </p>
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="">
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">
+          Applications ({pagination.totalRecords})
+        </h2>
+        <span  className="d-block text-sm text-gray-800 dark:text-white/90">Manage your Students' Applications.</span>
         </div>
         
-        {/* Applications Summary */}
-        {applicationsData && (
-          <div className="flex gap-4 text-sm">
-            <div className="text-center">
-              <div className="text-lg font-semibold text-gray-800 dark:text-white">
-                {applicationsData.pagination?.totalRecords || 0}
-              </div>
-              <div className="text-gray-500 dark:text-gray-400">Total</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-green-600 dark:text-green-400">
-                {tableData.filter(app => app.status === "Applied").length}
-              </div>
-              <div className="text-gray-500 dark:text-gray-400">Applied</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-red-600 dark:text-red-400">
-                {tableData.filter(app => app.status === "Received").length}
-              </div>
-              <div className="text-gray-500 dark:text-gray-400">Received</div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Search and Filter Controls */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        {/* <div className="relative">
-          <input
-            type="text"
-            placeholder="Search applications..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:w-64 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/10"
-          />
-          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-            <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-        </div> */}
-
-        {/* Filter Button */}
         <div className="flex items-center gap-3">
-          {hasActiveFilters && (
-            <button
-              onClick={clearAllFilters}
-              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              Clear All
-            </button>
-          )}
           <button
-            onClick={handleModalOpen}
-            disabled={loadingFilters}
-            className="h-11 px-4 rounded-lg border border-gray-200 bg-transparent text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={clearAllFilters}
+            className="h-11 px-4 rounded-lg border-2 border-gray-300 dark:border-gray-700 bg-transparent text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
-            </svg>
-            Filter Applications
-            {hasActiveFilters && (
-              <span className="ml-1 bg-brand-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {Object.values(filters).filter(v => v !== "all" && v !== "" && v !== undefined && v !== null).length}
-              </span>
-            )}
+            Clear Filters
           </button>
+          <Link href="/partner/programs" className="shrink-0">
+            <button className="h-11 px-4 rounded-lg border-2 border-green-500 bg-transparent text-sm text-green-500 shadow-theme-xs hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create Application
+            </button>
+          </Link>
         </div>
       </div>
+      
+      <div className="space-y-6">
+       
 
-      {/* Active Filters Display */}
-      {hasActiveFilters && (
-        <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-          {Object.entries(filters).map(([key, value]) => {
-            if (value === "all" || value === "" || value === undefined || value === null) return null;
-            
-            const displayName = getFilterDisplayName(key as keyof FilterOptions, value);
-            if (!displayName) return null;
-            
-            return (
-              <Badge key={key} size="sm" color="primary">
-                {key.replace('_', ' ')}: {displayName}
-                <button 
-                  onClick={() => handleRemoveFilter(key as keyof FilterOptions)}
-                  className="ml-1 text-xs hover:text-red-500"
-                >
-                  ×
-                </button>
-              </Badge>
-            );
-          })}
-        </div>
-      )}
+        {/* Filters Section */}
+        <div className="MSL-Searchform p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+           
 
-      {/* Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tableData.length > 0 ? (
-          tableData.map((application) => (
-            <ApplicationCard 
-              key={application.id} 
-              application={application}
-              onContinue={handleContinue}
-              showApplicationForm={showApplicationForm}
-
-            />
-          ))
-        ) : (
-          <div className="col-span-full text-center py-12">
-            <div className="text-gray-500 dark:text-gray-400 text-lg mb-2">
-              No applications found.
+            {/* Country Multi-select */}
+            <div className="all-countries">
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Country
+                </label>
+                <Select
+                  isMulti
+                  options={countryOptions}
+                  value={countryOptions.filter(option => 
+                    uiFilters.countries.includes(option.value)
+                  )}
+                  onChange={(selectedOptions) => {
+                    handleFilterChange('countries', 
+                      selectedOptions ? selectedOptions.map(option => option.value) : []
+                    );
+                  }}
+                  placeholder="Select countries"
+                  className="rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      backgroundColor: 'rgb(255 255 255 / var(--tw-bg-opacity))',
+                      borderColor: 'rgb(209 213 219 / var(--tw-border-opacity))',
+                      minHeight: '42px',
+                    }),
+                  }}
+                />
+              </div>
             </div>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mb-2">
-              {hasActiveFilters ? 'Try adjusting your filters' : 'Start by applying to universities'}
-            </p>
-            <Link
-              href={'/student/universities'}
-              className="flex justify-center text-sm text-blue-400 dark:text-blue-500 mt-3"
-            >
-              <p>Browse Universities </p> <ArrowRight size={20} />
-            </Link>
+
+            {/* University Multi-select */}
+            <div className="SF-University all-countries">
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  University
+                </label>
+                <Select
+                  isMulti
+                  options={universityOptions}
+                  value={universityOptions.filter(option => 
+                    uiFilters.universities.includes(option.value)
+                  )}
+                  onChange={(selectedOptions) => {
+                    handleFilterChange('universities', 
+                      selectedOptions ? selectedOptions.map(option => option.value) : []
+                    );
+                  }}
+                  placeholder="Select universities"
+                  className="rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      backgroundColor: 'rgb(255 255 255 / var(--tw-bg-opacity))',
+                      borderColor: 'rgb(209 213 219 / var(--tw-border-opacity))',
+                      minHeight: '42px',
+                    }),
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Study Level Multi-select */}
+            <div className="SF-StudyLevel all-countries">
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Study Level
+                </label>
+                <Select
+                  isMulti
+                  options={studyLevelOptions}
+                  value={studyLevelOptions.filter(option => 
+                    uiFilters.studyLevels.includes(option.value)
+                  )}
+                  onChange={(selectedOptions) => {
+                    handleFilterChange('studyLevels', 
+                      selectedOptions ? selectedOptions.map(option => option.value) : []
+                    );
+                  }}
+                  placeholder="Select study levels"
+                  className="rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      backgroundColor: 'rgb(255 255 255 / var(--tw-bg-opacity))',
+                      borderColor: 'rgb(209 213 219 / var(--tw-border-opacity))',
+                      minHeight: '42px',
+                    }),
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Discipline Multi-select */}
+            <div className="SF-Discipline all-countries">
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Discipline
+                </label>
+                <Select
+                  isMulti
+                  options={disciplineOptions}
+                  value={disciplineOptions.filter(option => 
+                    uiFilters.disciplines.includes(option.value)
+                  )}
+                  onChange={(selectedOptions) => {
+                    handleFilterChange('disciplines', 
+                      selectedOptions ? selectedOptions.map(option => option.value) : []
+                    );
+                  }}
+                  placeholder="Select disciplines"
+                  className="rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      backgroundColor: 'rgb(255 255 255 / var(--tw-bg-opacity))',
+                      borderColor: 'rgb(209 213 219 / var(--tw-border-opacity))',
+                      minHeight: '42px',
+                    }),
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Course Multi-select */}
+            <div className="SF-Course all-countries">
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Course
+                </label>
+                <Select
+                  isMulti
+                  options={courseOptions}
+                  value={courseOptions.filter(option => 
+                    uiFilters.courses.includes(option.value)
+                  )}
+                  onChange={(selectedOptions) => {
+                    handleFilterChange('courses', 
+                      selectedOptions ? selectedOptions.map(option => option.value) : []
+                    );
+                  }}
+                  placeholder="Select courses"
+                  className="rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      backgroundColor: 'rgb(255 255 255 / var(--tw-bg-opacity))',
+                      borderColor: 'rgb(209 213 219 / var(--tw-border-opacity))',
+                      minHeight: '42px',
+                    }),
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Intake Multi-select */}
+            <div className="SF-Intake all-countries">
+              <div className="form-group calendar-two">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Intake
+                </label>
+                <Select
+                  isMulti
+                  options={intakeOptions}
+                  value={intakeOptions.filter(option => 
+                    uiFilters.intakes.includes(option.value)
+                  )}
+                  onChange={(selectedOptions) => {
+                    handleFilterChange('intakes', 
+                      selectedOptions ? selectedOptions.map(option => option.value) : []
+                    );
+                  }}
+                  placeholder="Select intakes"
+                  className="rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      backgroundColor: 'rgb(255 255 255 / var(--tw-bg-opacity))',
+                      borderColor: 'rgb(209 213 219 / var(--tw-border-opacity))',
+                      minHeight: '42px',
+                    }),
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Year Multi-select */}
+            <div className="SF-year all-countries">
+              <div className="form-group calendar-two">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Year
+                </label>
+                <Select
+                  isMulti
+                  options={yearOptions}
+                  value={yearOptions.filter(option => 
+                    uiFilters.years.includes(option.value)
+                  )}
+                  onChange={(selectedOptions) => {
+                    handleFilterChange('years', 
+                      selectedOptions ? selectedOptions.map(option => option.value) : []
+                    );
+                  }}
+                  placeholder="Select years"
+                  className="rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      backgroundColor: 'rgb(255 255 255 / var(--tw-bg-opacity))',
+                      borderColor: 'rgb(209 213 219 / var(--tw-border-opacity))',
+                      minHeight: '42px',
+                    }),
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Status Multi-select */}
+            <div className="SF-Status all-countries">
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Status
+                </label>
+                <Select
+                  isMulti
+                  options={statusOptions}
+                  value={statusOptions.filter(option => 
+                    uiFilters.statuses.includes(option.value)
+                  )}
+                  onChange={(selectedOptions) => {
+                    handleFilterChange('statuses', 
+                      selectedOptions ? selectedOptions.map(option => option.value) : []
+                    );
+                  }}
+                  placeholder="Select statuses"
+                  className="rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      backgroundColor: 'rgb(255 255 255 / var(--tw-bg-opacity))',
+                      borderColor: 'rgb(209 213 219 / var(--tw-border-opacity))',
+                      minHeight: '42px',
+                    }),
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Date Created */}
+            <div className="SF-DateApp">
+              <div className="form-group calendar-one">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Date Created
+                </label>
+                <DatePicker
+                  selected={uiFilters.dateRange[0]}
+                  onChange={(dates: [Date | null, Date | null]) => handleFilterChange('dateRange', dates)}
+                  startDate={uiFilters.dateRange[0]}
+                  endDate={uiFilters.dateRange[1]}
+                  selectsRange
+                  isClearable
+                  placeholderText="Select date range"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  dateFormat="dd-MM-yyyy"
+                />
+              </div>
+            </div>
+
+            {/* Acknowledgement No. */}
+            <div className="SF-Keyword">
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Acknowledgement No.
+                </label>
+                <input
+                  type="text"
+                  placeholder="Acknowledgement No."
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  value={uiFilters.acknowledgeNo}
+                  onChange={(e) => handleFilterChange('acknowledgeNo', e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Program Name */}
+            <div className="SF-Keyword">
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Program Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Program Name"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  value={uiFilters.programName}
+                  onChange={(e) => handleFilterChange('programName', e.target.value)}
+                />
+              </div>
+            </div>
+
+           
+
+            {/* Deadline Type */}
+            <div className="SF-Intake all-countries">
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Deadline Type
+                </label>
+                <Select
+                  options={deadlineTypeOptions}
+                  value={deadlineTypeOptions.find(option => option.value === uiFilters.deadlineType)}
+                  onChange={(selectedOption) => {
+                    handleFilterChange('deadlineType', selectedOption?.value || null);
+                  }}
+                  placeholder="Select deadline type"
+                  className="border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  classNamePrefix="react-select"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      backgroundColor: 'rgb(255 255 255 / var(--tw-bg-opacity))',
+                      borderColor: 'rgb(209 213 219 / var(--tw-border-opacity))',
+                      minHeight: '42px',
+                    }),
+                  }}
+                  isClearable
+                />
+              </div>
+            </div>
+
+            {/* Deadline Date */}
+            <div className="SF-DateApp">
+              <div className="form-group calendar-one">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Deadline Date
+                </label>
+                <DatePicker
+                  selected={uiFilters.deadlineDate[0]}
+                  onChange={(dates: [Date | null, Date | null]) => handleFilterChange('deadlineDate', dates)}
+                  startDate={uiFilters.deadlineDate[0]}
+                  endDate={uiFilters.deadlineDate[1]}
+                  selectsRange
+                  isClearable
+                  placeholderText="Select deadline date"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  dateFormat="dd-MM-yyyy"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Search Button */}
+          <div className="SF-Searchbtn mt-6">
+            <div className="form-group flex justify-end">
+              <button
+                type="button"
+                className={`px-6 py-2.5 rounded-lg transition-colors font-medium flex items-center justify-center min-w-[100px] ${
+                  searchLoading 
+                    ? 'bg-blue-400 cursor-not-allowed' 
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+                onClick={handleSearch}
+                disabled={searchLoading}
+              >
+                {searchLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Searching...
+                  </>
+                ) : (
+                  'Search'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Show table loading overlay when data is being fetched */}
+        {loading && (
+          <div className="relative">
+            <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10">
+              <div className="flex flex-col items-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Loading applications...</p>
+              </div>
+            </div>
           </div>
         )}
-      </div>
 
-      {/* Loading More Indicator */}
-      {loadingMore && (
-        <div className="text-center py-4">
-          <div className="inline-block">
-            <svg className="animate-spin h-5 w-5 text-brand-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Loading more applications...</p>
+        {/* Results Count */}
+        <div className="text-sm text-gray-500 dark:text-gray-400">
+          Showing {applications.length} of {pagination.totalRecords} applications
+        </div>
+
+        {/* Table */}
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+          <div className="max-w-full overflow-x-auto">
+            <div className="min-w-[1200px]">
+              <Table>
+                {/* Table Header */}
+                <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
+                  <TableRow>
+                    {[
+                      { key: "acknowledgement_no", label: "Acknowledge No." },
+                      { key: "date_created", label: "Date Created" },
+                      { key: "student_full_name", label: "Student Name" },
+                      { key: "university_name", label: "University Name" },
+                      { key: "course_name", label: "Program Name" },
+                      { key: "intake_name", label: "Intake" },
+                      { key: "study_level_name", label: "Study Level" },
+                      { key: "status_label", label: "Application Status" },
+                    ].map(({ key, label }) => (
+                      <TableCell
+                        key={key}
+                        isHeader
+                        className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                        onClick={() => handleSort(key as keyof Application)}
+                      >
+                        <div className="flex items-center gap-1">
+                          {label}
+                          <span className="text-xs">{getSortIcon(key as keyof Application)}</span>
+                        </div>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+
+                {/* Table Body */}
+                <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                  {applications.length > 0 ? (
+                    applications.map((application) => (
+                      <TableRow key={application.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <TableCell className="px-5 py-4 text-gray-700 text-theme-sm dark:text-gray-300 font-medium">
+                          <Link href={`/partner/editProfile/${application.student_user_id}?tab=applications&app=${application.id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                            {application.acknowledgement_no}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-gray-700 text-theme-sm dark:text-gray-300">
+                          {formatDate(application.date_created)}
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-gray-700 text-theme-sm dark:text-gray-300 font-medium">
+                          <Link href={`/partner/editProfile/${application.student_user_id}`}>
+                            {application.student_full_name || 'N/A'}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-gray-700 text-theme-sm dark:text-gray-300">
+                          {application.university_name}
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-gray-700 text-theme-sm dark:text-gray-300">
+                          {application.course_name}
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-gray-700 text-theme-sm dark:text-gray-300">
+                          {application.intake_name || 'N/A'}
+                        </TableCell>
+                        <TableCell className="px-5 py-4 text-gray-700 text-theme-sm dark:text-gray-300">
+                          {application.study_level_name}
+                        </TableCell>
+                        <TableCell className="px-5 py-4">
+                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(application.status_label)}`}>
+                            {application.status_label}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                       
+                        className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400"
+                      >
+                        No applications found matching your criteria.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Intersection Observer Target */}
-      {hasMore && !loadingMore && tableData.length > 0 && (
-        <div ref={observerRef} className="h-10"></div>
-      )}
-
-      {/* Results Count */}
-      {tableData.length > 0 && (
-        <div className="text-sm text-gray-500 dark:text-gray-400">
-          Showing {tableData.length} of {applicationsData?.pagination?.totalRecords || 0} applications
-          {applicationsData?.pagination && (
-            <span className="ml-2">
-              (Page {applicationsData.pagination.page} of {applicationsData.pagination.totalPages})
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Filter Modal */}
-      <FilterModal
-        isOpen={isFilterModalOpen}
-        onClose={() => setIsFilterModalOpen(false)}
-        onFilterApply={handleFilterApply}
-        filterOptions={filterData?.data.filterOptions || null}
-        appliedFilters={modalFilters}
-        onFiltersChange={handleModalFiltersChange}
-      />
-
-      {/* Document Upload Modal */}
-      {selectedApplication && (
-        <DocumentUploadModal
-          isOpen={isDocumentModalOpen}
-          onClose={() => {
-            setIsDocumentModalOpen(false);
-            setSelectedApplication(null);
-          }}
-          applicationId={selectedApplication.id}
-          documents={
-            // Get fresh data from updated applications
-            selectedDocumentType === 'common' 
-              ? tableData.find(app => app.id === selectedApplication.id)?.common_documents?.list || []
-              : tableData.find(app => app.id === selectedApplication.id)?.specific_documents?.list || []
-          }
-          documentType={selectedDocumentType}
-          onUploadSuccess={handleUploadSuccess}
-        />
-      )}
-
-      {showApplicationFormModal && (
-                <ApplicationFormModal
-                  studentId={String(activeStudentId)}
-                  isOpen={showApplicationFormModal}
-                  onClose={handleCloseModal}
-                  onSuccess={()=>{}}
-                />
+        {/* Pagination */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Showing {(pagination.page - 1) * pagination.limit + 1} to {Math.min(pagination.page * pagination.limit, pagination.totalRecords)} of {pagination.totalRecords} applications
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {/* Items per page selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500 dark:text-gray-400">Show:</span>
+              <select
+                value={pagination.limit}
+                onChange={(e) => handleLimitChange(Number(e.target.value))}
+                className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm"
+              >
+                {[10, 20, 50, 100].map(limit => (
+                  <option key={limit} value={limit}>{limit}</option>
+                ))}
+              </select>
+              <span className="text-sm text-gray-500 dark:text-gray-400">per page</span>
+            </div>
+            
+            {/* Pagination buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={!pagination.hasPrevPage}
+                className={`px-3 py-1.5 rounded-lg border text-sm ${
+                  pagination.hasPrevPage
+                    ? 'border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    : 'border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                }`}
+              >
+                Previous
+              </button>
+              
+              {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                let pageNum;
+                if (pagination.totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (pagination.page <= 3) {
+                  pageNum = i + 1;
+                } else if (pagination.page >= pagination.totalPages - 2) {
+                  pageNum = pagination.totalPages - 4 + i;
+                } else {
+                  pageNum = pagination.page - 2 + i;
+                }
+                
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => handlePageChange(pageNum)}
+                    className={`px-3 py-1.5 rounded-lg text-sm ${
+                      pagination.page === pageNum
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              
+              {pagination.totalPages > 5 && pagination.page < pagination.totalPages - 2 && (
+                <>
+                  <span className="px-2 text-gray-500 dark:text-gray-400">...</span>
+                  <button
+                    onClick={() => handlePageChange(pagination.totalPages)}
+                    className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm"
+                  >
+                    {pagination.totalPages}
+                  </button>
+                </>
               )}
-    </div>
+              
+              <button
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={!pagination.hasNextPage}
+                className={`px-3 py-1.5 rounded-lg border text-sm ${
+                  pagination.hasNextPage
+                    ? 'border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    : 'border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                }`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

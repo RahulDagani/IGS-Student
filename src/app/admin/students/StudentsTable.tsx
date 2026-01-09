@@ -153,6 +153,10 @@ const fetchStudents = async () => {
     }
   }, [token, currentPage, limit]);
 
+  useEffect(()=>{
+    fetchStudents();
+  },[])
+
 
   // Reset to first page when filters change
   useEffect(() => {

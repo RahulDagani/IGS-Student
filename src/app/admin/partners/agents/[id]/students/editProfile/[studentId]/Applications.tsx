@@ -612,6 +612,7 @@ const AssignUserModal: React.FC<AssignUserModalProps> = ({
                   ))}
               </select>
             )}
+            
           </div>
 
           {selectedUserId !== currentAssignedTo && selectedUserId !== null && (

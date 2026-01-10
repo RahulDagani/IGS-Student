@@ -352,15 +352,8 @@ const updateCredentials = async () => {
   const loadMessages = async (applicationId: number) => {
     try {
       setIsLoadingMessages(true);
-      
-      let endpoint = '';
-      if (commentTab === 'Igs') {
-        endpoint = `${BASE_URL}/student/application/comments/${applicationId}?who_has_created=tenant`;
-      } else if (commentTab === 'student') {
-        endpoint = `${BASE_URL}/student/application/comments/${applicationId}?who_has_created=student`;
-      }
 
-      const response = await fetch(endpoint, {
+      const response = await fetch(`${BASE_URL}/student/application/comments/${applicationId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

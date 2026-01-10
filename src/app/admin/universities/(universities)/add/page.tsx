@@ -3,7 +3,22 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Country, State, City } from "country-state-city";
-import { Globe, MapPin, Mail, FileText, Video, Link, Building2, BookOpen, Users, Plus, X } from "lucide-react";
+import { 
+  Globe, 
+  MapPin, 
+  Mail, 
+  FileText, 
+  Video, 
+  Link, 
+  Building2, 
+  BookOpen, 
+  Users, 
+  Plus, 
+  X, 
+  Calendar  // Added Calendar icon
+} from "lucide-react";
+import DatePicker from "react-datepicker"; // Import DatePicker
+import "react-datepicker/dist/react-datepicker.css"; // Import DatePicker styles
 
 interface UniversityFormData {
   // Basic Info
@@ -30,6 +45,8 @@ interface UniversityFormData {
   // Additional Info
   video_link: string;
   tuition_url: string;
+  agreement_start_date: string; // Added field
+  agreement_end_date: string;   // Added field
 }
 
 interface Option {
@@ -81,6 +98,8 @@ export default function AddUniversity() {
     // Additional Info
     video_link: "",
     tuition_url: "",
+    agreement_start_date: "", // Added field
+    agreement_end_date: "",   // Added field
   });
 
   const [preview, setPreview] = useState({
@@ -166,6 +185,22 @@ export default function AddUniversity() {
       setFormData(prev => ({
         ...prev,
         city_code: ""
+      }));
+    }
+  };
+
+  // Handle date change function
+  const handleDateChange = (date: Date | null, field: 'agreement_start_date' | 'agreement_end_date') => {
+    if (date) {
+      const formattedDate = date.toISOString().split('T')[0];
+      setFormData(prev => ({
+        ...prev,
+        [field]: formattedDate
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [field]: ""
       }));
     }
   };
@@ -256,6 +291,10 @@ export default function AddUniversity() {
       formDataToSend.append('website_url', formData.website_url);
       formDataToSend.append('video_link', formData.video_link);
       formDataToSend.append('tuition_url', formData.tuition_url);
+      
+      // Append new date fields
+      formDataToSend.append('agreement_start_date', formData.agreement_start_date);
+      formDataToSend.append('agreement_end_date', formData.agreement_end_date);
 
       // Append files
       if (formData.logo) {
@@ -309,6 +348,7 @@ export default function AddUniversity() {
   ];
 
   const renderBasicInfoTab = () => (
+    // ... (keep existing basic info tab code unchanged)
     <div className="space-y-5">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* University Name */}
@@ -491,6 +531,7 @@ export default function AddUniversity() {
   );
 
   const renderContactTab = () => (
+    // ... (keep existing contact tab code unchanged)
     <div className="space-y-5">
       {/* Email */}
       <div>
@@ -581,6 +622,7 @@ export default function AddUniversity() {
   );
 
   const renderMediaTab = () => (
+    // ... (keep existing media tab code unchanged)
     <div className="space-y-5">
       {/* Logo Upload */}
       <div>
@@ -736,6 +778,7 @@ export default function AddUniversity() {
 
   const renderAdditionalTab = () => (
     <div className="space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
       {/* Video Link */}
       <div>
         <label htmlFor="video_link" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
@@ -777,6 +820,54 @@ export default function AddUniversity() {
           />
         </div>
       </div>
+
+      {/* Agreement Start Date */}
+      <div>
+        <label htmlFor="agreement_start_date" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+          Agreement Start Date
+        </label>
+        <div className="relative">
+          <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400 z-10">
+            <Calendar size={18} />
+          </span>
+          <DatePicker
+            id="agreement_start_date"
+            selected={formData.agreement_start_date ? new Date(formData.agreement_start_date) : null}
+            onChange={(date: Date | null) => handleDateChange(date, 'agreement_start_date')}
+            dateFormat="yyyy-MM-dd"
+            placeholderText="Select agreement start date"
+            showYearDropdown
+            showMonthDropdown
+            dropdownMode="select"
+            className="w-100 dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+          />
+        </div>
+      </div>
+
+      {/* Agreement End Date */}
+      <div>
+        <label htmlFor="agreement_end_date" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+          Agreement End Date
+        </label>
+        <div className="relative">
+          <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400 z-10">
+            <Calendar size={18} />
+          </span>
+          <DatePicker
+            id="agreement_end_date"
+            selected={formData.agreement_end_date ? new Date(formData.agreement_end_date) : null}
+            onChange={(date: Date | null) => handleDateChange(date, 'agreement_end_date')}
+            dateFormat="yyyy-MM-dd"
+            placeholderText="Select agreement end date"
+            minDate={formData.agreement_start_date ? new Date(formData.agreement_start_date) : undefined}
+            showYearDropdown
+            showMonthDropdown
+            dropdownMode="select"
+            className="w-100 dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+          />
+        </div>
+      </div>
+    </div>
     </div>
   );
 

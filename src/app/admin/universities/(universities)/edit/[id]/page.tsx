@@ -1,10 +1,25 @@
 "use client"
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Globe, MapPin, Mail, FileText, Video, Link as LinkIcon, Building2, BookOpen, Users, ArrowBigRightDash, X } from "lucide-react";
+import { 
+  Globe, 
+  MapPin, 
+  Mail, 
+  FileText, 
+  Video, 
+  Link as LinkIcon, 
+  Building2, 
+  BookOpen, 
+  Users, 
+  ArrowBigRightDash, 
+  X, 
+  Calendar  // Added Calendar icon
+} from "lucide-react";
 import { Country, State, City } from "country-state-city";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
+import DatePicker from "react-datepicker"; // Import DatePicker
+import "react-datepicker/dist/react-datepicker.css"; // Import DatePicker styles
 
 interface UniversityFormData {
   // Basic Info
@@ -31,6 +46,8 @@ interface UniversityFormData {
   kind_of_partner_id: number | null;
   collaboration_type_id: number | null;
   type_of_university_id: number | null;
+  agreement_start_date: string | null; // Added field
+  agreement_end_date: string | null;   // Added field
 }
 
 interface PartnerType {
@@ -80,6 +97,8 @@ interface UniversityData {
     video_link: string | null;
     tuition_url: string | null;
     email: string | null;
+    agreement_start_date: string | null; // Added field
+    agreement_end_date: string | null;   // Added field
     is_deleted: number;
     created_at: string;
     updated_at: string;
@@ -147,6 +166,8 @@ export default function EditUniversity() {
     kind_of_partner_id: null,
     collaboration_type_id: null,
     type_of_university_id: null,
+    agreement_start_date: null, // Added field
+    agreement_end_date: null,   // Added field
   });
 
   const [preview, setPreview] = useState({
@@ -211,6 +232,8 @@ export default function EditUniversity() {
           kind_of_partner_id: data.university.kind_of_partner_id,
           collaboration_type_id: data.university.collaboration_type_id,
           type_of_university_id: data.university.type_of_university_id,
+          agreement_start_date: data.university.agreement_start_date, // Added field
+          agreement_end_date: data.university.agreement_end_date,     // Added field
         });
         
         // Set current URLs for preview
@@ -220,7 +243,6 @@ export default function EditUniversity() {
           currentImage: data.university.image_url || "",
           currentBrochure: data.university.brochure_url || "",
         }));
-        console.log(data.university.logo)
         
         setOptions(data.options);
         setSelectedCountry(data.university.country_code);
@@ -308,6 +330,22 @@ export default function EditUniversity() {
     }
   };
 
+  // Handle date change for agreement dates
+  const handleDateChange = (date: Date | null, field: 'agreement_start_date' | 'agreement_end_date') => {
+    if (date) {
+      const formattedDate = date.toISOString().split('T')[0];
+      setFormData(prev => ({
+        ...prev,
+        [field]: formattedDate
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [field]: null
+      }));
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'logo' | 'image' | 'brochure') => {
     const file = e.target.files?.[0];
     if (file) {
@@ -334,8 +372,6 @@ export default function EditUniversity() {
       }
     }
   };
-
-  console.log(preview)
 
   const removeFile = (field: 'logo' | 'image' | 'brochure') => {
     setFormData(prev => ({
@@ -386,6 +422,10 @@ export default function EditUniversity() {
       if (formData.kind_of_partner_id !== null) formDataToSend.append('kind_of_partner_id', formData.kind_of_partner_id.toString());
       if (formData.collaboration_type_id !== null) formDataToSend.append('collaboration_type_id', formData.collaboration_type_id.toString());
       if (formData.type_of_university_id !== null) formDataToSend.append('type_of_university_id', formData.type_of_university_id.toString());
+      
+      // Append agreement dates
+      if (formData.agreement_start_date) formDataToSend.append('agreement_start_date', formData.agreement_start_date);
+      if (formData.agreement_end_date) formDataToSend.append('agreement_end_date', formData.agreement_end_date);
 
       // Append files if they are File objects
       if (formData.logo && typeof formData.logo !== 'string') {
@@ -445,6 +485,7 @@ export default function EditUniversity() {
 
   const renderBasicInfoTab = () => (
     <div className="space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
       {/* University Name */}
       <div>
         <label htmlFor="university" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
@@ -467,24 +508,9 @@ export default function EditUniversity() {
         </div>
       </div>
 
-      {/* Description */}
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-          Description *
-        </label>
-        <textarea
-          id="description"
-          name="description"
-          value={formData.description}
-          onChange={handleInputChange}
-          placeholder="Enter university description"
-          rows={4}
-          required
-          className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 resize-none"
-        />
-      </div>
+      
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+     
         {/* Country */}
         <div>
           <label htmlFor="country_code" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
@@ -549,7 +575,7 @@ export default function EditUniversity() {
             ))}
           </select>
         </div>
-      </div>
+      
 
       {/* University Type */}
       <div>
@@ -570,6 +596,71 @@ export default function EditUniversity() {
           ))}
         </select>
       </div>
+
+      {/* Partner Type */}
+      <div>
+        <label htmlFor="kind_of_partner_id" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+          Kind of Partners
+        </label>
+        <div className="relative">
+          <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+            <Users size={18} />
+          </span>
+          <select
+            id="kind_of_partner_id"
+            name="kind_of_partner_id"
+            value={formData.kind_of_partner_id || ""}
+            onChange={handleInputChange}
+            className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 appearance-none"
+          >
+            <option value="">Select Partner Type</option>
+            {options.partnerTypes.map(type => (
+              <option key={type.id} value={type.id}>{type.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Collaboration Type */}
+      <div>
+        <label htmlFor="collaboration_type_id" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+          Collaboration Type
+        </label>
+        <select
+          id="collaboration_type_id"
+          name="collaboration_type_id"
+          value={formData.collaboration_type_id || ""}
+          onChange={handleInputChange}
+          className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 appearance-none"
+        >
+          <option value="">Select Collaboration Type</option>
+          {options.collaborationTypes.map(type => (
+            <option key={type.id} value={type.id}>{type.name}</option>
+          ))}
+        </select>
+      </div>
+     
+
+      </div>
+
+       {/* Description */}
+      <div>
+        <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+          Description *
+        </label>
+        <textarea
+          id="description"
+          name="description"
+          value={formData.description}
+          onChange={handleInputChange}
+          placeholder="Enter university description"
+          rows={4}
+          required
+          className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 resize-none"
+        />
+      </div>
+
+      
     </div>
   );
 
@@ -658,8 +749,6 @@ export default function EditUniversity() {
           />
         </div>
       </div>
-
-      
     </div>
   );
 
@@ -677,16 +766,12 @@ export default function EditUniversity() {
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Current Logo:</p>
               <div className="flex items-center gap-3">
                 <div className="relative w-24 h-24 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
-               
                   <img 
                     src={preview.currentLogo} 
                     alt="Current logo" 
                     className="w-full h-full object-contain p-2"
                   />
                 </div>
-                {/* <p className="text-sm text-green-600 dark:text-green-400 break-all flex-1">
-                  {preview.currentLogo}
-                </p> */}
               </div>
             </div>
           )}
@@ -755,9 +840,6 @@ export default function EditUniversity() {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                {/* <p className="text-sm text-green-600 dark:text-green-400 break-all flex-1">
-                  {preview.currentImage}
-                </p> */}
               </div>
             </div>
           )}
@@ -819,7 +901,6 @@ export default function EditUniversity() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Current Brochure:</p>
               <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                
                 <Link href={preview.currentBrochure} className="text-sm text-green-600 dark:text-green-400 break-all"> view current brochure </Link>
               </div>
             </div>
@@ -876,6 +957,7 @@ export default function EditUniversity() {
 
   const renderAdditionalTab = () => (
     <div className="space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
       {/* Video Link */}
       <div>
         <label htmlFor="video_link" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
@@ -918,48 +1000,55 @@ export default function EditUniversity() {
         </div>
       </div>
 
-      {/* Partner Type */}
+      {/* Agreement Start Date */}
       <div>
-        <label htmlFor="kind_of_partner_id" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-          Kind of Partners
+        <label htmlFor="agreement_start_date" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+          Agreement Start Date
         </label>
         <div className="relative">
-          <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
-            <Users size={18} />
+          <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400 z-10">
+            <Calendar size={18} />
           </span>
-          <select
-            id="kind_of_partner_id"
-            name="kind_of_partner_id"
-            value={formData.kind_of_partner_id || ""}
-            onChange={handleInputChange}
-            className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 appearance-none"
-          >
-            <option value="">Select Partner Type</option>
-            {options.partnerTypes.map(type => (
-              <option key={type.id} value={type.id}>{type.name}</option>
-            ))}
-          </select>
+          <DatePicker
+            id="agreement_start_date"
+            selected={formData.agreement_start_date ? new Date(formData.agreement_start_date) : null}
+            onChange={(date: Date | null) => handleDateChange(date, 'agreement_start_date')}
+            dateFormat="yyyy-MM-dd"
+            placeholderText="Select agreement start date"
+            showYearDropdown
+            showMonthDropdown
+            dropdownMode="select"
+            className="w-100 dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+          />
         </div>
       </div>
 
-      {/* Collaboration Type */}
+      {/* Agreement End Date */}
       <div>
-        <label htmlFor="collaboration_type_id" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-          Collaboration Type
+        <label htmlFor="agreement_end_date" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+          Agreement End Date
         </label>
-        <select
-          id="collaboration_type_id"
-          name="collaboration_type_id"
-          value={formData.collaboration_type_id || ""}
-          onChange={handleInputChange}
-          className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 appearance-none"
-        >
-          <option value="">Select Collaboration Type</option>
-          {options.collaborationTypes.map(type => (
-            <option key={type.id} value={type.id}>{type.name}</option>
-          ))}
-        </select>
+        <div className="relative">
+          <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400 z-10">
+            <Calendar size={18} />
+          </span>
+          <DatePicker
+            id="agreement_end_date"
+            selected={formData.agreement_end_date ? new Date(formData.agreement_end_date) : null}
+            onChange={(date: Date | null) => handleDateChange(date, 'agreement_end_date')}
+            dateFormat="yyyy-MM-dd"
+            placeholderText="Select agreement end date"
+            minDate={formData.agreement_start_date ? new Date(formData.agreement_start_date) : undefined}
+            showYearDropdown
+            showMonthDropdown
+            dropdownMode="select"
+            className="w-100 dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+          />
+        </div>
       </div>
+      
+      </div>
+      
     </div>
   );
 
@@ -1026,7 +1115,6 @@ export default function EditUniversity() {
           {/* Navigation and Submit Buttons */}
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex gap-3">
-              
               <button
                 type="button"
                 onClick={() => router.back()}
@@ -1037,7 +1125,6 @@ export default function EditUniversity() {
             </div>
 
             <div className="flex gap-3">
-
               {activeTab !== "basic" && (
                 <button
                   type="button"
@@ -1071,28 +1158,26 @@ export default function EditUniversity() {
               )}
 
               {activeTab === "additional" && (
-              
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed sm:w-auto"
-              >
-                {isSubmitting ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Updating University...
-                  </>
-                ) : (
-                  <>
-                    Update University
-                    <ArrowBigRightDash size={18} />
-                  </>
-                )}
-              </button>
-
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed sm:w-auto"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Updating University...
+                    </>
+                  ) : (
+                    <>
+                      Update University
+                      <ArrowBigRightDash size={18} />
+                    </>
+                  )}
+                </button>
               )}
             </div>
           </div>

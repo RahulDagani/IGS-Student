@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Globe, GraduationCap, Pencil, Percent, University } from "lucide-react";
+import { Globe, GraduationCap, Pencil, Percent, University, Calendar } from "lucide-react";
 import { Country } from "country-state-city";
 import { useAuth } from "@/context/AuthContext";
 
@@ -11,6 +11,7 @@ interface CommissionFormData {
   study_level_id: string;
   agent_commission: string;
   commission_type: string;
+  total_installments: string; // Added this field
   remark: string;
 }
 
@@ -81,6 +82,7 @@ export default function AddCommission() {
     study_level_id: "",
     agent_commission: "",
     commission_type: "percentage",
+    total_installments: "1", // Default to 1 installment
     remark: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,8 +91,8 @@ export default function AddCommission() {
   const [studyLevels, setStudyLevels] = useState<StudyLevel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-    const {token} = useAuth();
-        const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+  const {token} = useAuth();
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
   
 
@@ -99,9 +101,6 @@ export default function AddCommission() {
     const fetchInitialData = async () => {
       try {
         setIsLoading(true);
-        
-        // In a real application, you would fetch these from your APIs
-        // For now, using mock data that matches your API structure
         
         const allCountries = Country.getAllCountries();
         const countries: Country[] = allCountries.map(country => ({
@@ -140,8 +139,7 @@ export default function AddCommission() {
       const resultStudylevels = await responseStudylevels.json();
 
 
-        // Mock study levels data
-        const studylevels: StudyLevel[] = resultStudylevels.data
+        const studylevels: StudyLevel[] = resultStudylevels.data;
 
         setCountries(countries);
         setUniversities(universities);
@@ -160,14 +158,24 @@ export default function AddCommission() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Only allow numbers for total_installments, but let user clear the field
+    if (name === "total_installments") {
+      // Allow only numbers or empty string
+      const numericValue = value.replace(/\D/g, '');
+      setFormData(prev => ({
+        ...prev,
+        [name]: numericValue
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleCommissionTypeChange = (value: string) => {
-    // Extract numeric value from commission input
     const numericValue = formData.agent_commission.replace(/[^0-9.]/g, '');
     setFormData(prev => ({
       ...prev,
@@ -177,7 +185,6 @@ export default function AddCommission() {
   };
 
   const handleCommissionValueChange = (value: string) => {
-    // Remove any existing percentage or dollar signs
     const cleanValue = value.replace(/[%$]/g, '');
     
     setFormData(prev => ({
@@ -209,6 +216,18 @@ export default function AddCommission() {
         return;
       }
 
+      // Validate total_installments - now done before submit
+      if (!formData.total_installments.trim()) {
+        setError("Total installments is required");
+        return;
+      }
+
+      const totalInstallments = parseInt(formData.total_installments);
+      if (isNaN(totalInstallments) || totalInstallments < 1) {
+        setError("Total installments must be a positive number (1 or greater)");
+        return;
+      }
+
       // Prepare data for API
       const apiData = {
         country_code: formData.country_code,
@@ -216,6 +235,7 @@ export default function AddCommission() {
         study_level_id: parseInt(formData.study_level_id),
         agent_commission: parseFloat(formData.agent_commission),
         commission_type: formData.commission_type,
+        no_of_installments: totalInstallments, // Added this field
         remark: formData.remark || "Standard commission"
       };
 
@@ -224,7 +244,6 @@ export default function AddCommission() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // Add authorization header if needed
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(apiData)
@@ -436,6 +455,31 @@ export default function AddCommission() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Total Installments Field */}
+            <div className="w-full px-2.5">
+              <label htmlFor="total_installments" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
+                Total Installments
+              </label>
+              <div className="relative">
+                <span className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                  <Calendar size={18} />
+                </span>
+                <input
+                  type="text"
+                  id="total_installments"
+                  name="total_installments"
+                  value={formData.total_installments}
+                  onChange={handleChange}
+                  placeholder="e.g., 1, 2, 3, etc."
+                  required
+                  className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Number of installments for commission payment (e.g., 1 for one-time payment, 2 for two installments, etc.)
+              </p>
             </div>
 
             {/* Remark Field */}

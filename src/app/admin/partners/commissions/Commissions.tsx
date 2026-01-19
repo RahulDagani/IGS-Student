@@ -25,6 +25,7 @@ interface Commission {
   updated_at: string;
   university_name: string;
   study_level_name: string;
+  no_of_installments: string;
 }
 
 interface ApiResponse {
@@ -32,51 +33,6 @@ interface ApiResponse {
   data: Commission[];
 }
 
-// Define the table data using the interface
-const tableData: Commission[] = [
-  {
-    id: 1,
-    tenant_id: 1,
-    country_code: "US",
-    university_id: 5,
-    study_level_id: 2,
-    agent_commission: "15.00",
-    commission_type: "percentage",
-    remark: "Adding 15% commission",
-    created_at: "2025-11-19T12:22:07.000Z",
-    updated_at: "2025-11-19T12:22:07.000Z",
-    university_name: "Harvard",
-    study_level_name: "Master"
-  },
-  {
-    id: 2,
-    tenant_id: 1,
-    country_code: "UK",
-    university_id: 6,
-    study_level_id: 1,
-    agent_commission: "12.00",
-    commission_type: "percentage",
-    remark: "Standard UK commission",
-    created_at: "2025-11-19T12:22:07.000Z",
-    updated_at: "2025-11-19T12:22:07.000Z",
-    university_name: "Oxford University",
-    study_level_name: "Bachelor"
-  },
-  {
-    id: 3,
-    tenant_id: 1,
-    country_code: "CA",
-    university_id: 7,
-    study_level_id: 3,
-    agent_commission: "500.00",
-    commission_type: "fixed",
-    remark: "Fixed amount for PhD",
-    created_at: "2025-11-19T12:22:07.000Z",
-    updated_at: "2025-11-19T12:22:07.000Z",
-    university_name: "University of Toronto",
-    study_level_name: "PhD"
-  }
-];
 
 type SortField = keyof Commission | "";
 type SortDirection = "asc" | "desc";
@@ -584,6 +540,7 @@ export default function CommissionsTable() {
                     { key: "study_level_name", label: "Study Level" },
                     { key: "commission_type", label: "Type" },
                     { key: "agent_commission", label: "Agent Commission" },
+                    { key: "no_of_installments", label: "No of Installment" },
                     { key: "remark", label: "Remark" },
                     { key: "created_at", label: "Created" },
                     { key: "action", label: "Action" },
@@ -642,6 +599,11 @@ export default function CommissionsTable() {
                         >
                           {getCommissionDisplay(commission)}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="px-5 py-4 text-start">
+                        <div className="text-gray-600 text-theme-sm dark:text-gray-400 max-w-[200px] truncate">
+                          {commission.no_of_installments}
+                        </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
                         <div className="text-gray-600 text-theme-sm dark:text-gray-400 max-w-[200px] truncate">

@@ -132,7 +132,7 @@ function AgentLoginContent() {
 
 
     try {
-      const response = await fetch(`${BASE_URL}/login`, {
+      const response = await fetch(`${BASE_URL}/agent/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

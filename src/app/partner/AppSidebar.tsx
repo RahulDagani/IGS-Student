@@ -128,7 +128,7 @@ const AppSidebar: React.FC = () => {
   }, [pathname]);
 
 
-  const isAgent = user ? user.role == "agent" : false;
+  const isAgent = user ? user.panel_type == "agent" : false;
 
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 

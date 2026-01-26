@@ -424,8 +424,19 @@ export default function EditUniversity() {
       if (formData.type_of_university_id !== null) formDataToSend.append('type_of_university_id', formData.type_of_university_id.toString());
       
       // Append agreement dates
-      if (formData.agreement_start_date) formDataToSend.append('agreement_start_date', formData.agreement_start_date);
-      if (formData.agreement_end_date) formDataToSend.append('agreement_end_date', formData.agreement_end_date);
+      if (formData.agreement_start_date) {
+        formDataToSend.append(
+          'agreement_start_date',
+          formData.agreement_start_date.split('T')[0]
+        );
+      }
+
+      if (formData.agreement_end_date) {
+        formDataToSend.append(
+          'agreement_end_date',
+          formData.agreement_end_date.split('T')[0]
+        );
+      }
 
       // Append files if they are File objects
       if (formData.logo && typeof formData.logo !== 'string') {

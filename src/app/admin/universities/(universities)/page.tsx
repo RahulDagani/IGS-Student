@@ -547,33 +547,6 @@ export default function UniversitiesTable() {
 
   return (
     <div className="space-y-4">
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Total Universities</div>
-          <div className="text-2xl font-bold text-gray-800 dark:text-white">
-            {pagination.total}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Active</div>
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {universities.filter(u => u.is_deleted === 0).length}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Countries</div>
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {filtersData.countries.length}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Current Page</div>
-          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-            {pagination.page} / {pagination.totalPages}
-          </div>
-        </div>
-      </div>
 
       {/* Search and Filter Controls */}
       <div className="flex flex-col sm:flex-row gap-4">

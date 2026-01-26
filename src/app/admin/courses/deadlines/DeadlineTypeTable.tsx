@@ -570,33 +570,6 @@ export default function DeadlineTypesTable() {
 
   return (
     <div className="space-y-4">
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Total Types</div>
-          <div className="text-2xl font-bold text-gray-800 dark:text-white">
-            {totalItems}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Application Types</div>
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {deadlineTypes.filter(d => d.name.toLowerCase().includes('application')).length}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Payment Types</div>
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {deadlineTypes.filter(d => d.name.toLowerCase().includes('payment')).length}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Other Types</div>
-          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-            {deadlineTypes.filter(d => !d.name.toLowerCase().includes('application') && !d.name.toLowerCase().includes('payment')).length}
-          </div>
-        </div>
-      </div>
 
       {/* Search and Add Controls */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">

@@ -568,42 +568,6 @@ export default function DisciplinesTable() {
 
   return (
     <div className="space-y-4">
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Total Disciplines</div>
-          <div className="text-2xl font-bold text-gray-800 dark:text-white">
-            {totalItems}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Bachelors</div>
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {disciplines.filter(d => {
-              const studyLevelName = getStudyLevelName(d.study_level_id);
-              return studyLevelName.toLowerCase().includes('bachelor');
-            }).length}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Masters</div>
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {disciplines.filter(d => {
-              const studyLevelName = getStudyLevelName(d.study_level_id);
-              return studyLevelName.toLowerCase().includes('master');
-            }).length}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">PhD</div>
-          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-            {disciplines.filter(d => {
-              const studyLevelName = getStudyLevelName(d.study_level_id);
-              return studyLevelName.toLowerCase().includes('phd') || studyLevelName.toLowerCase().includes('doctor');
-            }).length}
-          </div>
-        </div>
-      </div>
 
       {/* Search, Add Controls, and Pagination Controls */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">

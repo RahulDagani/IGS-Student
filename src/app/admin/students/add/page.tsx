@@ -111,7 +111,7 @@ export default function AddStudent() {
 
     try {
       // API call to create student
-      const response = await fetch(`${BASE_URL}/tenant/student/add`, {
+      const response = await fetch(`${BASE_URL}/tenant/student`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

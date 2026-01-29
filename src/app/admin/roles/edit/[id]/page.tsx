@@ -355,33 +355,36 @@ export default function EditRolePage() {
     };
 
     // Toggle all permissions in a module (including sub-modules and child modules)
-    const toggleAllPermissionsInModule = (moduleId: number) => {
-        const module = modules.find(m => m.id === moduleId);
-        if (!module) return;
+const toggleAllPermissionsInModule = (moduleId: number) => {
+    const module = modules.find(m => m.id === moduleId);
+    if (!module) return;
 
-        const allSelected = selectedModules[moduleId] === 1;
-        const newStatus = allSelected ? 0 : 1;
+    const allSelected = selectedModules[moduleId] === 1;
+    const newStatus = allSelected ? 0 : 1;
 
-        // Update module
-        setSelectedModules(prev => ({
-            ...prev,
-            [moduleId]: newStatus
-        }));
+    // Create copies of all state objects first
+    const updatedModules = { ...selectedModules };
+    const updatedSubModules = { ...selectedSubModules };
+    const updatedChildModules = { ...selectedChildModules };
 
-        // Update all sub-modules in this module
-        const updatedSubModules = { ...selectedSubModules };
-        module.sub_modules.forEach(subModule => {
-            updatedSubModules[subModule.id] = newStatus;
-            
-            // Update all child modules in this sub-module
-            const updatedChildModules = { ...selectedChildModules };
-            subModule.child_modules.forEach(childModule => {
-                updatedChildModules[childModule.id] = newStatus;
-            });
-            setSelectedChildModules(updatedChildModules);
+    // Update the current module
+    updatedModules[moduleId] = newStatus;
+
+    // Update all sub-modules and child modules in this module
+    module.sub_modules.forEach(subModule => {
+        updatedSubModules[subModule.id] = newStatus;
+        
+        // Update all child modules in this sub-module
+        subModule.child_modules.forEach(childModule => {
+            updatedChildModules[childModule.id] = newStatus;
         });
-        setSelectedSubModules(updatedSubModules);
-    };
+    });
+
+    // Set all updated states at once
+    setSelectedModules(updatedModules);
+    setSelectedSubModules(updatedSubModules);
+    setSelectedChildModules(updatedChildModules);
+};
 
     // Toggle all permissions in a sub-module (including child modules)
     const toggleAllPermissionsInSubModule = (subModuleId: number, moduleId: number) => {

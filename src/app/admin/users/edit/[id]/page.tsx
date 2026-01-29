@@ -677,25 +677,7 @@ export default function EditUserPage() {
                                     </div>
                                 </div>
 
-                                {/* Available Roles Info */}
-                                <div className="mt-4 p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
-                                    <h4 className="text-sm font-medium text-gray-300 mb-2">Available Roles ({availableRoles.length})</h4>
-                                    <div className="flex flex-wrap gap-1">
-                                        {availableRoles.slice(0, 5).map((role) => (
-                                            <span 
-                                                key={role.role_id} 
-                                                className={`px-2 py-1 text-xs rounded ${formData.role_id === role.value ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50' : 'bg-gray-700/50 text-gray-400 border border-gray-600'}`}
-                                            >
-                                                {role.label}
-                                            </span>
-                                        ))}
-                                        {availableRoles.length > 5 && (
-                                            <span className="px-2 py-1 text-xs bg-gray-700/50 text-gray-400 border border-gray-600 rounded">
-                                                +{availableRoles.length - 5} more
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
+                               
 
                                 {/* Form Actions */}
                                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-6 pt-4 border-t border-gray-700">

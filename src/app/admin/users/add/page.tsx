@@ -542,44 +542,7 @@ const fetchAvailableRoles = async () => {
                             </div>
                         </div>
 
-                        {/* Available Roles Info */}
-                        {!rolesLoading && availableRoles.length > 0 && (
-                            <div className="mt-6 p-4 bg-gray-800/30 border border-gray-700 rounded-lg">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h4 className="text-sm font-medium text-gray-300">
-                                        Available Roles ({availableRoles.length})
-                                    </h4>
-                                    <span className="text-xs text-gray-400">
-                                        Click to select
-                                    </span>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {availableRoles.map((role) => (
-                                        <button
-    key={role.role_id}
-    type="button"
-    onClick={() => {
-        setFormData(prev => ({ ...prev, role: role.role_id.toString() }));
-        if (validationErrors.role) {
-            setValidationErrors(prev => {
-                const newErrors = { ...prev };
-                delete newErrors.role;
-                return newErrors;
-            });
-        }
-    }}
-    className={`px-3 py-2 text-xs rounded-lg border transition-colors ${
-        formData.role === role.role_id.toString()
-            ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/50'
-            : 'bg-gray-700/30 text-gray-400 border-gray-600 hover:bg-gray-600/30'
-    }`}
->
-    {role.label}
-</button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                       
 
                         {/* Footer Actions */}
                         <div className="flex flex-col sm:flex-row items-center justify-between mt-8 border-t border-gray-700 pt-6 gap-4">

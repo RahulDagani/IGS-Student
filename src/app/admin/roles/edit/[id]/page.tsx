@@ -19,21 +19,78 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 // Interfaces for Role API Response
-interface RoleDetailApiResponse {
-    success: boolean;
-    data: Role;
+interface PermissionHierarchy {
+    id: number;
+    name: string;
+    sort_order: number;
+    has_permission: boolean;
+    sub_modules: Array<{
+        id: number;
+        module_id: number;
+        panel_type: string;
+        name: string;
+        slug: string;
+        sort_order: number;
+        has_permission: boolean;
+        child_modules: Array<{
+            id: number;
+            sub_module_id: number;
+            panel_type: string;
+            name: string;
+            slug: string;
+            sort_order: number;
+            has_permission: boolean;
+        }>;
+    }>;
+}
+
+interface FlatPermissions {
+    modules: Array<{
+        module_id: number;
+        module_name: string;
+        has_permission: boolean;
+    }>;
+    sub_modules: Array<{
+        sub_module_id: number;
+        sub_module_name: string;
+        module_id: number;
+        has_permission: boolean;
+    }>;
+    child_modules: Array<{
+        child_module_id: number;
+        child_module_name: string;
+        sub_module_id: number;
+        has_permission: boolean;
+    }>;
+}
+
+interface RoleCounts {
+    total_modules: number;
+    total_sub_modules: number;
+    total_child_modules: number;
+    total_permissions: number;
+    active_permissions: number;
+    inactive_permissions: number;
 }
 
 interface Role {
     id: number;
-    tenant_id: number;
+    panel_type: string;
     role_name: string;
     role_key: string;
-    panel_type: string;
     data_access: string;
-    is_active: boolean;
+    is_active: number;
     created_at: string;
-    updated_at: string;
+    permissions: {
+        hierarchical: PermissionHierarchy[];
+        flat: FlatPermissions;
+    };
+    counts: RoleCounts;
+}
+
+interface RoleDetailApiResponse {
+    success: boolean;
+    data: Role;
 }
 
 // Interfaces for Modules API Response
@@ -103,7 +160,7 @@ interface ModulesApiResponse {
     };
 }
 
-// Interfaces for Role Permissions API Response
+// Interface for Update Role Payload
 interface ModulePermission {
     module_id: number;
     status: number;
@@ -119,19 +176,6 @@ interface ChildModulePermission {
     status: number;
 }
 
-interface RolePermissionsApiResponse {
-    success: boolean;
-    data: {
-        role: Role;
-        permissions: {
-            module_permissions: ModulePermission[];
-            sub_module_permissions: SubModulePermission[];
-            child_module_permissions: ChildModulePermission[];
-        };
-    };
-}
-
-// Interface for Update Role Payload
 interface UpdateRolePayload {
     role_name: string;
     role_key: string;
@@ -213,19 +257,19 @@ export default function EditRolePage() {
         }
     }, [token]);
 
-    // Fetch role details and permissions
+    // Fetch role details and permissions from a single API endpoint
     const fetchRoleDetails = useCallback(async () => {
         if (!roleId) return;
         
         try {
             setRoleLoading(true);
-            // Fetch role basic details
+            // Fetch role details (which now includes permissions)
             const roleResponse = await fetch(`${BASE_URL}/tenant/roles/${roleId}`, {
                 headers: {
                     "Authorization": `Bearer ${token}`
                 }
             });
-            const roleData = await roleResponse.json();
+            const roleData: RoleDetailApiResponse = await roleResponse.json();
 
             if (roleData.success) {
                 const role = roleData.data;
@@ -237,67 +281,49 @@ export default function EditRolePage() {
                     role_key: role.role_key,
                     panel_type: role.panel_type || "admin",
                     data_access: role.data_access,
-                    is_active: role.is_active
+                    is_active: Boolean(role.is_active)
                 });
                 
-                // Fetch role permissions
-                const permissionsResponse = await fetch(`${BASE_URL}/tenant/roles/${roleId}/permissions`, {
-                    headers: {
-                        "Authorization": `Bearer ${token}`
-                    }
-                });
-                const permissionsData: RolePermissionsApiResponse = await permissionsResponse.json();
+                // Initialize permissions from the API response
+                // The API now returns permissions in the same response
+                const { permissions } = role;
+                
+                // Initialize selected permissions from the hierarchical structure
+                const initialSelectedModules: Record<number, number> = {};
+                const initialSelectedSubModules: Record<number, number> = {};
+                const initialSelectedChildModules: Record<number, number> = {};
 
-                if (permissionsData.success) {
-                    const { module_permissions, sub_module_permissions, child_module_permissions } = 
-                        permissionsData.data.permissions;
-                    
-                    // Initialize selected permissions from API response
-                    const initialSelectedModules: Record<number, number> = {};
-                    const initialSelectedSubModules: Record<number, number> = {};
-                    const initialSelectedChildModules: Record<number, number> = {};
-
-                    // Set module permissions
-                    module_permissions.forEach(perm => {
-                        initialSelectedModules[perm.module_id] = perm.status;
+                // Process hierarchical permissions
+                if (permissions && permissions.hierarchical) {
+                    permissions.hierarchical.forEach(module => {
+                        // Set module permission
+                        initialSelectedModules[module.id] = module.has_permission ? 1 : 0;
+                        
+                        // Process sub-modules
+                        module.sub_modules.forEach(subModule => {
+                            initialSelectedSubModules[subModule.id] = subModule.has_permission ? 1 : 0;
+                            
+                            // Process child modules
+                            subModule.child_modules.forEach(childModule => {
+                                initialSelectedChildModules[childModule.id] = childModule.has_permission ? 1 : 0;
+                            });
+                        });
                     });
-
-                    // Set sub-module permissions
-                    sub_module_permissions.forEach(perm => {
-                        initialSelectedSubModules[perm.sub_module_id] = perm.status;
-                    });
-
-                    // Set child module permissions
-                    child_module_permissions.forEach(perm => {
-                        initialSelectedChildModules[perm.child_module_id] = perm.status;
-                    });
-
-                    setSelectedModules(initialSelectedModules);
-                    setSelectedSubModules(initialSelectedSubModules);
-                    setSelectedChildModules(initialSelectedChildModules);
-                } else {
-                    // If permissions endpoint doesn't exist, initialize with all zeros
-                    const initialSelectedModules: Record<number, number> = {};
-                    const initialSelectedSubModules: Record<number, number> = {};
-                    const initialSelectedChildModules: Record<number, number> = {};
-
-                    // TODO: You might want to fetch modules here to initialize properly
-                    setSelectedModules(initialSelectedModules);
-                    setSelectedSubModules(initialSelectedSubModules);
-                    setSelectedChildModules(initialSelectedChildModules);
                 }
+
+                setSelectedModules(initialSelectedModules);
+                setSelectedSubModules(initialSelectedSubModules);
+                setSelectedChildModules(initialSelectedChildModules);
             } else {
                 showToast("Failed to load role details", "error");
-                // router.push("/admin/roles");
             }
         } catch (error) {
             console.error("Error fetching role details:", error);
             showToast("Failed to load role details", "error");
-            // router.push("/admin/roles");
         } finally {
             setRoleLoading(false);
         }
-    }, [roleId, token, router]);
+    }, [roleId, token]);
 
     useEffect(() => {
         fetchModules();
@@ -583,11 +609,33 @@ export default function EditRolePage() {
                 role_key: roleDetails.role_key,
                 panel_type: roleDetails.panel_type || "admin",
                 data_access: roleDetails.data_access,
-                is_active: roleDetails.is_active
+                is_active: Boolean(roleDetails.is_active)
             });
             
-            // Note: We can't reset permissions without making another API call
-            // The current implementation assumes we want to keep the current selections
+            // Reset permissions to original state
+            const { permissions } = roleDetails;
+            
+            const initialSelectedModules: Record<number, number> = {};
+            const initialSelectedSubModules: Record<number, number> = {};
+            const initialSelectedChildModules: Record<number, number> = {};
+
+            if (permissions && permissions.hierarchical) {
+                permissions.hierarchical.forEach(module => {
+                    initialSelectedModules[module.id] = module.has_permission ? 1 : 0;
+                    
+                    module.sub_modules.forEach(subModule => {
+                        initialSelectedSubModules[subModule.id] = subModule.has_permission ? 1 : 0;
+                        
+                        subModule.child_modules.forEach(childModule => {
+                            initialSelectedChildModules[childModule.id] = childModule.has_permission ? 1 : 0;
+                        });
+                    });
+                });
+            }
+
+            setSelectedModules(initialSelectedModules);
+            setSelectedSubModules(initialSelectedSubModules);
+            setSelectedChildModules(initialSelectedChildModules);
         }
     };
 
@@ -712,6 +760,16 @@ export default function EditRolePage() {
                                     Created: {new Date(roleDetails.created_at).toLocaleDateString()}
                                 </span>
                             </div>
+                            {roleDetails.counts && (
+                                <div className="mt-2 flex items-center gap-2 text-xs">
+                                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                                        {roleDetails.counts.active_permissions} active permissions
+                                    </span>
+                                    <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">
+                                        {roleDetails.counts.total_permissions} total
+                                    </span>
+                                </div>
+                            )}
                         </div>
                         <button
                             onClick={() => router.back()}

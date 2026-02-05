@@ -1164,7 +1164,7 @@ const CourseCard: React.FC<{
       {/* Buttons */}
       <div className="mt-6 flex gap-3">
         <Link
-          href={`/student/programs/${course.id}`}
+          href={`/student/courses/${course.id}`}
           className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-center dark:bg-indigo-700 dark:hover:bg-indigo-600 text-white font-semibold py-2 rounded-lg text-sm transition-all"
         >
           View Course Details

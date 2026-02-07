@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Badge from "@/components/ui/badge/Badge";
-import { DockIcon, DollarSign, GraduationCap, MapPin, Calendar, Book, Building2, Star, X, ChevronDown, ChevronUp } from "lucide-react";
+import { DockIcon, DollarSign, GraduationCap, MapPin, Calendar, Book, Building2, Star, X, ChevronDown, ChevronUp, Heart } from "lucide-react";
 import { useAuth } from '@/context/AuthContext';
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -1033,14 +1033,14 @@ const CourseCard: React.FC<{
       {/* Top Section */}
       <div className="flex items-start justify-between">
         {/* University Info */}
-        <div className="flex items-start gap-3">
-          <div className="logo w-20 h-20 flex shrink-0 justify-center items-center bg-white rounded-2xl">
+        <div className="flex items-start">
+          <div className="logo w-24 h-24 flex shrink-0 justify-center items-center bg-white rounded-2xl">
             {course.university_logo_url ? (
               <Image 
                 src={course.university_logo_url} 
                 alt={`${course.university_name} logo`}
-                height={80}
-                width={80}
+                height={100}
+                width={100}
                 className="rounded-md object-contain"
               />
             ) : (
@@ -1049,7 +1049,7 @@ const CourseCard: React.FC<{
               </div>
             )}
           </div>
-          <div>
+          <div className="ml-2">
             <h2 className="text-base font-semibold text-gray-800 dark:text-white leading-snug">
               {course.course_name}
             </h2>
@@ -1062,6 +1062,7 @@ const CourseCard: React.FC<{
                 Popular
               </Badge>
             )}
+            <span className="text-red-500 " ><Heart size={20} style={{position: "relative", bottom:"60px", float:"right"}}/> </span>
           </div>
         </div>
       </div>

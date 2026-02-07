@@ -130,7 +130,7 @@ export default function StudentDashboard() {
             </div>
             <div className="mt-4">
               <Link 
-                href="/student/applications"
+                href="/student/editProfile?tab=applications"
                 className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
               >
                 Track Applications ›
@@ -157,10 +157,10 @@ export default function StudentDashboard() {
             </div>
             <div className="mt-4">
               <Link 
-                href="/student/courses"
+                href="/student/courses/shortlisted"
                 className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
               >
-                View All Courses ›
+                View Shortlisted ›
               </Link>
             </div>
           </div>
@@ -290,7 +290,7 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                     <Link
-                      href={`/student/editProfile/${user?.id}?profileTab=profile`}
+                      href={`/student/editProfile?profileTab=profile`}
                       className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
                     >
                       {dashboardData?.profile.is_complete ? 'Update' : 'Complete'} ›
@@ -324,7 +324,7 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                     <Link
-                      href={`/student/editProfile/${user?.id}?tab=documents`}
+                      href={`/student/editProfile?tab=documents`}
                       className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
                     >
                       {dashboardData?.documents.is_complete ? 'View' : 'Upload'} ›
@@ -347,7 +347,7 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                     <Link
-                      href={`/student/editProfile/${user?.id}?profileTab=academics`}
+                      href={`/student/editProfile?profileTab=academics`}
                       className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
                     >
                       {dashboardData?.academic_qualifications.is_complete ? 'Update' : 'Complete'} ›
@@ -370,7 +370,7 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                     <Link
-                      href={`/student/editProfile/${user?.id}?profileTab=testscores`}
+                      href={`/student/editProfile?profileTab=testscores`}
                       className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
                     >
                       {dashboardData?.test_scores.is_complete ? 'Update' : 'Complete'} ›
@@ -393,7 +393,7 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                     <Link
-                      href={`/student/editProfile/${user?.id}?profileTab=workexperience`}
+                      href={`/student/editProfile?profileTab=workexperience`}
                       className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
                     >
                       {dashboardData?.work_experience.is_complete ? 'Update' : 'Add'} ›

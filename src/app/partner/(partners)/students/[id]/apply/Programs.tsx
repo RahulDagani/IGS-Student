@@ -544,7 +544,7 @@ const CourseCard: React.FC<{
       <div className="flex items-start justify-between">
         {/* University Info */}
         <div className="flex items-start gap-3">
-          <div className="logo w-20 h-20">
+          <div className="logo w-20 h-20 shrink-0 ">
             {course.university_logo_url ? (
               <Image 
                 src={course.university_logo_url} 

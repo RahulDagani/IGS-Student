@@ -1091,9 +1091,14 @@ export default function ProfileForm() {
       <AIAutofillModal
   isOpen={showAIAutofillModal}
   onClose={() => setShowAIAutofillModal(false)}
-  onUploadComplete={() => {
-    // You can add logic here to refresh form data or show notifications
-    console.log("Document uploaded and processed")
+  onUploadComplete={(extractedData) => {
+    // You can show a success notification or refresh the form data
+    console.log("Document processed and data extracted", extractedData);
+    // Optionally refresh the form data to show newly saved information
+    if (extractedData) {
+      // You might want to show a toast notification here
+      setValidationMessage("Document processed successfully! Review extracted data and click Save to update your profile.");
+    }
   }}
 />
     </div>

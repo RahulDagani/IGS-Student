@@ -786,9 +786,9 @@ export default function ProfileForm() {
                 fieldErrors.citizenship ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
               }`}
             >
-              <option value="">Select Citizenship</option>
+              <option value="">Select Country</option>
               {countries.map(country => (
-                <option key={country.isoCode} value={country.name}>{country.name}</option>
+                <option key={country.isoCode} value={country.isoCode}>{country.name}</option>
               ))}
             </select>
           </div>
@@ -1095,10 +1095,10 @@ export default function ProfileForm() {
     // You can show a success notification or refresh the form data
     console.log("Document processed and data extracted", extractedData);
     // Optionally refresh the form data to show newly saved information
-    if (extractedData) {
-      // You might want to show a toast notification here
-      setValidationMessage("Document processed successfully! Review extracted data and click Save to update your profile.");
-    }
+    // if (extractedData) {
+    //   // You might want to show a toast notification here
+    //   setValidationMessage("Document processed successfully! Review extracted data and click Save to update your profile.");
+    // }
   }}
 />
     </div>

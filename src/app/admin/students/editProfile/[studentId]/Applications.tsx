@@ -765,6 +765,7 @@ export default function Applications() {
   useEffect(() => {
     if (activeProgramFromUrl) {
       setActiveProgram(Number(activeProgramFromUrl));
+      setActiveTab("applied");
     }
   }, [activeProgramFromUrl]);
 

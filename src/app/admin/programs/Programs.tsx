@@ -1453,6 +1453,7 @@ const buildCoursesQueryString = useCallback((page: number = 1, filtersToBuild: F
     try {
       const payload = {
         course_id: selectedCourse.id,
+        university_id: selectedCourse.university_id,
         study_level_id: selectedCourse.study_level_id,
         remarks: "Student wants to apply for this course",
         student_user_id: studentId,

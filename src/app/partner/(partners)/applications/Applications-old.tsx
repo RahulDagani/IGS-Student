@@ -1043,7 +1043,7 @@ export default function ApplicationsTable() {
 
       if (!response.ok) {
         if (response.status === 403) {
-          logout();
+          logout("agent");
           return;
         }
         throw new Error('Failed to fetch filter options');

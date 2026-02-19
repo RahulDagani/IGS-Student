@@ -538,7 +538,7 @@ export default function ShortlistedCoursesPage() {
 
       if (!response.ok) {
         if (response.status === 403) {
-          logout();
+          logout("student");
           return;
         }
         throw new Error('Failed to fetch shortlisted courses');

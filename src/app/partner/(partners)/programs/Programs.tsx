@@ -1333,7 +1333,7 @@ export default function StudentProgramsPage() {
 
       if (!response.ok) {
         if (response.status === 403) {
-          logout();
+          logout("agent");
           return;
         }
         throw new Error('Failed to fetch filter options');
@@ -1411,7 +1411,7 @@ const buildCoursesQueryString = useCallback((page: number = 1, filtersToBuild: F
 
       if (!response.ok) {
         if (response.status === 403) {
-          logout();
+          logout("agent");
           return;
         }
         throw new Error('Failed to fetch courses');

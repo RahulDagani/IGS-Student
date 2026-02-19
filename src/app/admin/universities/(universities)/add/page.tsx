@@ -379,19 +379,42 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, token, onSuc
 
               </div>
             )}
+            {importResult && importResult.status === "fail" && (
+  <div className="mt-4 p-4 border border-red-300 bg-red-50 dark:bg-red-900/20 rounded-lg">
 
-            {importResult && importResult.status === 'fail' && (
-                  <div className="mt-3">
-                    <p className="text-xs text-red-600 dark:text-red-400 mb-2">Errors:</p>
-                    <div className="max-h-24 overflow-y-auto">
-                      {importResult.data.details.errors.map((error: any, idx: number) => (
-                        <p key={idx} className="text-xs text-red-600 dark:text-red-400">
-                          • {error.message || 'Unknown error'}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                )}            
+    {/* Main Message */}
+    <p className="text-sm font-semibold text-red-700 dark:text-red-400 mb-2">
+      {importResult.message}
+    </p>
+
+    {/* Summary */}
+    <div className="text-xs text-red-700 dark:text-red-400 space-y-1 mb-3">
+      <p>Total Rows: {importResult.data?.total_rows}</p>
+      <p>Inserted: {importResult.data?.inserted}</p>
+      <p>Updated: {importResult.data?.updated}</p>
+      <p>Total Errors: {importResult.data?.errors}</p>
+      <p>New Partner Types Created: {importResult.data?.details?.new_partner_types_created}</p>
+      <p>New University Types Created: {importResult.data?.details?.new_university_types_created}</p>
+    </div>
+
+    {/* Detailed Row Errors */}
+    {importResult.data?.details?.errors?.length > 0 && (
+      <div>
+        <p className="text-xs font-semibold text-red-600 dark:text-red-400 mb-1">
+          Row Errors:
+        </p>
+
+        <ul className="list-disc pl-4 max-h-40 overflow-y-auto text-xs text-red-600 dark:text-red-400 space-y-1">
+          {importResult.data.details.errors.map((error: string, idx: number) => (
+            <li key={idx}>{error}</li>
+          ))}
+        </ul>
+      </div>
+    )}
+  </div>
+)}
+
+         
           </div>
 
           <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">

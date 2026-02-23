@@ -1235,7 +1235,7 @@ function ValidationModal({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold text-gray-800 dark:text-white">
-                {validationResult.summary.total_to_process}
+                {validationResult.summary.total_rows_processed}
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">Total Rows</div>
             </div>

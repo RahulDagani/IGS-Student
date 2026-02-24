@@ -1,6 +1,8 @@
-"use client";
-import React, { useState, useEffect } from 'react';
-import { Application, ApplicationWithInstallments } from '../types';
+'use client';
+
+import React, { useState } from 'react';
+import { Application, GenerateInvoicePayload } from '../types';
+import { DollarSign, AlertCircle, Loader2, CheckCircle, ArrowLeft, Send } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 interface CommissionNotesProps {
@@ -10,731 +12,256 @@ interface CommissionNotesProps {
   onSuccess: () => void;
 }
 
-// Define extended type for local state
-interface ExtendedApplicationWithInstallments extends ApplicationWithInstallments {
-  newCommissionAmt?: number;
-  newInstallmentNo?: number;
-  editableTuitionFee?: string;
-  isCommissionEditable?: boolean;
-}
-
-// API response interface
-interface ApiApplicationResponse {
-  application_id: number;
-  acknowledgement_no: string;
-  student_name: string;
-  intake_year: number;
-  course_level: string;
-  currency_code: string;
-  tuition_fee: string;
-  generated_intallments: number;
-  no_of_installments: number;
-  commission_type: 'percentage' | 'fixed';
-  tenant_commission: string;
-  installments: Array<{
-    id: number;
-    installment_no: number;
-    commission_amt: string;
-    commissionable_tuition_fee?: string;
-    created_at: string;
-  }>;
-}
-
-const CommissionNotes: React.FC<CommissionNotesProps> = ({
-  applications,
-  universityId,
-  onBack,
-  onSuccess
-}) => {
-  const [appsWithInstallments, setAppsWithInstallments] = useState<ExtendedApplicationWithInstallments[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+export default function CommissionNotes({ applications, universityId, onBack, onSuccess }: CommissionNotesProps) {
+  const [tuitionFees, setTuitionFees] = useState<Record<number, number>>(
+    applications.reduce((acc, app) => {
+      // Set default value based on commission if applicable
+      const defaultValue = app.commission_type === 'fixed' 
+        ? parseFloat(app.commission_value) * 10 // Rough estimate for demo
+        : 50000; // Default value
+      return { ...acc, [app.application_id]: defaultValue };
+    }, {})
+  );
+  
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const { token } = useAuth();
+  const [success, setSuccess] = useState(false);
+
+  const {token} = useAuth();
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
-  useEffect(() => {
-    if (applications.length > 0) {
-      fetchApplicationNotes();
-    }
-  }, [applications]);
 
-  const fetchApplicationNotes = async () => {
+  const handleFeeChange = (applicationId: number, value: string) => {
+    const numValue = value === '' ? 0 : parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0) {
+      setTuitionFees(prev => ({ ...prev, [applicationId]: numValue }));
+    }
+  };
+
+  const validateFees = (): boolean => {
+    return applications.every(app => {
+      const fee = tuitionFees[app.application_id];
+      return fee !== undefined && fee > 0;
+    });
+  };
+
+  const handleSubmit = async () => {
+    if (!validateFees()) {
+      setError('Please enter valid tuition fees for all applications');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const payload: GenerateInvoicePayload = {
+      university_id: universityId,
+      applications: applications.map(app => ({
+        application_id: app.application_id,
+        commissionable_tuition_fee: tuitionFees[app.application_id]
+      }))
+    };
+
     try {
-      setLoading(true);
-      setError(null);
-      
-      const applicationIds = [...new Set(applications.map(app => app.application_id))];
-      const params = new URLSearchParams();
-      applicationIds.forEach(id => params.append('application_id', id.toString()));
-      
-      const response = await fetch(
-        `${BASE_URL}/tenant/invoice/note/items?${params.toString()}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch notes: ${response.status}`);
-      }
-      
+      const response = await fetch(`${BASE_URL}/tenant/invoice/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
       const data = await response.json();
-      
-      if (data.success) {
-        const apiApps = data.data as ApiApplicationResponse[];
-        const appsWithDefaults: ExtendedApplicationWithInstallments[] = apiApps.map((app: ApiApplicationResponse) => {
-          const calculatedCommission = calculateCommissionFromTuitionFee(app.tuition_fee, app.commission_type, app.tenant_commission);
-          
-          return {
-            application_id: app.application_id,
-            acknowledgement_no: app.acknowledgement_no,
-            student_name: app.student_name,
-            intake_year: app.intake_year,
-            course_level: app.course_level,
-            generated_intallments: app.generated_intallments,
-            no_of_installments: app.no_of_installments,
-            tuition_fee: app.tuition_fee,
-            currency_code: app.currency_code,
-            commission_type: app.commission_type,
-            tenant_commission: app.tenant_commission,
-            installments: app.installments,
-            newInstallmentNo: app.generated_intallments + 1,
-            newCommissionAmt: calculatedCommission, // Set initial value to calculated commission
-            editableTuitionFee: app.tuition_fee,
-            isCommissionEditable: false // Initially disabled
-          };
-        });
-        setAppsWithInstallments(appsWithDefaults);
+
+      if (data.status === 'success') {
+        setSuccess(true);
+        setTimeout(() => {
+          onSuccess();
+        }, 2000);
       } else {
-        throw new Error(data.message || "Failed to fetch notes");
+        setError(data.message || 'Failed to generate invoice');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError('Error connecting to server. Please try again.');
+      console.error('Error generating invoice:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper function to calculate commission from tuition fee
-  const calculateCommissionFromTuitionFee = (tuitionFee: string, commissionType: string, tenantCommission: string): number => {
-    if (!tuitionFee || parseFloat(tuitionFee) <= 0) {
-      return 0;
+  const calculateTotalCommission = (app: Application) => {
+    const fee = tuitionFees[app.application_id] || 0;
+    if (app.commission_type === 'percentage') {
+      return (fee * parseFloat(app.commission_value)) / 100;
     }
-    
-    const fee = parseFloat(tuitionFee);
-    const commissionValue = parseFloat(tenantCommission || "0");
-    
-    if (commissionType === 'percentage') {
-      return (fee * commissionValue) / 100;
-    } else if (commissionType === 'fixed') {
-      return commissionValue;
-    }
-    
-    return 0;
+    return parseFloat(app.commission_value);
   };
-
-  const handleCommissionChange = (applicationId: number, value: string) => {
-    const numValue = value ? parseFloat(value) : undefined;
-    setAppsWithInstallments(prev => prev.map(app => {
-      if (app.application_id === applicationId) {
-        return {
-          ...app,
-          newCommissionAmt: numValue
-        };
-      }
-      return app;
-    }));
-  };
-
-  const handleTuitionFeeChange = (applicationId: number, value: string) => {
-    const sanitizedValue = value.replace(/[^\d.]/g, '');
-    
-    setAppsWithInstallments(prev => prev.map(app => {
-      if (app.application_id === applicationId) {
-        const newTuitionFee = sanitizedValue;
-        const calculatedCommission = calculateCommissionFromTuitionFee(
-          newTuitionFee, 
-          app.commission_type, 
-          app.tenant_commission
-        );
-        
-        return {
-          ...app,
-          editableTuitionFee: sanitizedValue,
-          newCommissionAmt: !app.isCommissionEditable ? calculatedCommission : app.newCommissionAmt
-        };
-      }
-      return app;
-    }));
-  };
-
-  const toggleCommissionEdit = (applicationId: number) => {
-    setAppsWithInstallments(prev => prev.map(app => {
-      if (app.application_id === applicationId) {
-        const isEditable = !app.isCommissionEditable;
-        
-        // When enabling edit, keep the current value
-        // When disabling edit, recalculate commission based on tuition fee
-        let newCommissionAmt = app.newCommissionAmt;
-        if (!isEditable && app.editableTuitionFee) {
-          newCommissionAmt = calculateCommissionFromTuitionFee(
-            app.editableTuitionFee, 
-            app.commission_type, 
-            app.tenant_commission
-          );
-        }
-        
-        return {
-          ...app,
-          isCommissionEditable: isEditable,
-          newCommissionAmt: newCommissionAmt
-        };
-      }
-      return app;
-    }));
-  };
-
-  const validateForm = () => {
-    const errors = [];
-    
-    const appsWithoutCommission = appsWithInstallments.filter(
-      app => app.generated_intallments < app.no_of_installments && !app.newCommissionAmt
-    );
-    
-    if (appsWithoutCommission.length > 0) {
-      errors.push("Please enter commission amount for all applications");
-    }
-    
-    const invalidCommission = appsWithInstallments.filter(
-      app => app.newCommissionAmt !== undefined && (isNaN(app.newCommissionAmt) || app.newCommissionAmt <= 0)
-    );
-    
-    if (invalidCommission.length > 0) {
-      errors.push("Please enter valid commission amount (greater than 0)");
-    }
-    
-    const invalidTuitionFee = appsWithInstallments.filter(
-      app => app.generated_intallments < app.no_of_installments && 
-             (!app.editableTuitionFee || isNaN(parseFloat(app.editableTuitionFee)) || parseFloat(app.editableTuitionFee) <= 0)
-    );
-    
-    if (invalidTuitionFee.length > 0) {
-      errors.push("Please enter valid tuition fee amount (greater than 0) for all applications");
-    }
-    
-    return errors;
-  };
-
-  const handleSubmit = async () => {
-    const validationErrors = validateForm();
-    if (validationErrors.length > 0) {
-      setError(validationErrors.join(", "));
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      setError(null);
-      
-      const applicationsToSubmit = appsWithInstallments.filter(app => 
-        app.generated_intallments < app.no_of_installments && 
-        app.newCommissionAmt && 
-        app.newInstallmentNo &&
-        app.editableTuitionFee
-      );
-      
-      if (applicationsToSubmit.length === 0) {
-        setError("No applications available for Invoice Notes");
-        return;
-      }
-      
-      const totalCommissionableTuitionFee = applicationsToSubmit.reduce((sum, app) => 
-        sum + parseFloat(app.editableTuitionFee!), 0
-      );
-      
-      // Get the commission type from the first application
-      const firstAppCommissionType = applicationsToSubmit[0]?.commission_type || 'percentage';
-      
-      const payload = {
-        university_id: universityId,
-        commission_type: firstAppCommissionType,
-        commissionable_tuition_fee: totalCommissionableTuitionFee,
-        applications: applicationsToSubmit.map(app => ({
-          application_id: app.application_id,
-          commission_amt: app.newCommissionAmt!,
-          installment_no: app.newInstallmentNo!,
-          tuition_fee: parseFloat(app.editableTuitionFee!)
-        }))
-      };
-      
-      console.log("Submitting payload:", payload);
-      
-      const response = await fetch(
-        `${BASE_URL}/tenant/invoice/note`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        }
-      );
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || `Failed to create notes: ${response.status}`);
-      }
-      
-      if (data.success) {
-        setSuccess("Invoice Notes created successfully!");
-        
-        setTimeout(() => {
-          onSuccess();
-        }, 1500);
-      } else {
-        throw new Error(data.message || "Failed to create notes");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const calculateTotalCommission = () => {
-    return appsWithInstallments.reduce((total, app) => {
-      if (app.newCommissionAmt && app.generated_intallments < app.no_of_installments) {
-        return total + app.newCommissionAmt;
-      }
-      return total;
-    }, 0);
-  };
-
-  const calculateTotalTuitionFee = () => {
-    return appsWithInstallments.reduce((total, app) => {
-      if (app.editableTuitionFee && app.generated_intallments < app.no_of_installments) {
-        return total + parseFloat(app.editableTuitionFee);
-      }
-      return total;
-    }, 0);
-  };
-
-  if (loading) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-white/[0.05] p-6">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      </div>
-    );
-  }
 
   if (success) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-white/[0.05] p-6">
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800/50 dark:bg-green-900/20">
-          <div className="flex items-center">
-            <svg className="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <h3 className="ml-2 text-sm font-medium text-green-800 dark:text-green-400">Success</h3>
-          </div>
-          <p className="mt-2 text-sm text-green-700 dark:text-green-300">{success}</p>
-          <div className="mt-4 flex gap-2">
-            <button
-              onClick={onBack}
-              className="px-4 py-2 bg-blue-600 text-white  rounded-lg hover:bg-blue-700 transition-colors text-sm"
-            >
-              Back to Applications
-            </button>
-            <button
-              onClick={onSuccess}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-            >
-              Create More Notes
-            </button>
-          </div>
+      <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl p-12 text-center">
+        <div className="w-16 h-16 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
         </div>
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Invoice Generated Successfully!
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400">
+          Redirecting you back to the university list...
+        </p>
       </div>
     );
   }
 
-  const hasPendingChanges = appsWithInstallments.some(
-    app => app.generated_intallments < app.no_of_installments && app.newCommissionAmt && app.editableTuitionFee
-  );
-
-  const totalCommission = calculateTotalCommission();
-  const totalTuitionFee = calculateTotalTuitionFee();
-  const eligibleApplicationsCount = appsWithInstallments.filter(
-    app => app.generated_intallments < app.no_of_installments
-  ).length;
-
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-white/[0.05] p-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-gray-500 dark:text-gray-400"
-          >
-            ← Back to Applications
-          </button>
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              Invoice Notes
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {eligibleApplicationsCount} application(s) eligible for new Invoice Notes
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          {totalTuitionFee > 0 && (
-            <div className="text-right">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total Tuition Fee</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {totalTuitionFee.toFixed(2)}
-              </p>
-            </div>
-          )}
-          
-          {totalCommission > 0 && (
-            <div className="text-right">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total Commission</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {totalCommission.toFixed(2)}
-              </p>
-            </div>
-          )}
-          
-          <button
-            onClick={handleSubmit}
-            disabled={!hasPendingChanges || submitting}
-            className={`
-              px-6 py-2.5 rounded-lg font-medium transition-colors min-w-[140px]
-              ${!hasPendingChanges || submitting
-                ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                : 'bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white'
-              }
-            `}
-          >
-            {submitting ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                Submitting...
-              </div>
-            ) : (
-              'Create Invoice Notes'
-            )}
-          </button>
+      <div className="flex items-center space-x-4">
+        <button
+          onClick={onBack}
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+        </button>
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            Set Commissionable Tuition Fees
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Enter the tuition fee amount for each selected application
+          </p>
         </div>
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800/50 dark:bg-red-900/20">
-          <div className="flex items-center">
-            <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h3 className="ml-2 text-sm font-medium text-red-800 dark:text-red-400">Error</h3>
-          </div>
-          <p className="mt-2 text-sm text-red-700 dark:text-red-300">{error}</p>
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center space-x-3">
+          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         </div>
       )}
 
       {/* Applications List */}
-      <div className="space-y-6">
-        {appsWithInstallments.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            No application data found
-          </div>
-        ) : (
-          appsWithInstallments.map((app) => {
-            const nextInstallmentNo = app.generated_intallments + 1;
-            const canAddNote = app.generated_intallments < app.no_of_installments;
-            const commissionType = app.commission_type;
-            const tenantCommission = app.tenant_commission;
-            
-            return (
-              <div
-                key={app.application_id}
-                className={`border rounded-lg p-4 ${
-                  canAddNote 
-                    ? 'border-gray-200 dark:border-white/[0.05]' 
-                    : 'border-gray-100 dark:border-gray-800 opacity-70'
-                }`}
-              >
-                <div className="mb-4 pb-4 border-b border-gray-200 dark:border-white/[0.05]">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                        {app.student_name}
-                      </h3>
-                      <div className="flex flex-wrap gap-4 mt-2">
-                        <div className="text-sm">
-                          <span className="text-gray-500 dark:text-gray-400">Ack No: </span>
-                          <span className="font-medium text-gray-900 dark:text-gray-100">
-                            {app.acknowledgement_no}
-                          </span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-gray-500 dark:text-gray-400">Level: </span>
-                          <span className="font-medium text-gray-900 dark:text-gray-100">
-                            {app.course_level}
-                          </span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-gray-500 dark:text-gray-400">Year: </span>
-                          <span className="font-medium text-gray-900 dark:text-gray-100">
-                            {app.intake_year}
-                          </span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-gray-500 dark:text-gray-400">Commission Type: </span>
-                          <span className={`font-medium ${
-                            commissionType === 'percentage' 
-                              ? 'text-blue-600 dark:text-blue-400' 
-                              : 'text-green-600 dark:text-green-400'
-                          }`}>
-                            {commissionType.charAt(0).toUpperCase() + commissionType.slice(1)}
-                          </span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-gray-500 dark:text-gray-400">Commission: </span>
-                          <span className="font-medium text-gray-900 dark:text-gray-100">
-                            {commissionType === 'percentage' ? `${tenantCommission}%` : `${parseFloat(tenantCommission).toFixed(2)}`}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Installments</p>
-                      <p className={`font-medium ${
-                        canAddNote 
-                          ? 'text-green-600 dark:text-green-400' 
-                          : 'text-gray-900 dark:text-gray-100'
-                      }`}>
-                        {app.generated_intallments}/{app.no_of_installments}
-                      </p>
-                      {canAddNote && (
-                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                          Next: #{nextInstallmentNo}
-                        </p>
-                      )}
-                    </div>
+      <div className="space-y-4">
+        {applications.map((app) => (
+          <div 
+            key={app.application_id}
+            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-md transition-shadow"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex-1 min-w-[200px]">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                      Application #{app.application_id}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Student ID: {app.student_id}
+                    </p>
                   </div>
                 </div>
                 
-                {/* Previous Installments */}
-                {app.installments && app.installments.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Previous Invoice Notes
-                    </h4>
-                    <div className="space-y-2">
-                      {app.installments.map((installment) => (
-                        <div
-                          key={installment.id}
-                          className="flex justify-between items-center text-sm bg-gray-50 dark:bg-gray-900/50 p-3 rounded"
-                        >
-                          <div>
-                            <span className="font-medium text-gray-900 dark:text-gray-100">
-                              Installment {installment.installment_no}
-                            </span>
-                            <span className="text-gray-500 dark:text-gray-400 ml-4">
-                              Created: {new Date(installment.created_at).toLocaleDateString('en-GB')}
-                            </span>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-semibold text-gray-900 dark:text-gray-100">
-                              {parseFloat(installment.commission_amt).toFixed(2)}
-                            </div>
-                            {installment.commissionable_tuition_fee && (
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Fee: {installment.commissionable_tuition_fee}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Add New Note Section */}
-                {canAddNote ? (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Add New Invoice Note
-                      </h4>
-                      <div className="text-sm">
-                        <span className="text-gray-500 dark:text-gray-400">Installment: </span>
-                        <span className="font-semibold text-blue-600 dark:text-blue-400">
-                          #{nextInstallmentNo}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Tuition Fee ({app.currency_code})
-                          <span className="text-red-500 ml-1">*</span>
-                        </label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <span className="text-gray-500">{app.currency_code}</span>
-                          </div>
-                          <input
-                            type="text"
-                            placeholder="Enter tuition fee"
-                            value={app.editableTuitionFee || ''}
-                            onChange={(e) => handleTuitionFeeChange(app.application_id, e.target.value)}
-                            className="w-full pl-12 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Original: {app.currency_code} {app.tuition_fee}
-                        </p>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Commission Type
-                        </label>
-                        <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300">
-                          {commissionType.charAt(0).toUpperCase() + commissionType.slice(1)}
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {commissionType === 'percentage' ? `${tenantCommission}% of fee` : `Fixed: ${parseFloat(tenantCommission).toFixed(2)}`}
-                        </p>
-                      </div>
-                      
-                      <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Commission Amount 
-                          <span className="text-red-500 ml-1">*</span>
-                        </label>
-                        <div className="flex gap-2">
-                          <div className="flex-1 relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                              <span className="text-gray-500">{app.currency_code}</span>
-                            </div>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="Enter commission"
-                              value={app.newCommissionAmt || ''}
-                              onChange={(e) => handleCommissionChange(app.application_id, e.target.value)}
-                              disabled={!app.isCommissionEditable}
-                              className={`w-full pl-12 pr-3 py-2 border rounded-lg text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                                app.isCommissionEditable
-                                  ? 'border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-800'
-                                  : 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900'
-                              }`}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => toggleCommissionEdit(app.application_id)}
-                            className={`px-4 py-2 border rounded-lg transition-colors ${
-                              app.isCommissionEditable
-                                ? 'bg-green-600 hover:bg-green-700 border-green-600 text-white'
-                                : 'bg-blue-600 hover:bg-blue-700 border-blue-600 text-white'
-                            }`}
-                          >
-                            {app.isCommissionEditable ? 'Save' : 'Edit'}
-                          </button>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {app.isCommissionEditable 
-                            ? 'Edit mode enabled - you can modify the commission amount'
-                            : 'Commission is calculated based on original tuition fee. Click Edit to modify.'
-                          }
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-center">
-                    <p className="text-gray-600 dark:text-gray-400">
-                      All {app.no_of_installments} installments have been paid for this application
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 uppercase">Commission</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {app.commission_type === 'percentage' 
+                        ? `${app.commission_value}%` 
+                        : `${app.currency} ${parseFloat(app.commission_value).toLocaleString()}`}
                     </p>
                   </div>
-                )}
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 uppercase">Installments</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {app.no_of_installments} ({app.total_installments_paid} paid)
+                    </p>
+                  </div>
+                </div>
               </div>
-            );
-          })
-        )}
-      </div>
 
-      {/* Summary and Submit Section */}
-      {eligibleApplicationsCount > 0 && (
-        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-white/[0.05]">
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {eligibleApplicationsCount} application(s) eligible for Invoice Notes
-              </p>
-              <div className="flex gap-4 mt-1">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  Total Tuition Fee: {totalTuitionFee.toFixed(2)}
-                </p>
-                {totalCommission > 0 && (
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Total Commission: {totalCommission.toFixed(2)}
+              <div className="w-full sm:w-64">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Commissionable Tuition Fee ({app.currency})
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                    {app.currency}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={tuitionFees[app.application_id] || ''}
+                    onChange={(e) => handleFeeChange(app.application_id, e.target.value)}
+                    className="w-full pl-12 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter amount"
+                  />
+                </div>
+                {tuitionFees[app.application_id] > 0 && (
+                  <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                    Estimated commission: {app.currency} {calculateTotalCommission(app).toLocaleString()}
                   </p>
                 )}
               </div>
             </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={onBack}
-                className="px-6 py-2.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              
-              <button
-                onClick={handleSubmit}
-                disabled={!hasPendingChanges || submitting}
-                className={`
-                  px-6 py-2.5 rounded-lg font-medium transition-colors min-w-[140px]
-                  ${!hasPendingChanges || submitting
-                    ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white'
-                  }
-                `}
-              >
-                {submitting ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                    Creating Notes...
-                  </div>
-                ) : (
-                  'Create Invoice Notes'
-                )}
-              </button>
-            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Summary */}
+      <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Summary</h3>
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600 dark:text-gray-400">Selected Applications:</span>
+            <span className="font-medium text-gray-900 dark:text-gray-100">{applications.length}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600 dark:text-gray-400">Total Tuition Amount:</span>
+            <span className="font-medium text-gray-900 dark:text-gray-100">
+              {applications[0]?.currency} {Object.values(tuitionFees).reduce((a, b) => a + (b || 0), 0).toLocaleString()}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm pt-2 border-t border-gray-200 dark:border-gray-700">
+            <span className="text-gray-600 dark:text-gray-400">Total Estimated Commission:</span>
+            <span className="font-medium text-green-600 dark:text-green-400">
+              {applications[0]?.currency} {applications.reduce((total, app) => total + calculateTotalCommission(app), 0).toLocaleString()}
+            </span>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex justify-end space-x-4">
+        <button
+          onClick={onBack}
+          disabled={loading}
+          className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Back
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={loading || !validateFees()}
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg text-white font-medium transition-all shadow-lg hover:shadow-xl flex items-center space-x-2"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Generating...</span>
+            </>
+          ) : (
+            <>
+              <Send className="w-4 h-4" />
+              <span>Generate Invoice</span>
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
-};
-
-export default CommissionNotes;
+}

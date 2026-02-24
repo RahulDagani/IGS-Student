@@ -1,112 +1,108 @@
 "use client"
+
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { ChevronLeft, ChevronRight, Send, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send, Search, Download, Eye, Trash2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
-interface InvoiceNote {
-  invoice_note_id?: number;
-  invoice_note_number: string;
-  status: string;
-  company: string;
-  commission_amt: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface InvoiceNoteDetail {
-  invoice_note_number: string;
-  status: string;
-  company: string;
-  commission_amt: string;
-  generated_by: string | null;
-  paid_by: string;
-  date_received_on: string;
-  date_of_payment: string;
-  last_updated_on: string;
-  comments: Comment[];
-}
-
-interface Comment {
+interface Invoice {
   id: number;
-  comment: string;
-  created_by: string;
-  created_at: string;
+  invoice_number: string;
+  invoice_date: string;
+  total_amount: string;
+  currency: string;
+  status: string;
+  university_name: string;
 }
 
-interface ApiComment {
-  id: number;
-  invoice_note_id: number;
-  comment: string;
-  who_has_created: string;
-  created_by: number;
-  is_internal_note: number;
-  is_deleted: number;
-  deleted_by: number | null;
-  deleted_at: string | null;
-  created_at: string;
-  updated_at: string;
-  created_by_name: string | null;
-  created_by_email: string | null;
+interface InvoiceDetail {
+  invoice: {
+    id: number;
+    invoice_number: string;
+    invoice_date: string;
+    purpose_code: string | null;
+    total_amount: string;
+    currency: string;
+    status: string;
+    created_at: string;
+    university_id: number;
+    university_name: string;
+  };
+  summary: {
+    total_items: number;
+    paid_items: number;
+    unpaid_items: number;
+  };
+  items: InvoiceItem[];
 }
 
-type SortField = keyof InvoiceNote | "";
-type SortDirection = "asc" | "desc";
+interface InvoiceItem {
+  invoice_item_id: number;
+  application_id: number;
+  installment_no: number;
+  commission_type: string;
+  commission_value: string;
+  commissionable_tuition_fee: string;
+  commission_amount: string;
+  currency: string;
+  payment_status: string;
+  paid_at: string | null;
+}
+
+interface Pagination {
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
 
 interface FilterOptions {
   dateRange: [Date | null, Date | null];
   universities: string[];
   status: string[];
-  invoiceNoteNumber: string;
-  studentSearch: string;
-  acknowledgementNo: string;
+  invoiceNumber: string;
+  universitySearch: string;
 }
 
 interface University {
   university_id: number;
   university_name: string;
+  total_applications: number;
 }
 
-interface Pagination {
-  page: number;
-  limit: number;
-  total: number;
-  pages: number;
-}
-
-export default function PaymentsTable() {
-  const [notes, setNotes] = useState<InvoiceNote[]>([]);
-  const [activeNoteDetail, setActiveNoteDetail] = useState<InvoiceNoteDetail | null>(null);
+export default function InvoicesPage() {
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [activeInvoiceDetail, setActiveInvoiceDetail] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notesLoading, setNotesLoading] = useState(false);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortField, setSortField] = useState<SortField>("");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [universities, setUniversities] = useState<University[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
-    limit: 20,
+    limit: 10,
     total: 0,
-    pages: 1
+    total_pages: 1
   });
-  const [activeNoteId, setActiveNoteId] = useState<number | null>(null);
-  const [active, setActive] = useState<"progress" | "paid">("progress");
-  const [commentText, setCommentText] = useState("");
-  const [postingComment, setPostingComment] = useState(false);
+  const [activeInvoiceId, setActiveInvoiceId] = useState<number | null>(null);
+  // const [activeTab, setActiveTab] = useState<"all" | "draft" | "sent" | "paid">("all");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<number | null>(null);
+  const [processingAction, setProcessingAction] = useState(false);
+  const [markPaidItem, setMarkPaidItem] = useState<number | null>(null);
   
   // Filter states
   const [filters, setFilters] = useState<FilterOptions>({
     dateRange: [null, null],
     universities: [],
     status: [],
-    invoiceNoteNumber: "",
-    studentSearch: "",
-    acknowledgementNo: "",
+    invoiceNumber: "",
+    universitySearch: "",
   });
 
   const [appliedFilters, setAppliedFilters] = useState<FilterOptions>(filters);
@@ -115,7 +111,7 @@ export default function PaymentsTable() {
   const { token } = useAuth();
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
-  // Fetch universities
+  // Fetch universities for filter
   const fetchUniversities = useCallback(async () => {
     try {
       const response = await fetch(
@@ -134,10 +130,8 @@ export default function PaymentsTable() {
       
       const data = await response.json();
       
-      if (data.success) {
+      if (data.status === 'success') {
         setUniversities(data.data || []);
-      } else {
-        throw new Error(data.message || "Failed to fetch universities");
       }
     } catch (err) {
       console.error(err);
@@ -145,23 +139,22 @@ export default function PaymentsTable() {
     }
   }, [BASE_URL, token]);
 
-  // Fetch Invoice notes
-  const fetchInvoiceNotes = useCallback(async (page = 1, filterOptions = appliedFilters) => {
+  // Fetch invoices
+  const fetchInvoices = useCallback(async (page = 1, filterOptions = appliedFilters) => {
     try {
-      setNotesLoading(true);
+      setInvoicesLoading(true);
+      setError(null);
       
       // Build query parameters
       const params = new URLSearchParams();
       
       // Add status filter based on active tab
-      if (active === "progress") {
-        params.delete("status");
-      } else if (active === "paid") {
-        params.append('status', 'commission_payment_done');
-      }
+      // if (activeTab !== "all") {
+      //   params.append('status', activeTab);
+      // }
       
-      if (filterOptions.invoiceNoteNumber) {
-        params.append('invoice_note_number', filterOptions.invoiceNoteNumber);
+      if (filterOptions.invoiceNumber) {
+        params.append('invoice_number', filterOptions.invoiceNumber);
       }
       
       if (filterOptions.status.length > 0) {
@@ -180,19 +173,15 @@ export default function PaymentsTable() {
         params.append('end_date', filterOptions.dateRange[1].toISOString().split('T')[0]);
       }
       
-      if (filterOptions.studentSearch) {
-        params.append('student_search', filterOptions.studentSearch);
-      }
-      
-      if (filterOptions.acknowledgementNo) {
-        params.append('acknowledgement_no', filterOptions.acknowledgementNo);
+      if (filterOptions.universitySearch) {
+        params.append('university_search', filterOptions.universitySearch);
       }
       
       params.append('page', page.toString());
       params.append('limit', pagination.limit.toString());
       
       const response = await fetch(
-        `${BASE_URL}/tenant/invoice/notes?${params.toString()}`,
+        `${BASE_URL}/tenant/invoices?${params.toString()}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -202,46 +191,42 @@ export default function PaymentsTable() {
       );
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch notes: ${response.status}`);
+        throw new Error(`Failed to fetch invoices: ${response.status}`);
       }
       
       const data = await response.json();
       
-      if (data.success) {
-        const notesWithId = data.data.map((note: InvoiceNote, index: number) => ({
-          ...note,
-          id: index + 1
-        }));
-        
-        setNotes(notesWithId);
+      if (data.status === 'success') {
+        setInvoices(data.data);
         setPagination(data.pagination || {
           page: page,
           limit: pagination.limit,
-          total: notesWithId.length,
-          pages: 1
+          total: data.data.length,
+          total_pages: 1
         });
         
-        // Set first note as active if available
-        if (notesWithId.length > 0 && !activeNoteId) {
-          setActiveNoteId(notesWithId[0].invoice_note_id || null);
+        // Set first invoice as active if available
+        if (data.data.length > 0 && !activeInvoiceId) {
+          setActiveInvoiceId(data.data[0].id);
         }
       } else {
-        throw new Error(data.message || "Failed to fetch Invoice notes");
+        throw new Error(data.message || "Failed to fetch invoices");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
-      setNotesLoading(false);
+      setInvoicesLoading(false);
     }
-  }, [BASE_URL, token, active, pagination.limit, activeNoteId, appliedFilters]);
+  }, [BASE_URL, token, pagination.limit, activeInvoiceId, appliedFilters]);
 
-  // Fetch Invoice note details
-  const fetchInvoiceNoteDetail = useCallback(async (noteId: number) => {
+  // Fetch invoice details
+  const fetchInvoiceDetail = useCallback(async (invoiceId: number) => {
     try {
       setDetailLoading(true);
+      setError(null);
       
       const response = await fetch(
-        `${BASE_URL}/tenant/invoice/notes/${noteId}`,
+        `${BASE_URL}/tenant/invoice/${invoiceId}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -251,29 +236,15 @@ export default function PaymentsTable() {
       );
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch note details: ${response.status}`);
+        throw new Error(`Failed to fetch invoice details: ${response.status}`);
       }
       
       const data = await response.json();
       
-      if (data.success) {
-          // Transform API comments to match our Comment interface
-          const comments: Comment[] = data.data.comments.map((apiComment: ApiComment) => ({
-            id: apiComment.id,
-            comment: apiComment.comment,
-            created_by: apiComment.created_by_name || apiComment.created_by_email || `User ${apiComment.created_by}`,
-            created_at: apiComment.created_at
-          }));
-          
-          // Update the note details with transformed comments
-          const noteDetail = {
-            ...data.data,
-            comments: comments
-          };
-          
-          setActiveNoteDetail(noteDetail);
+      if (data.status === 'success') {
+        setActiveInvoiceDetail(data.data);
       } else {
-        throw new Error(data.message || "Failed to fetch note details");
+        throw new Error(data.message || "Failed to fetch invoice details");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -282,68 +253,142 @@ export default function PaymentsTable() {
     }
   }, [BASE_URL, token]);
 
-
-
-  // Post a new comment
-const postComment = useCallback(async (noteId: number, comment: string) => {
-  if (!comment.trim() || !activeNoteDetail) return;
-  
-  try {
-    setPostingComment(true);
-    
-    const response = await fetch(
-      `${BASE_URL}/tenant/invoice/comments/${noteId}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          comment: comment.trim()
-        })
-      }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`Failed to post comment: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data.success) {
-      // Clear the comment input
-      setCommentText("");
+  // Mark invoice item as paid
+  const markItemAsPaid = useCallback(async (invoiceItemId: number) => {
+    try {
+      setProcessingAction(true);
+      setError(null);
       
-      // Refresh the note details to get updated comments
-      fetchInvoiceNoteDetail(noteId);
-    } else {
-      throw new Error(data.message || "Failed to post comment");
+      const response = await fetch(
+        `${BASE_URL}/tenant/invoice/mark-paid`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            invoice_item_id: invoiceItemId
+          })
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to mark item as paid: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.status === 'success') {
+        setSuccess('Invoice item marked as paid successfully');
+        // Refresh invoice details
+        if (activeInvoiceId) {
+          fetchInvoiceDetail(activeInvoiceId);
+        }
+        // Refresh invoices list
+        fetchInvoices(pagination.page);
+      } else {
+        throw new Error(data.message || "Failed to mark item as paid");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setProcessingAction(false);
+      setMarkPaidItem(null);
     }
-  } catch (err) {
-    setError(err instanceof Error ? err.message : "An error occurred while posting comment");
-  } finally {
-    setPostingComment(false);
-  }
-}, [BASE_URL, token, activeNoteDetail, fetchInvoiceNoteDetail]);
+  }, [BASE_URL, token, activeInvoiceId, fetchInvoiceDetail, fetchInvoices, pagination.page]);
+
+  // Delete invoice
+  const deleteInvoice = useCallback(async (invoiceId: number) => {
+    try {
+      setProcessingAction(true);
+      setError(null);
+      
+      const response = await fetch(
+        `${BASE_URL}/tenant/invoice/${invoiceId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (data.status === 'success') {
+        setSuccess('Invoice deleted successfully');
+        setShowDeleteModal(false);
+        setInvoiceToDelete(null);
+        setActiveInvoiceId(null);
+        setActiveInvoiceDetail(null);
+        // Refresh invoices list
+        fetchInvoices(1);
+      } else {
+        throw new Error(data.message || "Failed to delete invoice");
+      }
+    } catch (err) {
+      
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setProcessingAction(false);
+    }
+  }, [BASE_URL, token, fetchInvoices]);
+
+  // Download invoice PDF
+  const downloadInvoicePDF = useCallback(async (invoiceId: number) => {
+    try {
+      setProcessingAction(true);
+      setError(null);
+      
+      const response = await fetch(
+        `${BASE_URL}/tenant/invoice/${invoiceId}/pdf`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download PDF: ${response.status}`);
+      }
+      
+      // Get the blob from response
+      const blob = await response.blob();
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${invoiceId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      setSuccess('Invoice PDF downloaded successfully');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred while downloading PDF");
+    } finally {
+      setProcessingAction(false);
+    }
+  }, [BASE_URL, token]);
 
   // Handle filter changes
   const handleFilterChange = (filterType: keyof FilterOptions, value: any) => {
-    setFilters(prev => {
-      const newFilters = {
-        ...prev,
-        [filterType]: value
-      };
-      
-      return newFilters;
-    });
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }));
   };
 
   // Handle search button click - apply filters
   const handleSearch = () => {
     setAppliedFilters(filters);
     setDatePickerKey(prev => prev + 1);
-    fetchInvoiceNotes(1, filters);
+    fetchInvoices(1, filters);
   };
 
   // Clear all filters
@@ -352,50 +397,52 @@ const postComment = useCallback(async (noteId: number, comment: string) => {
       dateRange: [null, null],
       universities: [],
       status: [],
-      invoiceNoteNumber: "",
-      studentSearch: "",
-      acknowledgementNo: ""
+      invoiceNumber: "",
+      universitySearch: ""
     };
     
     setFilters(clearedFilters);
     setAppliedFilters(clearedFilters);
     setDatePickerKey(prev => prev + 1);
-    setUniversities([]);
-    fetchInvoiceNotes(1, clearedFilters);
+    fetchInvoices(1, clearedFilters);
   };
 
-  // Handle note click
-  const handleNoteClick = (noteId: number) => {
-    setActiveNoteId(noteId);
-    fetchInvoiceNoteDetail(noteId);
+  // Handle invoice click
+  const handleInvoiceClick = (invoiceId: number) => {
+    setActiveInvoiceId(invoiceId);
+    fetchInvoiceDetail(invoiceId);
   };
 
   // Handle page change
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= pagination.pages) {
-      fetchInvoiceNotes(newPage);
+const handlePageChange = (newPage: number) => {
+  if (newPage >= 1 && newPage <= pagination.total_pages) {
+    fetchInvoices(newPage, appliedFilters);
+  }
+};
+
+  // Handle delete confirmation
+  const handleDeleteClick = (invoiceId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setInvoiceToDelete(invoiceId);
+    setShowDeleteModal(true);
+  };
+
+  // Handle mark as paid click
+  const handleMarkPaidClick = (invoiceItemId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMarkPaidItem(invoiceItemId);
+  };
+
+  // Confirm mark as paid
+  const confirmMarkPaid = () => {
+    if (markPaidItem) {
+      markItemAsPaid(markPaidItem);
     }
   };
 
-  // Handle comment submission
-  const handleCommentSubmit = async () => {
-    if (activeNoteId && commentText.trim()) {
-      await postComment(activeNoteId, commentText);
-    }
-  };
-
-  // Handle key press in comment input (Shift + Enter for new line, Enter to submit)
-  const handleCommentKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleCommentSubmit();
-    }
-  };
-
-  // Format date to readable string
+  // Format date
   const formatDate = (dateString: string) => {
-    if (!dateString || dateString === "-") return "-";
-    
+    if (!dateString) return "-";
     const date = new Date(dateString);
     return date.toLocaleDateString('en-GB', {
       day: '2-digit',
@@ -405,45 +452,53 @@ const postComment = useCallback(async (noteId: number, comment: string) => {
   };
 
   const formatDateTime = (dateString: string) => {
-    if (!dateString || dateString === "-") return "-";
-    
+    if (!dateString) return "-";
     const date = new Date(dateString);
     return date.toLocaleDateString('en-GB', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
+      minute: '2-digit'
     });
   };
 
   // Get status color
   const getStatusColor = (status: string) => {
-    if (status.includes("Received") || status.includes("Approved") || status.includes("Completed") || status.includes("Paid")) {
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
-    } else if (status.includes("Pending") || status.includes("Processing") || status.includes("Progress") || status.includes("In Progress")) {
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
-    } else if (status.includes("Rejected") || status.includes("Closed")) {
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
-    } else if (status.includes("Sent To Partner")) {
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
-    } else if (status.includes("Invoice Uploaded")) {
-      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+    switch(status.toLowerCase()) {
+      case 'draft':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+      case 'sent':
+      case 'sent_to_partner':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+      case 'paid':
+      case 'commission_payment_done':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
-    return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+  };
+
+  // Get payment status color
+  const getPaymentStatusColor = (status: string) => {
+    switch(status.toLowerCase()) {
+      case 'paid':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+    }
   };
 
   // Status options for filter
   const statusOptions = [
-    { value: "Draft", label: "Draft" },
-    { value: "sent_to_partner", label: "Sent To Partner" },
-    { value: "invoice_uploaded", label: "Invoice Uploaded" },
-    { value: "revisions_in_invoice_needed", label: "Revisions In Invoice Needed" },
-    { value: "invoice_uploaded_after_corrections", label: "Invoice Uploaded After Corrections" },
-    { value: "revision_in_in_needed", label: "Revision In IN Needed" },
-    { value: "commission_payment_done", label: "Commission Payment Done" },
+    { value: "draft", label: "Draft" },
+    { value: "sent", label: "Sent" },
+    { value: "partial_paid", label: "Partial Paid" },
+    { value: "paid", label: "Paid" },
   ];
 
   // Initial data fetch
@@ -451,67 +506,34 @@ const postComment = useCallback(async (noteId: number, comment: string) => {
     const fetchInitialData = async () => {
       setLoading(true);
       await fetchUniversities();
-      await fetchInvoiceNotes();
+      await fetchInvoices();
       setLoading(false);
     };
     
     fetchInitialData();
-  }, [fetchUniversities, fetchInvoiceNotes]);
+  }, [fetchUniversities, fetchInvoices]);
 
-  // Fetch detail when active note changes
+  // Fetch detail when active invoice changes
   useEffect(() => {
-    if (activeNoteId) {
-      fetchInvoiceNoteDetail(activeNoteId);
+    if (activeInvoiceId) {
+      fetchInvoiceDetail(activeInvoiceId);
     }
-  }, [activeNoteId, fetchInvoiceNoteDetail]);
+  }, [activeInvoiceId, fetchInvoiceDetail]);
 
-  // Refresh notes when active tab changes
-  useEffect(() => {
-    fetchInvoiceNotes(1);
-  }, [active, fetchInvoiceNotes]);
+  // Refresh invoices when active tab changes
+  // useEffect(() => {
+  //   fetchInvoices(1);
+  // }, [fetchInvoices]);
 
   // Custom styles for react-select
-  const customSelectStyles = {
-    control: (base: any, state: any) => ({
-      ...base,
-      backgroundColor: 'rgb(255 255 255 / var(--tw-bg-opacity))',
-      borderColor: 'rgb(209 213 219 / var(--tw-border-opacity))',
-      minHeight: '42px',
-      '&:hover': {
-        borderColor: 'rgb(156 163 175 / var(--tw-border-opacity))',
-      },
-    }),
-    menu: (base: any) => ({
-      ...base,
-      backgroundColor: 'rgb(255 255 255)',
-      zIndex: 50,
-    }),
-    option: (base: any, state: any) => ({
-      ...base,
-      backgroundColor: state.isFocused ? 'rgb(243 244 246)' : 'white',
-      color: 'rgb(17 24 39)',
-      '&:hover': {
-        backgroundColor: 'rgb(243 244 246)',
-      },
-    }),
-    multiValue: (base: any) => ({
-      ...base,
-      backgroundColor: 'rgb(239 246 255)',
-    }),
-    multiValueLabel: (base: any) => ({
-      ...base,
-      color: 'rgb(29 78 216)',
-    }),
-  };
-
   const darkSelectStyles = {
-    control: (base: any, state: any) => ({
+    control: (base: any) => ({
       ...base,
-      backgroundColor: 'rgb(31 41 55 / var(--tw-bg-opacity))',
-      borderColor: 'rgb(75 85 99 / var(--tw-border-opacity))',
+      backgroundColor: 'rgb(31 41 55)',
+      borderColor: 'rgb(75 85 99)',
       minHeight: '42px',
       '&:hover': {
-        borderColor: 'rgb(107 114 128 / var(--tw-border-opacity))',
+        borderColor: 'rgb(107 114 128)',
       },
     }),
     menu: (base: any) => ({
@@ -552,294 +574,338 @@ const postComment = useCallback(async (noteId: number, comment: string) => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800/50 dark:bg-red-900/20">
-        <div className="flex items-center">
-          <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h3 className="ml-2 text-sm font-medium text-red-800 dark:text-red-400">Error loading data</h3>
-        </div>
-        <p className="mt-2 text-sm text-red-700 dark:text-red-300">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-3 text-sm text-red-800 dark:text-red-400 underline"
-        >
-          Try again
-        </button>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div className="flex justify-between w-full bg-[#f8fbff] dark:bg-gray-900 rounded-lg ">
-          {/* Tabs */}
-          <div className="flex gap-8 font-medium relative">
-            <button
-              onClick={() => setActive("progress")}
-              className={`pb-3 relative ${
-                active === "progress"
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "text-gray-900 dark:text-gray-300"
-              }`}
+      {/* Success Message */}
+      {success && (
+        <div className="fixed top-4 right-4 z-999999 bg-green-100 dark:bg-green-900 border border-green-200 dark:border-green-800 rounded-lg p-4 shadow-lg max-w-md animate-slide-in">
+          <div className="flex items-center">
+            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+            <p className="text-green-800 dark:text-green-300">{success}</p>
+            <button 
+              onClick={() => setSuccess(null)}
+              className="ml-4 text-green-600 dark:text-green-400 hover:text-green-800"
             >
-              In Progress
-              {active === "progress" && (
-                <span className="absolute left-0 -bottom-[1px] h-[3px] w-full bg-blue-600 dark:bg-blue-400 rounded-full" />
-              )}
+              <XCircle className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
 
-            <button
-              onClick={() => setActive("paid")}
-              className={`pb-3 relative ${
-                active === "paid"
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "text-gray-900 dark:text-gray-300"
-              }`}
+      {/* Error Message */}
+      {error && (
+        <div className="fixed top-4 right-4 z-999999 bg-red-100 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded-lg p-4 shadow-lg max-w-md animate-slide-in">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" />
+            <p className="text-red-800 dark:text-red-300">{error}</p>
+            <button 
+              onClick={() => setError(null)}
+              className="ml-4 text-red-600 dark:text-red-400 hover:text-red-800"
             >
-              Paid
-              {active === "paid" && (
-                <span className="absolute left-0 -bottom-[1px] h-[3px] w-full bg-blue-600 dark:bg-blue-400 rounded-full" />
-              )}
+              <XCircle className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 z-99999 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              Confirm Delete
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Are you sure you want to delete this invoice? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setInvoiceToDelete(null);
+                }}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                disabled={processingAction}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => invoiceToDelete && deleteInvoice(invoiceToDelete)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                disabled={processingAction}
+              >
+                {processingAction ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark as Paid Confirmation Modal */}
+      {markPaidItem && (
+        <div className="fixed inset-0 bg-black/50 z-99999 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              Confirm Payment
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Are you sure you want to mark this invoice item as paid?
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setMarkPaidItem(null)}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                disabled={processingAction}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmMarkPaid}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                disabled={processingAction}
+              >
+                {processingAction ? 'Processing...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              Invoices
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Manage and track all your invoices
+            </p>
           </div>
 
           <Link
             href="/admin/partners/accounts/universityinvoice/add"
-            type="button"
             className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium dark:bg-blue-700 dark:hover:bg-blue-600"
           >
-            <span>Create Invoice</span>
+            Create New Invoice
           </Link>
         </div>
-      </div>
-      
-      <div className="space-y-6">
+
+        {/* Tabs */}
+        {/* <div className="border-b border-gray-200 dark:border-white/[0.05]">
+          <div className="flex gap-8">
+            {['all', 'draft', 'sent', 'paid'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as any)}
+                className={`pb-3 px-1 relative capitalize ${
+                  activeTab === tab
+                    ? "text-blue-600 dark:text-blue-400 font-medium"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300"
+                }`}
+              >
+                {tab}
+                {activeTab === tab && (
+                  <span className="absolute left-0 -bottom-[1px] h-[3px] w-full bg-blue-600 dark:bg-blue-400 rounded-full" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div> */}
+        
         {/* Filters Section */}
-        <div className="MSL-Searchform bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-white/[0.05]">
+        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-white/[0.05]">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             
-            {/* Invoice note Number */}
-            <div className="SF-Keyword">
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Invoice Note
-                </label>
-                <input
-                  type="text"
-                  placeholder="Search by invoice note Number"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
-                  value={filters.invoiceNoteNumber}
-                  onChange={(e) => handleFilterChange('invoiceNoteNumber', e.target.value)}
-                />
-              </div>
+            {/* Invoice Number */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Invoice Number
+              </label>
+              <input
+                type="text"
+                placeholder="Search by invoice number"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
+                value={filters.invoiceNumber}
+                onChange={(e) => handleFilterChange('invoiceNumber', e.target.value)}
+              />
             </div>
 
             {/* Status Multi-select */}
-            <div className="SF-University all-countries">
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Status
-                </label>
-                <Select
-                  key={JSON.stringify(filters.status)}
-                  isMulti
-                  options={statusOptions}
-                  value={statusOptions.filter(option => 
-                    filters.status.includes(option.value)
-                  )}
-                  onChange={(selectedOptions) => {
-                    handleFilterChange('status', 
-                      selectedOptions ? selectedOptions.map(option => option.value) : []
-                    );
-                  }}
-                  placeholder="Select status"
-                  className="react-select-container"
-                  classNamePrefix="react-select"
-                  styles={darkSelectStyles}
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Status
+              </label>
+              <Select
+                isMulti
+                options={statusOptions}
+                value={statusOptions.filter(option => 
+                  filters.status.includes(option.value)
+                )}
+                onChange={(selectedOptions) => {
+                  handleFilterChange('status', 
+                    selectedOptions ? selectedOptions.map(option => option.value) : []
+                  );
+                }}
+                placeholder="Select status"
+                className="react-select-container"
+                classNamePrefix="react-select"
+                styles={darkSelectStyles}
+              />
             </div>
 
             {/* University Multi-select */}
-            <div className="SF-University all-countries">
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  University
-                </label>
-                <Select
-                  key={JSON.stringify([filters.universities])}
-                  isMulti
-                  options={universities.map(univ => ({
-                    value: univ.university_id.toString(),
-                    label: univ.university_name
-                  }))}
-                  value={universities.filter(univ => 
-                    filters.universities.includes(univ.university_id.toString())
-                  ).map(univ => ({
-                    value: univ.university_id.toString(),
-                    label: univ.university_name
-                  }))}
-                  onChange={(selectedOptions) => {
-                    handleFilterChange('universities', 
-                      selectedOptions ? selectedOptions.map(option => option.value) : []
-                    );
-                  }}
-                  placeholder={"Select universities"}
-                  className="react-select-container"
-                  classNamePrefix="react-select"
-                  styles={darkSelectStyles}
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                University
+              </label>
+              <Select
+                isMulti
+                options={universities.map(univ => ({
+                  value: univ.university_id.toString(),
+                  label: univ.university_name
+                }))}
+                value={universities.filter(univ => 
+                  filters.universities.includes(univ.university_id.toString())
+                ).map(univ => ({
+                  value: univ.university_id.toString(),
+                  label: univ.university_name
+                }))}
+                onChange={(selectedOptions) => {
+                  handleFilterChange('universities', 
+                    selectedOptions ? selectedOptions.map(option => option.value) : []
+                  );
+                }}
+                placeholder="Select universities"
+                className="react-select-container"
+                classNamePrefix="react-select"
+                styles={darkSelectStyles}
+              />
             </div>
 
-            {/* Date Created */}
-            <div className="SF-DateApp">
-              <div className="form-group calendar-one">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Date Created
-                </label>
-                <div className="relative">
-                  <DatePicker
-                    key={datePickerKey}
-                    selected={filters.dateRange[0]}
-                    onChange={(dates: [Date | null, Date | null]) => handleFilterChange('dateRange', dates)}
-                    startDate={filters.dateRange[0]}
-                    endDate={filters.dateRange[1]}
-                    selectsRange
-                    isClearable
-                    placeholderText="Select date range"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    dateFormat="dd-MM-yyyy"
-                    wrapperClassName="w-full"
-                  />
-                </div>
-              </div>
+            {/* Date Range */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Date Created
+              </label>
+              <DatePicker
+                key={datePickerKey}
+                selected={filters.dateRange[0]}
+                onChange={(dates: [Date | null, Date | null]) => handleFilterChange('dateRange', dates)}
+                startDate={filters.dateRange[0]}
+                endDate={filters.dateRange[1]}
+                selectsRange
+                isClearable
+                placeholderText="Select date range"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                dateFormat="dd-MM-yyyy"
+                wrapperClassName="w-full"
+              />
             </div>
 
-            {/* Student Search */}
-            <div className="SF-Keyword">
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Student
-                </label>
-                <input
-                  type="text"
-                  placeholder="Search by student Name/Email"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
-                  value={filters.studentSearch}
-                  onChange={(e) => handleFilterChange('studentSearch', e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Acknowledgement No. */}
-            <div className="SF-Keyword">
-              <div className="form-group">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Acknowledgement No.
-                </label>
-                <input
-                  type="text"
-                  placeholder="Acknowledgement No."
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
-                  value={filters.acknowledgementNo}
-                  onChange={(e) => handleFilterChange('acknowledgementNo', e.target.value)}
-                />
-              </div>
+            {/* University Search */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                University Search
+              </label>
+              <input
+                type="text"
+                placeholder="Search by university name"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
+                value={filters.universitySearch}
+                onChange={(e) => handleFilterChange('universitySearch', e.target.value)}
+              />
             </div>
 
             {/* Action Buttons */}
             <div className="flex items-end gap-2">
-              <div className="form-group">
-                <button
-                  type="button"
-                  className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium dark:bg-blue-700 dark:hover:bg-blue-600"
-                  onClick={handleSearch}
-                  disabled={notesLoading}
-                >
-                  <Search size={18} />
-                  {notesLoading ? "Searching..." : "Search"}
-                </button>
-              </div>
+              <button
+                type="button"
+                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium dark:bg-blue-700 dark:hover:bg-blue-600"
+                onClick={handleSearch}
+                disabled={invoicesLoading}
+              >
+                <Search size={18} />
+                {invoicesLoading ? "Searching..." : "Search"}
+              </button>
               
-              <div className="form-group">
-                <button
-                  type="button"
-                  className="px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
-                  onClick={handleClearFilters}
-                >
-                  Clear
-                </button>
-              </div>
+              <button
+                type="button"
+                className="px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
+                onClick={handleClearFilters}
+              >
+                Clear
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+        {/* Main Content */}
+        <div className="overflow-hidden rounded-xl bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
           <div className="max-w-full overflow-x-auto">
             <div className="min-w-[1200px]">
               <div className="flex gap-6 bg-[#F6F9FC] dark:bg-gray-900 min-h-screen">
-                {/* LEFT PANEL */}
+                {/* LEFT PANEL - Invoices List */}
                 <div className="w-[420px] bg-white dark:bg-gray-800 rounded-xl space-y-4 border border-gray-200 dark:border-white/[0.05]">
-                  {notesLoading ? (
+                  {invoicesLoading ? (
                     <div className="flex justify-center items-center h-32">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
-                  ) : notes.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      No Invoice notes found
+                  ) : invoices.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <p className="text-gray-600 dark:text-gray-400 font-medium">No invoices found</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                        Try adjusting your filters or create a new invoice
+                      </p>
                     </div>
                   ) : (
                     <>
-                      {notes.map((note) => (
+                      {invoices.map((invoice) => (
                         <div 
-                          key={note.invoice_note_number}
-                          className={`rounded-xl p-4 space-y-2 mb-0 relative cursor-pointer transition-all ${
-                            activeNoteId === note.invoice_note_id 
+                          key={invoice.id}
+                          className={`rounded-xl p-4 space-y-2 relative cursor-pointer transition-all ${
+                            activeInvoiceId === invoice.id 
                               ? 'border-l-4 border-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500' 
                               : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-l-4 border-transparent'
                           }`}
-                          onClick={() => handleNoteClick(note.invoice_note_id!)}
+                          onClick={() => handleInvoiceClick(invoice.id)}
                         >
-                          <span className={`absolute top-4 right-4 text-xs px-3 py-1 rounded-full ${getStatusColor(note.status)}`}>
-                            {note.status}
-                          </span>
+                          <div className="flex justify-between items-start">
+                            <span className={`text-xs px-3 py-1 rounded-full ${getStatusColor(invoice.status)}`}>
+                              {invoice.status}
+                            </span>
+                            <button
+                              onClick={(e) => handleDeleteClick(invoice.id, e)}
+                              className="text-gray-400 hover:text-red-600 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
 
                           <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
-                            {note.invoice_note_number}
+                            {invoice.invoice_number}
                           </h3>
 
                           <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {note.company}
+                            {invoice.university_name}
                           </p>
 
-                          <p className="text-sm text-gray-700 dark:text-gray-300">
-                            Commission Amount is{" "}
-                            <span className="font-semibold">{note.commission_amt}</span>
-                          </p>
-
-                          <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                            <p>
-                              Created On:{" "}
-                              <span className="font-medium text-gray-800 dark:text-gray-300">
-                                {formatDateTime(note.created_at)}
-                              </span>
+                          <div className="flex justify-between items-center">
+                            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                              {invoice.currency} {parseFloat(invoice.total_amount).toLocaleString()}
                             </p>
-                            <p>
-                              Last Updated On:{" "}
-                              <span className="font-medium text-gray-800 dark:text-gray-300">
-                                {formatDateTime(note.updated_at)}
-                              </span>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {formatDate(invoice.invoice_date)}
                             </p>
                           </div>
                         </div>
@@ -847,9 +913,9 @@ const postComment = useCallback(async (noteId: number, comment: string) => {
                     </>
                   )}
 
-                  {/* PAGINATION */}
-                  {notes.length > 0 && (
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-white/[0.05]">
+                  {/* Pagination */}
+                  {invoices.length > 0 && (
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-white/[0.05]">
                       <div className="flex items-center gap-2">
                         <button 
                           className="h-9 w-9 border border-gray-300 dark:border-gray-700 rounded-lg flex items-center justify-center disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
@@ -859,31 +925,35 @@ const postComment = useCallback(async (noteId: number, comment: string) => {
                           <ChevronLeft size={16} />
                         </button>
 
-                        <button className="h-9 w-9 bg-blue-600 text-white rounded-lg dark:bg-blue-700">
-                          {pagination.page}
-                        </button>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          Page {pagination.page} of {pagination.total_pages}
+                        </span>
 
                         <button 
                           className="h-9 w-9 border border-gray-300 dark:border-gray-700 rounded-lg flex items-center justify-center disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                           onClick={() => handlePageChange(pagination.page + 1)}
-                          disabled={pagination.page === pagination.pages}
+                          disabled={pagination.page === pagination.total_pages}
                         >
                           <ChevronRight size={16} />
                         </button>
                       </div>
 
                       <select 
-                        className="border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                        value={pagination.limit}
-                        onChange={(e) => {
-                          const newLimit = parseInt(e.target.value);
-                          setPagination(prev => ({
-                            ...prev,
-                            limit: newLimit
-                          }));
-                          fetchInvoiceNotes(1);
-                        }}
-                      >
+  className="border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+  value={pagination.limit}
+  onChange={(e) => {
+    const newLimit = parseInt(e.target.value);
+    setPagination(prev => ({
+      ...prev,
+      limit: newLimit,
+      page: 1 // Reset to first page when changing limit
+    }));
+    // Use setTimeout to ensure state update completes
+    setTimeout(() => {
+      fetchInvoices(1, appliedFilters);
+    }, 0);
+  }}
+>
                         <option value="10">10/page</option>
                         <option value="20">20/page</option>
                         <option value="50">50/page</option>
@@ -893,133 +963,183 @@ const postComment = useCallback(async (noteId: number, comment: string) => {
                   )}
                 </div>
 
-                {/* RIGHT PANEL */}
+                {/* RIGHT PANEL - Invoice Details */}
                 <div className="flex-1 bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-white/[0.05]">
                   {detailLoading ? (
                     <div className="flex justify-center items-center h-64">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
-                  ) : activeNoteDetail ? (
-                    <>
-                      {/* HEADER */}
-                      <div className="flex justify-between items-start border-b border-gray-200 dark:border-white/[0.05] pb-4">
-                        <div className="space-y-2">
-                          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                            {activeNoteDetail.invoice_note_number}
-                          </h2>
-
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {activeNoteDetail.company}
-                          </p>
-
-                          <p className="text-sm text-gray-700 dark:text-gray-300">
-                            Commission Amount is{" "}
-                            <span className="font-semibold">{activeNoteDetail.commission_amt}</span>
-                          </p>
-                        </div>
-
+                  ) : activeInvoiceDetail ? (
+                    <div className="space-y-6">
+                      {/* Header Actions */}
+                      <div className="flex justify-between items-center">
                         <div className="flex gap-3">
-                          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors dark:bg-blue-700 dark:hover:bg-blue-600">
-                            Generate Invoice
-                          </button>
-
-                          <button className="border border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400 px-4 py-2 rounded-lg text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                            View Note
-                          </button>
-
-                          <button className="border border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400 px-4 py-2 rounded-lg text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                            Download Note
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* DETAILS */}
-                      <div className="grid grid-cols-2 gap-y-4 gap-x-10 py-6 text-sm">
-                        <p className="text-gray-700 dark:text-gray-300">
-                          Generated By:{" "}
-                          <span className="font-medium text-gray-800 dark:text-gray-200">
-                            {activeNoteDetail.generated_by || '-'}
-                          </span>
-                        </p>
-
-                        <p className="text-gray-700 dark:text-gray-300">
-                          Paid By:{" "}
-                          <span className="font-medium text-gray-800 dark:text-gray-200">
-                            {activeNoteDetail.paid_by}
-                          </span>
-                        </p>
-
-                        <p className="text-gray-700 dark:text-gray-300">
-                          Date Received On:{" "}
-                          <span className="font-medium text-gray-800 dark:text-gray-200">
-                            {formatDateTime(activeNoteDetail.date_received_on)}
-                          </span>
-                        </p>
-
-                        <p className="text-gray-700 dark:text-gray-300">
-                          Date of Payment:{" "}
-                          <span className="font-medium text-gray-800 dark:text-gray-200">
-                            {activeNoteDetail.date_of_payment}
-                          </span>
-                        </p>
-
-                        <p className="text-gray-700 dark:text-gray-300">
-                          Last Updated On:{" "}
-                          <span className="font-medium text-gray-800 dark:text-gray-200">
-                            {formatDateTime(activeNoteDetail.last_updated_on)}
-                          </span>
-                        </p>
-                      </div>
-
-                      {/* COMMENTS */}
-                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 border border-blue-100 dark:border-blue-900/30">
-                        <h3 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Comments</h3>
-
-                        <div className="flex items-center gap-3">
-                          <input
-                            placeholder="Type your comment here... Press Enter to submit"
-                            className="flex-1 rounded-full px-4 py-3 border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 dark:placeholder-gray-500"
-                            value={commentText}
-                            onChange={(e) => setCommentText(e.target.value)}
-                            onKeyDown={handleCommentKeyDown}
-                            disabled={postingComment}
-                          />
-
-                          <button 
-                            className="h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-700 transition-colors dark:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={handleCommentSubmit}
-                            disabled={postingComment || !commentText.trim()}
+                          <button
+                            onClick={() => downloadInvoicePDF(activeInvoiceDetail.invoice.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                            disabled={processingAction}
                           >
-                            {postingComment ? (
-                              <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                            ) : (
-                              <Send size={18} />
-                            )}
+                            <Download size={16} />
+                            Download PDF
                           </button>
+                          {/* <button
+                            onClick={() => window.open(`/admin/invoice/view/${activeInvoiceDetail.invoice.id}`, '_blank')}
+                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm"
+                          >
+                            <Eye size={16} />
+                            View Details
+                          </button> */}
                         </div>
-
-                        {activeNoteDetail.comments && activeNoteDetail.comments.length > 0 ? (
-                          <div className="mt-4 space-y-4">
-                            {activeNoteDetail.comments.map((comment) => (
-                              <div key={comment.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-white/[0.05] shadow-sm">
-                                <p className="text-gray-700 dark:text-gray-300">{comment.comment}</p>
-                                <div className="flex justify-between items-center mt-2 text-sm text-gray-500 dark:text-gray-400">
-                                  <span>By: {comment.created_by}</span>
-                                  <span>{formatDateTime(comment.created_at)}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 mt-16">
-                            <p>No comments yet.</p>
-                          </div>
-                        )}
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(activeInvoiceDetail.invoice.status)}`}>
+                          {activeInvoiceDetail.invoice.status}
+                        </span>
                       </div>
-                    </>
+
+                      {/* Invoice Header */}
+                      <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Invoice Number</p>
+                            <p className="font-semibold text-gray-900 dark:text-gray-100">
+                              {activeInvoiceDetail.invoice.invoice_number}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Invoice Date</p>
+                            <p className="font-semibold text-gray-900 dark:text-gray-100">
+                              {formatDate(activeInvoiceDetail.invoice.invoice_date)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">University</p>
+                            <p className="font-semibold text-gray-900 dark:text-gray-100">
+                              {activeInvoiceDetail.invoice.university_name}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Total Amount</p>
+                            <p className="font-bold text-lg text-gray-900 dark:text-gray-100">
+                              {activeInvoiceDetail.invoice.currency} {parseFloat(activeInvoiceDetail.invoice.total_amount).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                          <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Total Items</p>
+                          <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                            {activeInvoiceDetail.summary.total_items}
+                          </p>
+                        </div>
+                        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                          <p className="text-sm text-green-600 dark:text-green-400 mb-1">Paid Items</p>
+                          <p className="text-2xl font-bold text-green-700 dark:text-green-300">
+                            {activeInvoiceDetail.summary.paid_items}
+                          </p>
+                        </div>
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+                          <p className="text-sm text-yellow-600 dark:text-yellow-400 mb-1">Unpaid Items</p>
+                          <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
+                            {activeInvoiceDetail.summary.unpaid_items}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Invoice Items Table */}
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Invoice Items</h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-gray-50 dark:bg-gray-700/50">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                  App ID
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                  Installment
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                  Commission Type
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                  Tuition Fee
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                  Commission Amount
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                  Status
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                  Action
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                              {activeInvoiceDetail.items.map((item) => (
+                                <tr key={item.invoice_item_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                                    #{item.application_id}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                                    {item.installment_no}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                                    <span className="capitalize">{item.commission_type}</span>
+                                    <span className="text-gray-500 ml-1">
+                                      ({item.commission_value})
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                                    {item.currency} {parseFloat(item.commissionable_tuition_fee).toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    {item.currency} {parseFloat(item.commission_amount).toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className={`px-2 py-1 text-xs rounded-full ${getPaymentStatusColor(item.payment_status)}`}>
+                                      {item.payment_status}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {item.payment_status === 'pending' && (
+                                      <button
+                                        onClick={(e) => handleMarkPaidClick(item.invoice_item_id, e)}
+                                        className="text-xs px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                        disabled={processingAction}
+                                      >
+                                        Mark Paid
+                                      </button>
+                                    )}
+                                    {item.paid_at && (
+                                      <span className="text-xs text-gray-500">
+                                        Paid: {formatDateTime(item.paid_at)}
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="text-xs text-gray-500 dark:text-gray-400 pt-4 border-t border-gray-200 dark:border-white/[0.05]">
+                        Created: {formatDateTime(activeInvoiceDetail.invoice.created_at)}
+                      </div>
+                    </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
-                      <p>Select a Invoice note to view details</p>
+                      <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <p className="text-lg font-medium mb-1">No invoice selected</p>
+                      <p className="text-sm">Select an invoice from the list to view details</p>
                     </div>
                   )}
                 </div>
@@ -1028,70 +1148,9 @@ const postComment = useCallback(async (noteId: number, comment: string) => {
           </div>
         </div>
 
-        {/* Results Count and Pagination */}
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            Showing {notes.length} of {pagination.total} Invoice notes
-          </div>
-          
-          {/* Pagination */}
-          <div className="flex items-center gap-2">
-            <button 
-              className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
-              onClick={() => handlePageChange(pagination.page - 1)}
-              disabled={pagination.page === 1}
-            >
-              Previous
-            </button>
-            
-            {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
-              let pageNum;
-              if (pagination.pages <= 5) {
-                pageNum = i + 1;
-              } else if (pagination.page <= 3) {
-                pageNum = i + 1;
-              } else if (pagination.page >= pagination.pages - 2) {
-                pageNum = pagination.pages - 4 + i;
-              } else {
-                pageNum = pagination.page - 2 + i;
-              }
-              
-              return (
-                <button
-                  key={pageNum}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                    pagination.page === pageNum
-                      ? 'bg-blue-600 text-white dark:bg-blue-700 dark:text-white'
-                      : 'border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                  onClick={() => handlePageChange(pageNum)}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-            
-            {pagination.pages > 5 && pagination.page < pagination.pages - 2 && (
-              <span className="px-2 text-gray-500 dark:text-gray-400">...</span>
-            )}
-            
-            {pagination.pages > 5 && pagination.page < pagination.pages - 2 && (
-              <button
-                className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                onClick={() => handlePageChange(pagination.pages)}
-              >
-                {pagination.pages}
-              </button>
-            )}
-            
-            <button 
-              className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
-              onClick={() => handlePageChange(pagination.page + 1)}
-              disabled={pagination.page === pagination.pages}
-            >
-              Next
-            </button>
-          </div>
+        {/* Results Count */}
+        <div className="text-sm text-gray-500 dark:text-gray-400">
+          Showing {invoices.length} of {pagination.total} invoices
         </div>
       </div>
     </>

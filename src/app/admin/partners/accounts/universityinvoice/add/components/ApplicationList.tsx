@@ -1,259 +1,259 @@
-"use client";
-import React, { useState, useEffect } from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import { Application } from '../types';
+import { Check, Loader2, AlertCircle, GraduationCap, DollarSign, Calendar } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 interface ApplicationListProps {
-  universityId: number | null;
+  universityId: number;
   onApplicationsSelect: (applications: Application[]) => void;
   onNextStep: () => void;
 }
 
-const ApplicationList: React.FC<ApplicationListProps> = ({
-  universityId,
-  onApplicationsSelect,
-  onNextStep
-}) => {
+export default function ApplicationList({ universityId, onApplicationsSelect, onNextStep }: ApplicationListProps) {
   const [applications, setApplications] = useState<Application[]>([]);
-  const [selectedApps, setSelectedApps] = useState<number[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { token } = useAuth();
-  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const {token} = useAuth();
+    const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
   useEffect(() => {
-    if (universityId) {
-      fetchApplications();
-    } else {
-      setApplications([]);
-      setSelectedApps([]);
-    }
+    fetchApplications();
   }, [universityId]);
 
   const fetchApplications = async () => {
-    if (!universityId) return;
-    
     try {
       setLoading(true);
-      setError(null);
-      
-      const response = await fetch(
-        `${BASE_URL}/tenant/invoice/applications?university_id=${universityId}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+      const response = await fetch(`${BASE_URL}/tenant/invoice/applications/${universityId}`,{
+          headers:{
+            "Authorization": `Bearer ${token}`
           }
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch applications: ${response.status}`);
-      }
-      
+        });
       const data = await response.json();
       
-      if (data.success) {
-        setApplications(data.data || []);
+      if (data.status === 'success') {
+        setApplications(data.data);
       } else {
-        throw new Error(data.message || "Failed to fetch applications");
+        setError('Failed to fetch applications');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError('Error connecting to server');
+      console.error('Error fetching applications:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectApplication = (applicationId: number, isEligible: boolean) => {
-    if (!isEligible) return;
+  const toggleApplication = (applicationId: number) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(applicationId)) {
+      newSelected.delete(applicationId);
+    } else {
+      newSelected.add(applicationId);
+    }
+    setSelectedIds(newSelected);
     
-    setSelectedApps(prev => {
-      if (prev.includes(applicationId)) {
-        return prev.filter(id => id !== applicationId);
-      } else {
-        return [...prev, applicationId];
-      }
-    });
+    const selectedApps = applications.filter(app => newSelected.has(app.application_id));
+    onApplicationsSelect(selectedApps);
   };
 
-  const handleCreatePayment = () => {
-    const selectedApplications = applications.filter(app => 
-      selectedApps.includes(app.application_id)
-    );
-    onApplicationsSelect(selectedApplications);
-    onNextStep();
+  const toggleAll = () => {
+    if (selectedIds.size === applications.length) {
+      setSelectedIds(new Set());
+      onApplicationsSelect([]);
+    } else {
+      const allIds = new Set(applications.map(app => app.application_id));
+      setSelectedIds(allIds);
+      onApplicationsSelect(applications);
+    }
   };
 
-  const isApplicationEligible = (app: Application) => {
-    return app.generated_intallments < app.no_of_installments;
+  const getCommissionDisplay = (app: Application) => {
+    const value = parseFloat(app.commission_value);
+    if (app.commission_type === 'percentage') {
+      return `${value}%`;
+    }
+    return `${app.currency} ${value.toLocaleString()}`;
   };
-
-  if (!universityId) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-white/[0.05] p-6 text-center">
-        <div className="text-gray-400 dark:text-gray-500">
-          Please select a university first
-        </div>
-      </div>
-    );
-  }
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-white/[0.05] p-6">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-white/[0.05] p-6">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800/50 dark:bg-red-900/20">
-          <div className="flex items-center">
-            <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h3 className="ml-2 text-sm font-medium text-red-800 dark:text-red-400">Error</h3>
-          </div>
-          <p className="mt-2 text-sm text-red-700 dark:text-red-300">{error}</p>
-          <button
-            onClick={fetchApplications}
-            className="mt-3 text-sm text-red-800 dark:text-red-400 underline"
-          >
-            Try again
-          </button>
-        </div>
+      <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-8 text-center">
+        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+        <p className="text-red-600 dark:text-red-400">{error}</p>
+        <button 
+          onClick={fetchApplications}
+          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
 
-  const eligibleApplications = applications.filter(isApplicationEligible);
-  const isCreateDisabled = selectedApps.length === 0 || 
-    selectedApps.length > eligibleApplications.length;
-
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-white/[0.05] p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-          Select Applications
-        </h2>
-        
-        {selectedApps.length > 0 && (
-          <button
-            onClick={handleCreatePayment}
-            disabled={isCreateDisabled}
-            className={`
-              px-6 py-2.5 rounded-lg font-medium transition-colors
-              ${isCreateDisabled
-                ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white'
-              }
-            `}
-          >
-            Create Payment ({selectedApps.length} selected)
-          </button>
-        )}
+    <div className="space-y-6">
+      {/* Selection Summary */}
+      <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+            <GraduationCap className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {selectedIds.size} application{selectedIds.size !== 1 ? 's' : ''} selected
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-500">
+              Total available: {applications.length} applications
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={toggleAll}
+          className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+        >
+          {selectedIds.size === applications.length ? 'Deselect All' : 'Select All'}
+        </button>
       </div>
-      
-      {applications.length === 0 ? (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          No applications found for this university
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {applications.map((app) => {
-            const isEligible = isApplicationEligible(app);
-            const isSelected = selectedApps.includes(app.application_id);
-            
-            return (
-              <div
-                key={app.application_id}
-                className={`
-                  p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer
-                  ${!isEligible
-                    ? 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 opacity-60 cursor-not-allowed'
-                    : isSelected
-                    ? 'border-blue-600 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                  }
-                `}
-                onClick={() => handleSelectApplication(app.application_id, isEligible)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleSelectApplication(app.application_id, isEligible)}
-                        disabled={!isEligible}
-                        className="h-4 w-4 text-blue-600 rounded border-gray-300 dark:border-gray-600 focus:ring-blue-500 dark:focus:ring-blue-400"
-                      />
-                      
-                      <div>
-                        <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                          {app.student_name}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {app.acknowledgement_no}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm ml-7">
-                      <div>
-                        <p className="text-gray-500 dark:text-gray-400">Intake</p>
-                        <p className="font-medium text-gray-900 dark:text-gray-100">
-                          {app.intake_name} {app.intake_year}
-                        </p>
-                      </div>
-                      
-                      <div>
-                        <p className="text-gray-500 dark:text-gray-400">Study Level</p>
-                        <p className="font-medium text-gray-900 dark:text-gray-100">
-                          {app.study_level}
-                        </p>
-                      </div>
-                      
-                      <div>
-                        <p className="text-gray-500 dark:text-gray-400">Tuition Fee</p>
-                        <p className="font-medium text-gray-900 dark:text-gray-100">
-                          {app.currency_code} {app.tuition_fee}
-                        </p>
-                      </div>
-                      
-                      <div>
-                        <p className="text-gray-500 dark:text-gray-400">Installments</p>
-                        <p className="font-medium text-gray-900 dark:text-gray-100">
-                          {app.generated_intallments}/{app.no_of_installments} paid
-                        </p>
-                      </div>
-                    </div>
+
+      {/* Applications Table */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
+              <tr>
+                <th className="px-6 py-4 text-left">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Select
+                    </span>
                   </div>
-                  
-                  {!isEligible && (
-                    <span className="ml-4 px-3 py-1 text-xs rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
-                      All installments paid
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Application ID
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Student ID
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Commission
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Installments
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Last Invoice
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {applications.map((app) => (
+                <tr 
+                  key={app.application_id}
+                  onClick={() => toggleApplication(app.application_id)}
+                  className={`cursor-pointer transition-colors ${
+                    selectedIds.has(app.application_id)
+                      ? 'bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+                      : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  <td className="px-6 py-4">
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                      selectedIds.has(app.application_id)
+                        ? 'bg-blue-600 border-blue-600'
+                        : 'border-gray-300 dark:border-gray-600'
+                    }`}>
+                      {selectedIds.has(app.application_id) && (
+                        <Check className="w-3 h-3 text-white" />
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">
+                    #{app.application_id}
+                  </td>
+                  <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
+                    {app.student_id}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center space-x-1">
+                      <DollarSign className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-900 dark:text-gray-100">
+                        {getCommissionDisplay(app)}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-900 dark:text-gray-100">
+                        {app.total_installments_paid}/{app.no_of_installments}
+                      </span>
+                      {app.pending_installments > 0 && (
+                        <span className="px-2 py-1 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full">
+                          {app.pending_installments} pending
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {app.last_invoice_date || 'No invoice'}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                      app.pending_installments > 0
+                        ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+                        : app.total_installments_paid === app.no_of_installments
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400'
+                    }`}>
+                      {app.pending_installments > 0 ? 'Pending' : 
+                       app.total_installments_paid === app.no_of_installments ? 'Paid' : 'New'}
                     </span>
-                  )}
-                  
-                  {isEligible && (
-                    <span className="ml-4 px-3 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                      Eligible for payment
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex justify-end space-x-4">
+        <button
+          onClick={() => window.history.back()}
+          className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          Back
+        </button>
+        <button
+          onClick={onNextStep}
+          disabled={selectedIds.size === 0}
+          className={`px-6 py-2 rounded-lg text-white font-medium transition-all ${
+            selectedIds.size > 0
+              ? 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl'
+              : 'bg-gray-400 cursor-not-allowed'
+          }`}
+        >
+          Continue with {selectedIds.size} Application{selectedIds.size !== 1 ? 's' : ''}
+        </button>
+      </div>
     </div>
   );
-};
-
-export default ApplicationList;
+}

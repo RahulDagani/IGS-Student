@@ -773,7 +773,7 @@ export default function CommissionsTable() {
   </div>
 
   {/* Export Button with Dropdown */}
-  <div className="relative group">
+  {/* <div className="relative group">
     <button
       onClick={handleExport}
       disabled={isExporting}
@@ -783,7 +783,7 @@ export default function CommissionsTable() {
       {isExporting ? 'Exporting...' : 'Export'}
     </button>
     
-    {/* Dropdown Menu */}
+    
     <div className="absolute right-0 top-7 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 hidden group-hover:block z-50">
       <button
         onClick={handleExport}
@@ -809,7 +809,16 @@ export default function CommissionsTable() {
         </button>
       )}
     </div>
-  </div>
+  </div> */}
+
+  <button
+      onClick={handleSavedExport}
+      disabled={isExporting}
+      className="dark:bg-dark-900 h-11 px-4 rounded-lg border border-gray-200 bg-transparent text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 flex items-center gap-2 disabled:opacity-50"
+    >
+      <Download className="w-4 h-4" />
+      {isExporting ? 'Exporting...' : 'Export'}
+    </button>
 
   {/* Download Sample Button */}
   <button

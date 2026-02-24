@@ -30,13 +30,6 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
     return () => clearTimeout(timer);
   }, [onClose]);
 
-  useEffect(()=>{
-    window.scrollTo({
-          top: 0,
-          behavior: 'smooth'
-        });
-  },[])
-
   const bgColor = {
     success: 'bg-green-50 dark:bg-green-900/20 border-green-500',
     error: 'bg-red-50 dark:bg-red-900/20 border-red-500',
@@ -56,13 +49,15 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
   }[type];
 
   return (
-    <div className="flex z-[99999] animate-slide-down">
-      <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border-l-4 shadow-lg ${bgColor}`}>
-        <CheckCircle className={`w-5 h-5 ${iconColor}`} />
-        <p className={`text-sm font-medium ${textColor}`}>{message}</p>
+    <div className="fixed top-4 right-4 z-[99999] max-w-[350px] animate-slide-down">
+      <div className={`flex items-start gap-3 px-4 py-3 rounded-lg border-l-4 shadow-lg ${bgColor}`}>
+        <CheckCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconColor}`} />
+        <p className={`text-sm font-medium break-words flex-1 ${textColor}`}>
+          {message}
+        </p>
         <button
           onClick={onClose}
-          className={`ml-4 hover:opacity-70 ${textColor}`}
+          className={`flex-shrink-0 hover:opacity-70 ${textColor}`}
         >
           <X className="w-4 h-4" />
         </button>

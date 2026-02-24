@@ -24,7 +24,8 @@ import { useAuth } from "@/context/AuthContext";
 
 // Types for API response
 interface ChildModule {
-  id: number;
+  sub_module_id?: number;
+  id?: number;
   module_id: number;
   name: string;
   slug: string;
@@ -50,14 +51,75 @@ interface NavItem {
   subItems?: NavItem[];
 }
 
-// Static items that don't come from API
-const staticNavItems: NavItem[] = [
-  {
-    name: "Dashboard",
-    icon: <LayoutDashboard size={18} />,
-    path: "/",
-  },
-];
+interface MenuSection {
+  title: string;
+  items: NavItem[];
+}
+
+// SVG parser helper
+const parseSVGIcon = (iconString: string): React.ReactNode => {
+  if (!iconString || iconString.trim() === '') {
+    return <div className="w-5 h-5" />;
+  }
+  
+  try {
+    const svgMatch = iconString.match(/<svg[\s\S]*?<\/svg>/);
+    if (svgMatch) {
+      return (
+        <span
+          className="inline-flex items-center justify-center w-5 h-5"
+          dangerouslySetInnerHTML={{ 
+            __html: svgMatch[0]
+              .replace(/width="[^"]*"/, 'width="18"')
+              .replace(/height="[^"]*"/, 'height="18"')
+              .replace(/class="/g, 'className="')
+          }}
+        />
+      );
+    }
+  } catch (error) {
+    console.error('Error parsing SVG:', error);
+  }
+  
+  return <div className="w-5 h-5" />;
+};
+
+const getIcon = parseSVGIcon;
+
+// Map API modules to NavItems
+const mapApiToNavItems = (modules: Module[]): MenuSection[] => {
+  return modules.map(module => {
+    const items: NavItem[] = (module.sub_modules || [])
+      .filter(subModule => subModule.status === 1)
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(subModule => {
+        const navItem: NavItem = {
+          name: subModule.name,
+          icon: getIcon(subModule.icon),
+          path: subModule.route ? `/partner/${subModule.route}` : undefined,
+        };
+
+        // Map child modules if they exist
+        if (subModule.child_modules && subModule.child_modules.length > 0) {
+          navItem.subItems = subModule.child_modules
+            .filter(child => child.status === 1)
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map(child => ({
+              name: child.name,
+              icon: getIcon(child.icon),
+              path: `/partner/${child.route}`,
+            }));
+        }
+
+        return navItem;
+      });
+
+    return {
+      title: module.name,
+      items: items,
+    };
+  });
+};
 
 const AppSidebar: React.FC = () => {
   const router = useRouter();
@@ -69,103 +131,21 @@ const AppSidebar: React.FC = () => {
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
   
   // State for dynamic modules
-  const [modules, setModules] = useState<Module[]>([]);
+  const [menuSections, setMenuSections] = useState<MenuSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
-  const isAgent = user ? user.panel_type == "agent" : false;
+  const { token } = useAuth();
 
-  const {token} = useAuth();
-
-  // Fetch modules from API
-  useEffect(() => {
-    const fetchModules = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`${BASE_URL}/modules`,{
-          headers:{
-            "Authorization": `Bearer ${token}`
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch modules');
-        }
-        
-        const data = await response.json();
-        setModules(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load modules');
-        console.error('Error fetching modules:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchModules();
-  }, []);
-
-  // Convert HTML icon string to React component
-  const parseIcon = (iconString: string): React.ReactNode => {
-    // This is a simplified approach - you might need a more robust solution
-    // to parse SVG strings into React components
-    const iconMap: Record<string, React.ReactNode> = {
-      'dashboard': <LayoutDashboard size={18} />,
-      'users': <Users size={18} />,
-      'university': <Book size={18} />,
-      'file-text': <FileText size={18} />,
-      'percent': <Percent size={18} />,
-      'wallet': <Wallet size={18} />,
-      'mail': <Mail size={18} />,
-      'settings': <Settings size={18} />,
-    };
-
-    // Try to determine which icon to use based on the name or slug
-    const iconKey = iconString.toLowerCase();
-    if (iconKey.includes('dashboard')) return iconMap['dashboard'];
-    if (iconKey.includes('users') || iconKey.includes('student')) return iconMap['users'];
-    if (iconKey.includes('program') || iconKey.includes('university')) return iconMap['university'];
-    if (iconKey.includes('application') || iconKey.includes('file')) return iconMap['file-text'];
-    if (iconKey.includes('commission') || iconKey.includes('percent')) return iconMap['percent'];
-    if (iconKey.includes('wallet')) return iconMap['wallet'];
-    if (iconKey.includes('mail') || iconKey.includes('resource')) return iconMap['mail'];
-    if (iconKey.includes('account') || iconKey.includes('setting')) return iconMap['settings'];
-    
-    // Default icon
-    return <LayoutDashboard size={18} />;
-  };
-
-  // Recursive function to convert API modules to NavItems
-  const convertToNavItems = (modules: ChildModule[]): NavItem[] => {
-    return modules
-      .filter(module => module.status === 1) // Only include active modules
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map(module => {
-        const navItem: NavItem = {
-          name: module.name,
-          icon: parseIcon(module.icon),
-          path: module.child_modules && module.child_modules.length > 0 
-            ? undefined 
-            : `/${module.route}`,
-        };
-
-        if (module.child_modules && module.child_modules.length > 0) {
-          navItem.subItems = convertToNavItems(module.child_modules);
-        }
-
-        return navItem;
-      });
-  };
-
-  // Create dynamic nav items from API modules
-  const dynamicNavItems = modules
-    .filter(module => module.status === 1)
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .map(module => ({
-      section: module.name,
-      items: convertToNavItems(module.sub_modules || [])
-    }));
+  // Static items that don't come from API
+  const staticNavItems: NavItem[] = [
+    {
+      name: "Dashboard",
+      icon: <LayoutDashboard size={18} />,
+      path: "/partner",
+    },
+  ];
 
   // Create computed navigation items based on adminToken
   const [computedNavItems, setComputedNavItems] = useState<NavItem[]>(staticNavItems);
@@ -184,10 +164,66 @@ const AppSidebar: React.FC = () => {
     setComputedNavItems(updatedItems);
   }, [adminToken]);
 
-  const isActive = useCallback((path: string | undefined): boolean => {
-    if (!path) return false;
-    return pathname === path || pathname.startsWith(path + '/');
-  }, [pathname]);
+  // Fetch modules from API
+  useEffect(() => {
+    const fetchModules = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${BASE_URL}/modules`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch modules');
+        }
+        
+        const data = await response.json();
+        
+        // Filter active modules (status === 1) and sort by sort_order
+        const activeModules = data
+          .filter((module: Module) => module.status === 1)
+          .sort((a: Module, b: Module) => a.sort_order - b.sort_order);
+        
+        const sections = mapApiToNavItems(activeModules);
+        setMenuSections(sections);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load modules');
+        console.error('Error fetching modules:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchModules();
+    }
+  }, [token]);
+
+  const isActive = useCallback(
+    (path?: string): boolean => {
+      if (!path) return false;
+
+      // Remove /partner prefix from pathname for comparison
+      const cleanPathname = pathname.replace(/^\/partner/, '');
+      const normalizedPath = path.replace(/^\/partner/, '').replace(/\/$/, '');
+      const normalizedCurrent = cleanPathname.replace(/\/$/, '');
+      
+      // Special case for home/dashboard
+      if (normalizedPath === "" || normalizedPath === "/") {
+        return normalizedCurrent === "" || normalizedCurrent === "/";
+      }
+
+      // For exact match
+      if (normalizedCurrent === normalizedPath) {
+        return true;
+      }
+
+      return false;
+    },
+    [pathname]
+  );
 
   const handleAdminReLogin = async () => {
     try {
@@ -217,15 +253,15 @@ const AppSidebar: React.FC = () => {
     item: NavItem; 
     level?: number;
     parentKey?: string;
-    section?: string;
-  }> = ({ item, level = 0, parentKey = '', section = '' }) => {
+    sectionIndex?: number;
+  }> = ({ item, level = 0, parentKey = '', sectionIndex = 0 }) => {
     const itemKey = parentKey 
-      ? `${section}-${parentKey}-${item.name}` 
-      : `${section}-${item.name}`;
+      ? `${sectionIndex}-${parentKey}-${item.name}` 
+      : `${sectionIndex}-${item.name}`;
       
     const hasSubItems = item.subItems && item.subItems.length > 0;
     const isSubmenuOpen = openSubmenus.has(itemKey);
-  
+
     return (
       <li>
         {hasSubItems ? (
@@ -241,7 +277,7 @@ const AppSidebar: React.FC = () => {
               }`}
               style={{ paddingLeft: `${level * 20 + 16}px` }}
             >
-              <span className={isSubmenuOpen ? "menu-item-icon-active" : "menu-item-icon-inactive"}>
+              <span className={`${isSubmenuOpen ? "menu-item-icon-active" : "menu-item-icon-inactive"} flex items-center justify-center w-5 h-5`}>
                 {item.icon}
               </span>
               {(isExpanded || isHovered || isMobileOpen) && (
@@ -271,7 +307,7 @@ const AppSidebar: React.FC = () => {
                       item={subItem} 
                       level={level + 1}
                       parentKey={itemKey}
-                      section={section}
+                      sectionIndex={sectionIndex}
                     />
                   ))}
                 </ul>
@@ -281,13 +317,13 @@ const AppSidebar: React.FC = () => {
         ) : (
           item.path && (
             <Link
-              href={"/partner" + item.path}
+              href={item.path}
               className={`menu-item group ${
                 isActive(item.path) ? "menu-item-active" : "menu-item-inactive"
               }`}
               style={{ paddingLeft: `${level * 20 + 16}px` }}
             >
-              <span className={isActive(item.path) ? "menu-item-icon-active" : "menu-item-icon-inactive"}>
+              <span className={`${isActive(item.path) ? "menu-item-icon-active" : "menu-item-icon-inactive"} flex items-center justify-center w-5 h-5`}>
                 {item.icon}
               </span>
               {(isExpanded || isHovered || isMobileOpen) && (
@@ -301,91 +337,133 @@ const AppSidebar: React.FC = () => {
   };
 
   const renderMainMenuItems = () => (
-    <ul className="flex flex-col gap-4">
-      {computedNavItems.map((item) => {
-        if (item.name === "Go to Admin Panel" && adminToken) {
-          return (
-            <li key={item.name}>
-              <div
-                onClick={handleAdminReLogin}
-                className={`menu-item group cursor-pointer`}
-                style={{ paddingLeft: `16px` }}
-              >
-                <span className={"menu-item-icon-inactive"}>
-                  <ArrowLeft size={19}/>
-                </span>
-                {(isExpanded || isHovered || isMobileOpen) && (
-                  <span className="menu-item-text dark:text-white">
-                    {item.name}
+    <div>
+      <h2
+        className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+          !isExpanded && !isHovered
+            ? "lg:justify-center"
+            : "justify-start"
+        }`}
+      >
+        {isExpanded || isHovered || isMobileOpen ? (
+          "Main Menu"
+        ) : (
+          <HorizontaLDots />
+        )}
+      </h2>
+      <ul className="flex flex-col gap-4">
+        {computedNavItems.map((item) => {
+          if (item.name === "Go to Admin Panel" && adminToken) {
+            return (
+              <li key={item.name}>
+                <div
+                  onClick={handleAdminReLogin}
+                  className={`menu-item group cursor-pointer`}
+                  style={{ paddingLeft: `16px` }}
+                >
+                  <span className="menu-item-icon-inactive flex items-center justify-center w-5 h-5">
+                    {item.icon}
                   </span>
-                )}
-              </div>
-            </li>
+                  {(isExpanded || isHovered || isMobileOpen) && (
+                    <span className="menu-item-text dark:text-white">
+                      {item.name}
+                    </span>
+                  )}
+                </div>
+              </li>
+            );
+          }
+          return (
+            <NavItemComponent 
+              key={item.name} 
+              item={item} 
+              sectionIndex={-1} 
+            />
           );
-        }
-        return (
+        })}
+      </ul>
+    </div>
+  );
+
+  const renderMenuSection = (section: MenuSection, index: number) => (
+    <div key={section.title}>
+      <h2
+        className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+          !isExpanded && !isHovered
+            ? "lg:justify-center"
+            : "justify-start"
+        }`}
+      >
+        {isExpanded || isHovered || isMobileOpen ? (
+          section.title
+        ) : (
+          <HorizontaLDots />
+        )}
+      </h2>
+      <ul className="flex flex-col gap-4">
+        {section.items.map((item) => (
           <NavItemComponent 
             key={item.name} 
             item={item} 
-            section="main" 
+            sectionIndex={index}
           />
-        );
-      })}
-    </ul>
+        ))}
+      </ul>
+    </div>
   );
 
-  const renderDynamicSections = () => {
-    if (loading) {
-      return (
-        <div className="flex justify-center items-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-        </div>
-      );
-    }
+  // Auto-open submenus based on current path
+  useEffect(() => {
+    const findAndOpenParentMenus = (
+      items: NavItem[], 
+      currentPath: string, 
+      parentKeys: string[] = [], 
+      sectionIndex: number = 0
+    ): boolean => {
+      for (const item of items) {
+        const itemKey = parentKeys.length > 0 
+          ? `${sectionIndex}-${parentKeys.join('-')}-${item.name}` 
+          : `${sectionIndex}-${item.name}`;
+        
+        // Remove /partner prefix from currentPath for comparison
+        const cleanCurrentPath = currentPath.replace(/^\/partner/, '');
+        const cleanItemPath = item.path?.replace(/^\/partner/, '') || '';
+        
+        if (cleanItemPath === cleanCurrentPath) {
+          // Open all parent menus
+          parentKeys.forEach((key, index) => {
+            const parentKey = parentKeys.slice(0, index + 1).join('-');
+            setOpenSubmenus(prev => new Set(prev).add(`${sectionIndex}-${parentKey}`));
+          });
+          return true;
+        }
 
-    if (error) {
-      return (
-        <div className="text-red-500 text-sm py-2">
-          Failed to load menu items
-        </div>
-      );
-    }
+        if (item.subItems) {
+          const found = findAndOpenParentMenus(
+            item.subItems, 
+            currentPath, 
+            [...parentKeys, item.name],
+            sectionIndex
+          );
+          if (found) {
+            setOpenSubmenus(prev => new Set(prev).add(itemKey));
+            return true;
+          }
+        }
+      }
+      return false;
+    };
 
-    return dynamicNavItems.map((section, index) => (
-      <div key={index} className="mt-4">
-        <h2
-          className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
-            !isExpanded && !isHovered
-              ? "lg:justify-center"
-              : "justify-start"
-          }`}
-        >
-          {isExpanded || isHovered || isMobileOpen ? (
-            section.section
-          ) : (
-            <HorizontaLDots />
-          )}
-        </h2>
-        <ul className="flex flex-col gap-4">
-          {section.items
-            .filter(item => {
-              // Filter items based on user type
-              if (!isAgent && item.name === "Wallet") {
-                return false;
-              }
-              return true;
-            })
-            .map((item) => (
-              <NavItemComponent 
-                key={item.name} 
-                item={item} 
-                section={section.section} 
-              />
-            ))}
-        </ul>
-      </div>
-    ));
-  };
+    setOpenSubmenus(new Set());
+    
+    // Find and open menus for main nav items (sectionIndex = -1)
+    findAndOpenParentMenus(computedNavItems, pathname, [], -1);
+    
+    // Find and open menus for dynamic sections
+    menuSections.forEach((section, index) => {
+      findAndOpenParentMenus(section.items, pathname, [], index);
+    });
+  }, [pathname, computedNavItems, menuSections]);
 
   const handleSubmenuToggle = (itemKey: string) => {
     setOpenSubmenus(prev => {
@@ -399,41 +477,23 @@ const AppSidebar: React.FC = () => {
     });
   };
 
-  // Auto-open submenus based on current path
-  useEffect(() => {
-    const findAndOpenParentMenus = (items: NavItem[], currentPath: string, parentKeys: string[] = []): boolean => {
-      for (const item of items) {
-        const itemKey = parentKeys.length > 0 ? `${parentKeys.join('-')}-${item.name}` : item.name;
-        
-        if (item.path === currentPath) {
-          parentKeys.forEach((key, index) => {
-            const parentKey = parentKeys.slice(0, index + 1).join('-');
-            setOpenSubmenus(prev => new Set(prev).add(parentKey));
-          });
-          return true;
-        }
-
-        if (item.subItems) {
-          const found = findAndOpenParentMenus(item.subItems, currentPath, [...parentKeys, item.name]);
-          if (found) {
-            setOpenSubmenus(prev => new Set(prev).add(itemKey));
-            return true;
-          }
-        }
-      }
-      return false;
-    };
-
-    setOpenSubmenus(new Set());
-    
-    // Find and open menus for main nav items
-    findAndOpenParentMenus(staticNavItems, pathname);
-    
-    // Find and open menus for dynamic items
-    dynamicNavItems.forEach(section => {
-      findAndOpenParentMenus(section.items, pathname);
-    });
-  }, [pathname, dynamicNavItems]);
+  if (loading) {
+    return (
+      <aside className="fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen w-[290px] border-r border-gray-200 z-50">
+        <div className="py-8 flex justify-center">
+          <Image
+            src="/images/site/igslogo.png"
+            alt="Logo"
+            width={85}
+            height={65}
+          />
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">Loading menu...</div>
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside
@@ -452,7 +512,7 @@ const AppSidebar: React.FC = () => {
     >
       <div
         className={`py-8 flex  ${
-          !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+          !isExpanded && !isHovered ? "lg:justify-center" : "justify-center"
         }`}
       >
         <Link href="/partner">
@@ -460,21 +520,18 @@ const AppSidebar: React.FC = () => {
             <>
               <div className="flex justify-center items-center">
                 <Image
-                  className=""
-                  src="/images/logo/logo.png"
+                  className="mx-auto"
+                  src="/images/site/igslogo.png"
                   alt="Logo"
-                  width={45}
-                  height={45}
+                  width={85}
+                  height={65}
                 />
-                <span className="dark:text-white ms-1 text-black font-semibold text-2xl">
-                  ApplyTech
-                </span>
               </div>
             </>
           ) : (
             <Image
               className=""
-              src="/images/logo/logo.png"
+              src="/images/site/igslogo.png"
               alt="Logo"
               width={32}
               height={32}
@@ -484,15 +541,14 @@ const AppSidebar: React.FC = () => {
       </div>
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-6">
             {/* Main Menu Section */}
-           
+            {renderMainMenuItems()}
 
             {/* Dynamic Sections from API */}
-            {renderDynamicSections()}
+            {menuSections.map((section, index) => renderMenuSection(section, index))}
           </div>
         </nav>
-        {isExpanded || isHovered || isMobileOpen ? null : null}
       </div>
     </aside>
   );

@@ -15,11 +15,11 @@ interface CommissionNotesProps {
 export default function CommissionNotes({ applications, universityId, onBack, onSuccess }: CommissionNotesProps) {
   const [tuitionFees, setTuitionFees] = useState<Record<number, number>>(
     applications.reduce((acc, app) => {
-      // Set default value based on commission if applicable
-      const defaultValue = app.commission_type === 'fixed' 
-        ? parseFloat(app.commission_value) * 10 // Rough estimate for demo
-        : 50000; // Default value
-      return { ...acc, [app.application_id]: defaultValue };
+      // Only set default values for percentage-based commissions
+      if (app.commission_type === 'percentage') {
+        return { ...acc, [app.application_id]: 0 }; // Default value for percentage
+      }
+      return acc; // No tuition fee needed for fixed commissions
     }, {})
   );
   
@@ -39,27 +39,36 @@ export default function CommissionNotes({ applications, universityId, onBack, on
   };
 
   const validateFees = (): boolean => {
-    return applications.every(app => {
-      const fee = tuitionFees[app.application_id];
-      return fee !== undefined && fee > 0;
-    });
+    // Only validate fees for percentage-based applications
+    return applications
+      .filter(app => app.commission_type === 'percentage')
+      .every(app => {
+        const fee = tuitionFees[app.application_id];
+        return fee !== undefined && fee > 0;
+      });
   };
 
   const handleSubmit = async () => {
     if (!validateFees()) {
-      setError('Please enter valid tuition fees for all applications');
+      setError('Please enter valid tuition fees for percentage-based applications');
       return;
     }
 
     setLoading(true);
     setError(null);
 
-    const payload: GenerateInvoicePayload = {
-      university_id: universityId,
-      applications: applications.map(app => ({
+    // Only include applications in payload that have tuition fees set
+    // For fixed commissions, we don't need to send commissionable_tuition_fee
+    const payloadApplications = applications
+      .filter(app => app.commission_type === 'percentage') // Only percentage apps need tuition fee
+      .map(app => ({
         application_id: app.application_id,
         commissionable_tuition_fee: tuitionFees[app.application_id]
-      }))
+      }));
+
+    const payload: GenerateInvoicePayload = {
+      university_id: universityId,
+      applications: payloadApplications
     };
 
     try {
@@ -91,10 +100,11 @@ export default function CommissionNotes({ applications, universityId, onBack, on
   };
 
   const calculateTotalCommission = (app: Application) => {
-    const fee = tuitionFees[app.application_id] || 0;
     if (app.commission_type === 'percentage') {
+      const fee = tuitionFees[app.application_id] || 0;
       return (fee * parseFloat(app.commission_value)) / 100;
     }
+    // For fixed commission, just return the fixed amount
     return parseFloat(app.commission_value);
   };
 
@@ -118,18 +128,20 @@ export default function CommissionNotes({ applications, universityId, onBack, on
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-4">
-        <button
+        {/* <button
           onClick={onBack}
           className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-        </button>
+        </button> */}
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             Set Commissionable Tuition Fees
           </h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Enter the tuition fee amount for each selected application
+            {applications.some(app => app.commission_type === 'percentage') 
+              ? 'Enter tuition fees for percentage-based commissions. Fixed commissions will be processed automatically.'
+              : 'All selected applications have fixed commissions. No tuition fees required.'}
           </p>
         </div>
       </div>
@@ -147,13 +159,25 @@ export default function CommissionNotes({ applications, universityId, onBack, on
         {applications.map((app) => (
           <div 
             key={app.application_id}
-            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-md transition-shadow"
+            className={`bg-white dark:bg-gray-800 border rounded-xl p-6 transition-shadow ${
+              app.commission_type === 'percentage' 
+                ? 'border-gray-200 dark:border-gray-700 hover:shadow-md' 
+                : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30'
+            }`}
           >
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex-1 min-w-[200px]">
                 <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <div className={`p-2 rounded-lg ${
+                    app.commission_type === 'percentage' 
+                      ? 'bg-blue-100 dark:bg-blue-900/30' 
+                      : 'bg-gray-100 dark:bg-gray-800'
+                  }`}>
+                    <DollarSign className={`w-5 h-5 ${
+                      app.commission_type === 'percentage' 
+                        ? 'text-blue-600 dark:text-blue-400' 
+                        : 'text-gray-600 dark:text-gray-400'
+                    }`} />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-gray-100">
@@ -165,9 +189,15 @@ export default function CommissionNotes({ applications, universityId, onBack, on
                   </div>
                 </div>
                 
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 uppercase">Commission</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 uppercase">Commission Type</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 capitalize">
+                      {app.commission_type}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 uppercase">Commission Value</p>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                       {app.commission_type === 'percentage' 
                         ? `${app.commission_value}%` 
@@ -183,30 +213,43 @@ export default function CommissionNotes({ applications, universityId, onBack, on
                 </div>
               </div>
 
-              <div className="w-full sm:w-64">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Commissionable Tuition Fee ({app.currency})
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                    {app.currency}
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={tuitionFees[app.application_id] || ''}
-                    onChange={(e) => handleFeeChange(app.application_id, e.target.value)}
-                    className="w-full pl-12 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter amount"
-                  />
+              {app.commission_type === 'percentage' ? (
+                <div className="w-full sm:w-64">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Commissionable Tuition Fee ({app.currency})
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                      {app.currency}
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={tuitionFees[app.application_id] || ''}
+                      onChange={(e) => handleFeeChange(app.application_id, e.target.value)}
+                      className="w-full pl-12 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter amount"
+                      required
+                    />
+                  </div>
+                  {tuitionFees[app.application_id] > 0 && (
+                    <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                      Estimated commission: {app.currency} {calculateTotalCommission(app).toLocaleString()}
+                    </p>
+                  )}
                 </div>
-                {tuitionFees[app.application_id] > 0 && (
-                  <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-                    Estimated commission: {app.currency} {calculateTotalCommission(app).toLocaleString()}
+              ) : (
+                <div className="w-full sm:w-64 bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Fixed Commission Amount</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    {app.currency} {parseFloat(app.commission_value).toLocaleString()}
                   </p>
-                )}
-              </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                    No tuition fee input required for fixed commissions
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -217,13 +260,19 @@ export default function CommissionNotes({ applications, universityId, onBack, on
         <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Summary</h3>
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600 dark:text-gray-400">Selected Applications:</span>
+            <span className="text-gray-600 dark:text-gray-400">Total Applications:</span>
             <span className="font-medium text-gray-900 dark:text-gray-100">{applications.length}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600 dark:text-gray-400">Total Tuition Amount:</span>
+            <span className="text-gray-600 dark:text-gray-400">Percentage-based:</span>
             <span className="font-medium text-gray-900 dark:text-gray-100">
-              {applications[0]?.currency} {Object.values(tuitionFees).reduce((a, b) => a + (b || 0), 0).toLocaleString()}
+              {applications.filter(app => app.commission_type === 'percentage').length}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600 dark:text-gray-400">Fixed Commission:</span>
+            <span className="font-medium text-gray-900 dark:text-gray-100">
+              {applications.filter(app => app.commission_type === 'fixed').length}
             </span>
           </div>
           <div className="flex justify-between text-sm pt-2 border-t border-gray-200 dark:border-gray-700">

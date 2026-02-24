@@ -91,29 +91,29 @@ const mapApiToNavItems = (modules: Module[]): MenuSection[] => {
   return modules.map(module => {
     const items: NavItem[] = (module.sub_modules || [])
       .filter(subModule => subModule.status === 1)
-      .sort((a, b) => a.sort_order - b.sort_order)
+      // .sort((a, b) => a.sort_order - b.sort_order)
       .map(subModule => {
         const navItem: NavItem = {
           name: subModule.name,
           icon: getIcon(subModule.icon),
-          path: subModule.route ? `/partner/${subModule.route}` : undefined,
+          path: subModule.route ? `/partner/${subModule.route}` : "",
         };
 
         // Map child modules if they exist
         if (subModule.child_modules && subModule.child_modules.length > 0) {
           navItem.subItems = subModule.child_modules
             .filter(child => child.status === 1)
-            .sort((a, b) => a.sort_order - b.sort_order)
+            // .sort((a, b) => a.sort_order - b.sort_order)
             .map(child => ({
               name: child.name,
               icon: getIcon(child.icon),
               path: `/partner/${child.route}`,
             }));
         }
-
+       
         return navItem;
       });
-
+      
     return {
       title: module.name,
       items: items,
@@ -184,9 +184,12 @@ const AppSidebar: React.FC = () => {
         // Filter active modules (status === 1) and sort by sort_order
         const activeModules = data
           .filter((module: Module) => module.status === 1)
-          .sort((a: Module, b: Module) => a.sort_order - b.sort_order);
+          // .sort((a: Module, b: Module) => a.sort_order - b.sort_order);
+
+          
         
         const sections = mapApiToNavItems(activeModules);
+       
         setMenuSections(sections);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load modules');
@@ -315,7 +318,24 @@ const AppSidebar: React.FC = () => {
             )}
           </>
         ) : (
-          item.path && (
+          item.name == "Dashbaord" ?
+          (
+            <Link
+              href={""}
+              className={`menu-item group ${
+                isActive(item.path) ? "menu-item-active" : "menu-item-inactive"
+              }`}
+              style={{ paddingLeft: `${level * 20 + 16}px` }}
+            >
+              <span className={`${isActive(item.path) ? "menu-item-icon-active" : "menu-item-icon-inactive"} flex items-center justify-center w-5 h-5`}>
+                {item.icon}
+              </span>
+              {(isExpanded || isHovered || isMobileOpen) && (
+                <span className="menu-item-text">{item.name}</span>
+              )}
+            </Link>
+          )
+          : (item.path && (
             <Link
               href={item.path}
               className={`menu-item group ${
@@ -329,7 +349,7 @@ const AppSidebar: React.FC = () => {
               {(isExpanded || isHovered || isMobileOpen) && (
                 <span className="menu-item-text">{item.name}</span>
               )}
-            </Link>
+            </Link>)
           )
         )}
       </li>
@@ -346,7 +366,7 @@ const AppSidebar: React.FC = () => {
         }`}
       >
         {isExpanded || isHovered || isMobileOpen ? (
-          "Main Menu"
+          "Admin Controls"
         ) : (
           <HorizontaLDots />
         )}
@@ -543,7 +563,7 @@ const AppSidebar: React.FC = () => {
         <nav className="mb-6">
           <div className="flex flex-col gap-6">
             {/* Main Menu Section */}
-            {renderMainMenuItems()}
+            {adminToken && renderMainMenuItems()}
 
             {/* Dynamic Sections from API */}
             {menuSections.map((section, index) => renderMenuSection(section, index))}

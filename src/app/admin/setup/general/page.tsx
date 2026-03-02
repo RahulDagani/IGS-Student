@@ -318,23 +318,37 @@ export default function GeneralSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300">
-                    Default Currency{" "}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="default_currency"
-                    value={formData.default_currency}
-                    onChange={handleChange}
-                    className="mt-1 w-full px-3 py-2 bg-[#1F2937] border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500"
-                    required
-                  >
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                    <option value="INR">INR (₹)</option>
-                  </select>
-                </div>
+  <label className="block text-sm font-medium text-gray-300">
+    Default Currency{" "}
+    <span className="text-red-500">*</span>
+  </label>
+  <select
+    name="default_currency"
+    value={formData.default_currency}
+    onChange={handleChange}
+    className="mt-1 w-full px-3 py-2 bg-[#1F2937] border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500"
+    required
+  >
+    <option value="USD">USD ($)</option>
+    <option value="EUR">EUR (€)</option>
+    <option value="GBP">GBP (£)</option>
+    <option value="INR">INR (₹)</option>
+    <option value="AUD">AUD (A$)</option>
+    <option value="CAD">CAD (C$)</option>
+    <option value="SGD">SGD (S$)</option>
+    <option value="NZD">NZD (NZ$)</option>
+    <option value="AED">AED (د.إ)</option>
+    <option value="SAR">SAR (﷼)</option>
+    <option value="QAR">QAR (﷼)</option>
+    <option value="KWD">KWD (د.ك)</option>
+    <option value="CHF">CHF (Fr)</option>
+    <option value="CNY">CNY (¥)</option>
+    <option value="HKD">HKD (HK$)</option>
+    <option value="JPY">JPY (¥)</option>
+    <option value="MYR">MYR (RM)</option>
+    <option value="ZAR">ZAR (R)</option>
+  </select>
+</div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-300">
                     Copyright Text{" "}

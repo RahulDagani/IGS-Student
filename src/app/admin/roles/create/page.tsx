@@ -122,65 +122,79 @@ export default function CreateRolePage() {
     const [expandedModules, setExpandedModules] = useState<Record<number, boolean>>({});
     const [expandedSubModules, setExpandedSubModules] = useState<Record<number, boolean>>({});
 
+    const [currentPanelType, setCurrentPanelType] = useState("admin");
+
     const router = useRouter();
     const { token } = useAuth();
+// Modify fetchModules to accept panel type parameter
+const fetchModules = useCallback(async (panelType: string) => {
+    try {
+        setModulesLoading(true);
+        setError(""); // Clear any previous errors
+        
+        const response = await fetch(`${BASE_URL}/tenant/modules?panel_type=${panelType}`, {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
 
-    // Fetch modules with their hierarchical structure
-    const fetchModules = useCallback(async () => {
-        try {
-            const response = await fetch(`${BASE_URL}/tenant/modules`, {
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                }
-            });
-            const data: ModulesApiResponse = await response.json();
+        // Handle 401 Unauthorized specifically
+        if (response.status === 401) {
+            showToast("Authentication failed. Please log in again.", "error");
+            // Optionally redirect to login
+            // router.push("/login");
+            return;
+        }
 
-            if (data.success) {
-                // Sort modules alphabetically by name
-                const sortedModules = [...data.data.hierarchical];
+        const data: ModulesApiResponse = await response.json();
+
+        if (data.success) {
+            // Sort modules alphabetically by name
+            const sortedModules = [...data.data.hierarchical];
+            
+            setModules(sortedModules);
+            
+            // Initialize selected permissions objects
+            const initialSelectedModules: Record<number, number> = {};
+            const initialSelectedSubModules: Record<number, number> = {};
+            const initialSelectedChildModules: Record<number, number> = {};
+            const initialExpandedModules: Record<number, boolean> = {};
+            const initialExpandedSubModules: Record<number, boolean> = {};
+            
+            sortedModules.forEach(module => {
+                initialSelectedModules[module.id] = 0;
+                initialExpandedModules[module.id] = true;
                 
-                setModules(sortedModules);
-                
-                // Initialize selected permissions objects
-                const initialSelectedModules: Record<number, number> = {};
-                const initialSelectedSubModules: Record<number, number> = {};
-                const initialSelectedChildModules: Record<number, number> = {};
-                const initialExpandedModules: Record<number, boolean> = {};
-                const initialExpandedSubModules: Record<number, boolean> = {};
-                
-                sortedModules.forEach(module => {
-                    initialSelectedModules[module.id] = 0;
-                    initialExpandedModules[module.id] = true;
+                module.sub_modules.forEach(subModule => {
+                    initialSelectedSubModules[subModule.id] = 0;
+                    initialExpandedSubModules[subModule.id] = true;
                     
-                    module.sub_modules.forEach(subModule => {
-                        initialSelectedSubModules[subModule.id] = 0;
-                        initialExpandedSubModules[subModule.id] = true;
-                        
-                        subModule.child_modules.forEach(childModule => {
-                            initialSelectedChildModules[childModule.id] = 0;
-                        });
+                    subModule.child_modules.forEach(childModule => {
+                        initialSelectedChildModules[childModule.id] = 0;
                     });
                 });
-                
-                setSelectedModules(initialSelectedModules);
-                setSelectedSubModules(initialSelectedSubModules);
-                setSelectedChildModules(initialSelectedChildModules);
-                setExpandedModules(initialExpandedModules);
-                setExpandedSubModules(initialExpandedSubModules);
-            } else {
-                showToast("Failed to load modules", "error");
-            }
-        } catch (error) {
-            console.error("Error fetching modules:", error);
+            });
+            
+            setSelectedModules(initialSelectedModules);
+            setSelectedSubModules(initialSelectedSubModules);
+            setSelectedChildModules(initialSelectedChildModules);
+            setExpandedModules(initialExpandedModules);
+            setExpandedSubModules(initialExpandedSubModules);
+        } else {
             showToast("Failed to load modules", "error");
-        } finally {
-            setModulesLoading(false);
         }
-    }, [token]);
+    } catch (error) {
+        console.error("Error fetching modules:", error);
+        showToast("Failed to load modules. Please check your connection.", "error");
+    } finally {
+        setModulesLoading(false);
+    }
+}, [token]);
+
 
     useEffect(() => {
-        fetchModules();
-    }, [fetchModules]);
+    fetchModules(currentPanelType);
+}, [fetchModules, currentPanelType]);
 
     // Toggle module selection
     const toggleModule = (moduleId: number) => {
@@ -324,14 +338,23 @@ const toggleAllPermissionsInModule = (moduleId: number) => {
     };
 
     const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-    ) => {
-        const { name, value, type } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
-        }));
-    };
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+) => {
+    const { name, value, type } = e.target;
+    
+    if (name === "panel_type") {
+        setCurrentPanelType(value);
+        // Reset modules and show loading state
+        setModulesLoading(true);
+        // Clear existing modules while loading new ones
+        setModules([]);
+    }
+    
+    setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+    }));
+};
 
     const generateRoleKey = (roleName: string) => {
         return roleName

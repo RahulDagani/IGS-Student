@@ -192,6 +192,8 @@ const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 export default function EditRolePage() {
     const params = useParams();
     const roleId = params.id as string;
+
+    const [currentPanelType, setCurrentPanelType] = useState("admin");
     
     const [formData, setFormData] = useState({
         role_name: "",
@@ -217,118 +219,188 @@ export default function EditRolePage() {
     const router = useRouter();
     const { token } = useAuth();
 
-    // Fetch modules with their hierarchical structure
-    const fetchModules = useCallback(async () => {
-        try {
-            const response = await fetch(`${BASE_URL}/tenant/modules`, {
-                headers: {
-                    "Authorization": `Bearer ${token}`
+
+
+    // Helper function to apply permissions from role to modules
+const applyPermissionsToModules = (modulesList: Module[], hierarchicalPermissions: PermissionHierarchy[]) => {
+    const initialSelectedModules: Record<number, number> = {};
+    const initialSelectedSubModules: Record<number, number> = {};
+    const initialSelectedChildModules: Record<number, number> = {};
+
+    // First, initialize all to 0
+    modulesList.forEach((module: Module) => {
+        initialSelectedModules[module.id] = 0;
+        
+        module.sub_modules.forEach((subModule: SubModule) => {
+            initialSelectedSubModules[subModule.id] = 0;
+            
+            subModule.child_modules.forEach((childModule: ChildModule) => {
+                initialSelectedChildModules[childModule.id] = 0;
+            });
+        });
+    });
+
+    // Then apply permissions from role data
+    hierarchicalPermissions.forEach(permModule => {
+        // Find matching module in the current modules list
+        const matchingModule = modulesList.find(m => m.id === permModule.id);
+        if (matchingModule) {
+            initialSelectedModules[permModule.id] = permModule.has_permission ? 1 : 0;
+            
+            permModule.sub_modules.forEach(permSubModule => {
+                // Find matching sub-module
+                const matchingSubModule = matchingModule.sub_modules.find(sm => sm.id === permSubModule.id);
+                if (matchingSubModule) {
+                    initialSelectedSubModules[permSubModule.id] = permSubModule.has_permission ? 1 : 0;
+                    
+                    permSubModule.child_modules.forEach(permChildModule => {
+                        // Find matching child module
+                        const matchingChildModule = matchingSubModule.child_modules.find(cm => cm.id === permChildModule.id);
+                        if (matchingChildModule) {
+                            initialSelectedChildModules[permChildModule.id] = permChildModule.has_permission ? 1 : 0;
+                        }
+                    });
                 }
             });
-            const data: ModulesApiResponse = await response.json();
-
-            if (data.success) {
-                // Sort modules alphabetically by name
-                const sortedModules = [...data.data.hierarchical];
-                
-                setModules(sortedModules);
-                
-                // Initialize expanded state
-                const initialExpandedModules: Record<number, boolean> = {};
-                const initialExpandedSubModules: Record<number, boolean> = {};
-                
-                sortedModules.forEach(module => {
-                    initialExpandedModules[module.id] = true;
-                    module.sub_modules.forEach(subModule => {
-                        initialExpandedSubModules[subModule.id] = true;
-                    });
-                });
-                
-                setExpandedModules(initialExpandedModules);
-                setExpandedSubModules(initialExpandedSubModules);
-            } else {
-                showToast("Failed to load modules", "error");
-            }
-        } catch (error) {
-            console.error("Error fetching modules:", error);
-            showToast("Failed to load modules", "error");
-        } finally {
-            setModulesLoading(false);
         }
-    }, [token]);
+    });
+
+    setSelectedModules(initialSelectedModules);
+    setSelectedSubModules(initialSelectedSubModules);
+    setSelectedChildModules(initialSelectedChildModules);
+};
 
     // Fetch role details and permissions from a single API endpoint
-    const fetchRoleDetails = useCallback(async () => {
-        if (!roleId) return;
-        
-        try {
-            setRoleLoading(true);
-            // Fetch role details (which now includes permissions)
-            const roleResponse = await fetch(`${BASE_URL}/tenant/roles/${roleId}`, {
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                }
-            });
-            const roleData: RoleDetailApiResponse = await roleResponse.json();
-
-            if (roleData.success) {
-                const role = roleData.data;
-                setRoleDetails(role);
-                
-                // Set form data
-                setFormData({
-                    role_name: role.role_name,
-                    role_key: role.role_key,
-                    panel_type: role.panel_type || "admin",
-                    data_access: role.data_access,
-                    is_active: Boolean(role.is_active)
+        const fetchRoleDetails = useCallback(async () => {
+            if (!roleId) return;
+            
+            try {
+                setRoleLoading(true);
+                const roleResponse = await fetch(`${BASE_URL}/tenant/roles/${roleId}`, {
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
                 });
-                
-                // Initialize permissions from the API response
-                // The API now returns permissions in the same response
-                const { permissions } = role;
-                
-                // Initialize selected permissions from the hierarchical structure
+                const roleData: RoleDetailApiResponse = await roleResponse.json();
+
+                if (roleData.success) {
+                    const role = roleData.data;
+                    setRoleDetails(role);
+                    
+                    // Set form data
+                    setFormData({
+                        role_name: role.role_name,
+                        role_key: role.role_key,
+                        panel_type: role.panel_type || "admin",
+                        data_access: role.data_access,
+                        is_active: Boolean(role.is_active)
+                    });
+                    
+                    // Set current panel type from role data
+                    setCurrentPanelType(role.panel_type || "admin");
+                    
+                } else {
+                    showToast("Failed to load role details", "error");
+                }
+            } catch (error) {
+                console.error("Error fetching role details:", error);
+                showToast("Failed to load role details", "error");
+            } finally {
+                setRoleLoading(false);
+            }
+        }, [roleId, token]);
+
+
+            // Fetch modules with their hierarchical structure
+    const fetchModules = useCallback(async (panelType: string) => {
+    try {
+        setModulesLoading(true);
+        setError(""); // Clear any previous errors
+        
+        const response = await fetch(`${BASE_URL}/tenant/modules?panel_type=${panelType}`, {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        // Handle 401 Unauthorized specifically
+        if (response.status === 401) {
+            showToast("Authentication failed. Please log in again.", "error");
+            return;
+        }
+
+        const data: ModulesApiResponse = await response.json();
+
+        if (data.success) {
+            // Sort modules alphabetically by name
+            const sortedModules: Module[] = [...data.data.hierarchical];
+            
+            setModules(sortedModules);
+            
+            // Initialize expanded state
+            const initialExpandedModules: Record<number, boolean> = {};
+            const initialExpandedSubModules: Record<number, boolean> = {};
+            
+            sortedModules.forEach((module: Module) => {
+                initialExpandedModules[module.id] = true;
+                module.sub_modules.forEach((subModule: SubModule) => {
+                    initialExpandedSubModules[subModule.id] = true;
+                });
+            });
+            
+            setExpandedModules(initialExpandedModules);
+            setExpandedSubModules(initialExpandedSubModules);
+
+            // If we have role details, apply the permissions to the new module structure
+            if (roleDetails && roleDetails.permissions && roleDetails.permissions.hierarchical) {
+                applyPermissionsToModules(sortedModules, roleDetails.permissions.hierarchical);
+            } else {
+                // Initialize all permissions to 0 if no role details
                 const initialSelectedModules: Record<number, number> = {};
                 const initialSelectedSubModules: Record<number, number> = {};
                 const initialSelectedChildModules: Record<number, number> = {};
-
-                // Process hierarchical permissions
-                if (permissions && permissions.hierarchical) {
-                    permissions.hierarchical.forEach(module => {
-                        // Set module permission
-                        initialSelectedModules[module.id] = module.has_permission ? 1 : 0;
+                
+                sortedModules.forEach((module: Module) => {
+                    initialSelectedModules[module.id] = 0;
+                    
+                    module.sub_modules.forEach((subModule: SubModule) => {
+                        initialSelectedSubModules[subModule.id] = 0;
                         
-                        // Process sub-modules
-                        module.sub_modules.forEach(subModule => {
-                            initialSelectedSubModules[subModule.id] = subModule.has_permission ? 1 : 0;
-                            
-                            // Process child modules
-                            subModule.child_modules.forEach(childModule => {
-                                initialSelectedChildModules[childModule.id] = childModule.has_permission ? 1 : 0;
-                            });
+                        subModule.child_modules.forEach((childModule: ChildModule) => {
+                            initialSelectedChildModules[childModule.id] = 0;
                         });
                     });
-                }
-
+                });
+                
                 setSelectedModules(initialSelectedModules);
                 setSelectedSubModules(initialSelectedSubModules);
                 setSelectedChildModules(initialSelectedChildModules);
-            } else {
-                showToast("Failed to load role details", "error");
             }
-        } catch (error) {
-            console.error("Error fetching role details:", error);
-            showToast("Failed to load role details", "error");
-        } finally {
-            setRoleLoading(false);
+        } else {
+            showToast("Failed to load modules", "error");
         }
-    }, [roleId, token]);
+    } catch (error) {
+        console.error("Error fetching modules:", error);
+        showToast("Failed to load modules. Please check your connection.", "error");
+    } finally {
+        setModulesLoading(false);
+    }
+    }, [token, roleDetails]);
+
 
     useEffect(() => {
-        fetchModules();
-        fetchRoleDetails();
-    }, [fetchModules, fetchRoleDetails]);
+        if (token) {
+            // Fetch modules for the current panel type
+            fetchModules(currentPanelType);
+        }
+    }, [token, currentPanelType, fetchModules]);
+
+    // Separate effect for initial load of role details
+    useEffect(() => {
+        if (token && roleId) {
+            fetchRoleDetails();
+        }
+    }, [token, roleId, fetchRoleDetails]);
 
     // Toggle module selection
     const toggleModule = (moduleId: number) => {
@@ -471,15 +543,26 @@ const toggleAllPermissionsInModule = (moduleId: number) => {
         }));
     };
 
-    const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-    ) => {
-        const { name, value, type } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
-        }));
-    };
+const handleChange = useCallback((
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+) => {
+    const { name, value, type } = e.target;
+    
+    setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+    }));
+
+    // If panel type changes, update currentPanelType and reload modules
+    if (name === "panel_type") {
+        setCurrentPanelType(value);
+        setModulesLoading(true); // Show loading state
+        
+        // Don't clear modules immediately - let the loading state handle it
+        // The fetch will happen via useEffect when currentPanelType changes
+    }
+}, []);
+
 
     const generateRoleKey = (roleName: string) => {
         return roleName

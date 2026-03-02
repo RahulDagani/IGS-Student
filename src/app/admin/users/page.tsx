@@ -217,6 +217,7 @@ export default function UsersTable() {
   const [sortField, setSortField] = useState<SortField>("");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [filters, setFilters] = useState<FilterOptions>({
     role: "all",
     status: "all",
@@ -229,13 +230,16 @@ export default function UsersTable() {
   useEffect(() => {
     fetchUsers();
     fetchStats();
-  }, [filters]);
+  }, [filters, currentPage]); // Added currentPage to dependencies
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       let url = `${BASE_URL}/tenant/users?`;
       const params = new URLSearchParams();
+      
+      // Add pagination parameter
+      params.append("page", currentPage.toString());
       
       if (filters.role !== "all") {
         params.append("role", filters.role);
@@ -260,6 +264,8 @@ export default function UsersTable() {
       if (data.success) {
         setUsers(data.data.users);
         setPagination(data.data.pagination);
+        // Update current page from response in case API returns different page
+        setCurrentPage(data.data.pagination.page);
       }
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -301,34 +307,14 @@ export default function UsersTable() {
     return Array.from(new Set(users.map(user => user.status)));
   }, [users]);
 
-  // Filter and sort data locally (or you can use server-side filtering)
-  const filteredAndSortedData = useMemo(() => {
-    let filtered = [...users];
+  // We're now using server-side filtering, so we don't need local filtering
+  // But we keep sorting local since it's not handled by the API
+  const sortedData = useMemo(() => {
+    let sorted = [...users];
 
-    // Apply local filters for role and status (if not already filtered by API)
-    if (filters.role !== "all") {
-      filtered = filtered.filter(user => user.role_name === filters.role);
-    }
-    if (filters.status !== "all") {
-      filtered = filtered.filter(user => user.status === filters.status);
-    }
-
-    // Apply local search
-    if (searchTerm) {
-      filtered = filtered.filter((user) => {
-        return (
-          user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.role_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.status?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      });
-    }
-
-    // Sorting
+    // Apply local sorting only
     if (sortField) {
-      filtered.sort((a, b) => {
+      sorted.sort((a, b) => {
         let aValue = a[sortField];
         let bValue = b[sortField];
         
@@ -346,13 +332,12 @@ export default function UsersTable() {
           }
         }
         
-        
         return 0;
       });
     }
 
-    return filtered;
-  }, [users, filters, searchTerm, sortField, sortDirection]);
+    return sorted;
+  }, [users, sortField, sortDirection]);
 
   const handleSort = (field: keyof User) => {
     if (sortField === field) {
@@ -417,7 +402,8 @@ export default function UsersTable() {
   };
 
   const handleApplyFilters = (newFilters: FilterOptions) => {
-    // Update both local filters and trigger API call
+    // Reset to page 1 when applying new filters
+    setCurrentPage(1);
     setFilters(prev => ({
       ...prev,
       role: newFilters.role,
@@ -426,6 +412,8 @@ export default function UsersTable() {
   };
 
   const handleSearch = () => {
+    // Reset to page 1 when searching
+    setCurrentPage(1);
     setFilters(prev => ({
       ...prev,
       search: searchTerm,
@@ -443,6 +431,7 @@ export default function UsersTable() {
   };
 
   const clearAllFilters = () => {
+    setCurrentPage(1);
     setFilters({
       role: "all",
       status: "all",
@@ -475,6 +464,25 @@ export default function UsersTable() {
         console.error("Error deleting user:", error);
         alert("Failed to delete user");
       }
+    }
+  };
+
+  // Pagination handlers
+  const goToPreviousPage = () => {
+    if (pagination && currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (pagination && currentPage < pagination.total_pages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPage = (page: number) => {
+    if (pagination && page >= 1 && page <= pagination.total_pages) {
+      setCurrentPage(page);
     }
   };
 
@@ -520,27 +528,6 @@ export default function UsersTable() {
           </div>
         </div>
       </div>
-
-      {/* Role Distribution */}
-      {/* {stats?.roles_distribution && (
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Role Distribution</h3>
-          <div className="flex flex-wrap gap-2">
-            {stats.roles_distribution.map((item: {
-      role_id: string;
-      count: number;
-    }) => (
-              <Badge 
-                key={item.role_id} 
-                color={getRoleColor(item.role_id)}
-                size="sm"
-              >
-                {formatRole(item.role_id)}: {item.count}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      )} */}
 
       {/* Search and Filter Controls */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
@@ -639,7 +626,6 @@ export default function UsersTable() {
               <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                 <TableRow>
                   {[
-                    // { key: "id", label: "ID" },
                     { key: "name", label: "Name" },
                     { key: "email", label: "Email" },
                     { key: "phone", label: "Phone" },
@@ -674,14 +660,9 @@ export default function UsersTable() {
                       <Loader className="w-6 h-6 animate-spin mx-auto text-gray-400" />
                     </TableCell>
                   </TableRow>
-                ) : filteredAndSortedData.length > 0 ? (
-                  filteredAndSortedData.map((user) => (
+                ) : sortedData.length > 0 ? (
+                  sortedData.map((user) => (
                     <TableRow key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      {/* <TableCell className="px-5 py-4 text-start">
-                        <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                          #{user.id}
-                        </div>
-                      </TableCell> */}
                       <TableCell className="px-5 py-4 text-start">
                         <div className="flex items-center gap-2">
                           <User size={14} className="text-gray-400" />
@@ -697,9 +678,7 @@ export default function UsersTable() {
                             <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
                               {user.email}
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Tenant: {user.tenant_id}
-                            </div>
+                            
                           </div>
                         </div>
                       </TableCell>
@@ -762,7 +741,7 @@ export default function UsersTable() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell  className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400">
+                    <TableCell className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400">
                       No users found matching your criteria.
                     </TableCell>
                   </TableRow>
@@ -776,7 +755,7 @@ export default function UsersTable() {
       {/* Results Count and Pagination */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="text-sm text-gray-500 dark:text-gray-400">
-          Showing {filteredAndSortedData.length} of {pagination?.total || 0} users
+          Showing {sortedData.length} of {pagination?.total || 0} users
           {pagination && pagination.total_pages > 1 && (
             <span className="ml-2">
               (Page {pagination.page} of {pagination.total_pages})
@@ -787,23 +766,48 @@ export default function UsersTable() {
         {pagination && pagination.total_pages > 1 && (
           <div className="flex items-center gap-2">
             <button
-              disabled={pagination.page <= 1}
-              onClick={() => {
-                // Handle previous page
-              }}
-              className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={currentPage <= 1}
+              onClick={goToPreviousPage}
+              className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               Previous
             </button>
-            <span className="px-3 py-1 text-sm">
-              {pagination.page} / {pagination.total_pages}
-            </span>
+            
+            {/* Page numbers */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, pagination.total_pages) }, (_, i) => {
+                // Show pages around current page
+                let pageNum = currentPage;
+                if (pagination.total_pages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= pagination.total_pages - 2) {
+                  pageNum = pagination.total_pages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => goToPage(pageNum)}
+                    className={`px-3 py-1 text-sm rounded ${
+                      currentPage === pageNum
+                        ? 'bg-brand-500 text-white'
+                        : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            
             <button
-              disabled={pagination.page >= pagination.total_pages}
-              onClick={() => {
-                // Handle next page
-              }}
-              className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={pagination && currentPage >= pagination.total_pages}
+              onClick={goToNextPage}
+              className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               Next
             </button>

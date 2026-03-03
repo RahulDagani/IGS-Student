@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { ChevronLeft, ChevronRight, Send, Search, Download, CheckCircle, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send, Search, Download, CheckCircle, X, Mail } from "lucide-react";
 import Link from "next/link";
 
 interface CommissionNote {
@@ -149,6 +149,7 @@ export default function PaymentsTable() {
   const [commentText, setCommentText] = useState("");
   const [postingComment, setPostingComment] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [sendingMail, setSendingMail] = useState(false);
   const [markingAsPaid, setMarkingAsPaid] = useState(false);
   
   // Add ref to track initial mount and prevent unnecessary fetches
@@ -408,6 +409,55 @@ export default function PaymentsTable() {
     }
   }, [BASE_URL, token, fetchComments]);
 
+  // Send commission note email
+  const sendEmail = useCallback(async (noteId: number) => {
+    if (!noteId) return;
+    
+    try {
+      setSendingMail(true);
+      
+      const response = await fetch(
+        `${BASE_URL}/api/tenant/commission-note/${noteId}/send`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (data.status === "success") {
+        // Show success dialog
+        setDialog({
+          isOpen: true,
+          type: 'success',
+          message: data.message || "Commission note sent via email successfully!"
+        });
+        
+        // Refresh the notes list to update status
+        fetchCommissionNotes(pagination.page);
+      } else {
+        // Show error dialog
+        setDialog({
+          isOpen: true,
+          type: 'error',
+          message: data.message || "Failed to send email"
+        });
+      }
+    } catch (err) {
+      setDialog({
+        isOpen: true,
+        type: 'error',
+        message: err instanceof Error ? err.message : "An error occurred while sending email"
+      });
+    } finally {
+      setSendingMail(false);
+    }
+  }, [BASE_URL, token, fetchCommissionNotes, pagination.page]);
+
   // Mark commission note as paid
   const markAsPaid = useCallback(async (noteId: number) => {
     if (!noteId) return;
@@ -465,11 +515,11 @@ export default function PaymentsTable() {
     }
   }, [BASE_URL, token, fetchCommissionNotes, fetchCommissionNoteDetail, activeNoteId, pagination.page]);
 
-   const closeDialog = () => {
+  const closeDialog = () => {
     setDialog(prev => ({ ...prev, isOpen: false }));
   };
 
-    const StatusDialog = () => {
+  const StatusDialog = () => {
     if (!dialog.isOpen) return null;
 
     return (
@@ -696,6 +746,15 @@ export default function PaymentsTable() {
   const handleDownloadPdf = () => {
     if (activeNoteId) {
       downloadPdf(activeNoteId);
+    }
+  };
+
+  // Handle send email
+  const handleSendEmail = () => {
+    if (activeNoteId) {
+      if (window.confirm("Are you sure you want to send this commission note via email?")) {
+        sendEmail(activeNoteId);
+      }
     }
   };
 
@@ -1059,6 +1118,7 @@ return (
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                  {/* Download Button */}
                   <button
                     onClick={handleDownloadPdf}
                     disabled={downloadingPdf}
@@ -1066,6 +1126,16 @@ return (
                   >
                     <Download size={16} />
                     {downloadingPdf ? "Downloading..." : "Download"}
+                  </button>
+
+                  {/* Send Mail Button */}
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={sendingMail}
+                    className="inline-flex items-center gap-2 px-3 py-2 border border-green-600 text-green-600 dark:border-green-500 dark:text-green-400 rounded-lg text-sm hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50"
+                  >
+                    <Mail size={16} />
+                    {sendingMail ? "Sending..." : "Send Mail"}
                   </button>
 
                   {notes.find(n => n.id === activeNoteId)?.status !== 'commission_payment_done' && (

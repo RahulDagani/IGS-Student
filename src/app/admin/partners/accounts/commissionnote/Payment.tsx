@@ -1393,54 +1393,7 @@ return (
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <p className="text-xs text-gray-500 dark:text-gray-400">Total Commissionable</p>
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {activeNoteDetail.commission_note?.total_commissionable_amount || '-'}
-          </p>
-        </div>
-        
-        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <p className="text-xs text-gray-500 dark:text-gray-400">Total Received</p>
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {activeNoteDetail.commission_note?.total_received_in_default || '-'}
-          </p>
-        </div>
-        
-        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <p className="text-xs text-gray-500 dark:text-gray-400">Agent Commission</p>
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {activeNoteDetail.commission_note?.total_agent_commission || '-'}
-          </p>
-        </div>
-        
-        {activeNoteDetail.commission_note?.total_gst_amount !== '0.00 USD' && (
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-xs text-gray-500 dark:text-gray-400">GST Amount</p>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {activeNoteDetail.commission_note?.total_gst_amount || '-'}
-            </p>
-          </div>
-        )}
-        
-        {activeNoteDetail.commission_note?.total_tds_amount !== '0.00 USD' && (
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-xs text-gray-500 dark:text-gray-400">TDS Amount</p>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {activeNoteDetail.commission_note?.total_tds_amount || '-'}
-            </p>
-          </div>
-        )}
-        
-        <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
-          <p className="text-xs text-green-600 dark:text-green-400">Net Payable</p>
-          <p className="text-sm font-semibold text-green-700 dark:text-green-300">
-            {activeNoteDetail.commission_note?.total_net_payable_default || '-'}
-          </p>
-        </div>
-      </div>
+      
 
       {/* Items Table */}
       {activeNoteDetail.items && activeNoteDetail.items.length > 0 && (
@@ -1489,6 +1442,55 @@ return (
           </div>
         </div>
       )}
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+          <p className="text-xs text-gray-500 dark:text-gray-400">Total Commissionable</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {activeNoteDetail.commission_note?.total_commissionable_amount || '-'}
+          </p>
+        </div>
+        
+        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+          <p className="text-xs text-gray-500 dark:text-gray-400">Total Received</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {activeNoteDetail.commission_note?.total_received_in_default || '-'}
+          </p>
+        </div>
+        
+        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+          <p className="text-xs text-gray-500 dark:text-gray-400">Agent Commission</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {activeNoteDetail.commission_note?.total_agent_commission || '-'}
+          </p>
+        </div>
+        
+        {activeNoteDetail.commission_note?.total_gst_amount !== '0.00 USD' && (
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <p className="text-xs text-gray-500 dark:text-gray-400">GST Amount</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {activeNoteDetail.commission_note?.total_gst_amount || '-'}
+            </p>
+          </div>
+        )}
+        
+        {activeNoteDetail.commission_note?.total_tds_amount !== '0.00 USD' && (
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <p className="text-xs text-gray-500 dark:text-gray-400">TDS Amount</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {activeNoteDetail.commission_note?.total_tds_amount || '-'}
+            </p>
+          </div>
+        )}
+        
+        <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
+          <p className="text-xs text-green-600 dark:text-green-400">Net Payable</p>
+          <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+            {activeNoteDetail.commission_note?.total_net_payable_default || '-'}
+          </p>
+        </div>
+      </div>
 
 
       {/* Comments Section - Keep as is */}

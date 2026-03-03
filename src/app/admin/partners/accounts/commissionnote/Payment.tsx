@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { ChevronLeft, ChevronRight, Send, Search, Download, CheckCircle, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send, Search, Download, CheckCircle, X, Mail, Upload, FileText, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
 interface CommissionNote {
@@ -34,48 +34,50 @@ interface CommissionNote {
   business_name: string;
 }
 
-// Updated interface for the new commission note item structure
-interface CommissionNoteItem {
-  invoice_item_id: number;
-  application_id: number;
-  installment_no: number;
-  commission_amount: number;
-  currency: string;
-  commissionable_tuition_fee: number;
-  student: string;
-  course_name: string;
-  study_level: string;
-  intake_year: number;
-  gst_percentage: number;
-  gst_amount: number;
-  commission_after_gst: number;
-  agent_share_percentage: number;
-  agent_commission_amount: number;
-  conversion_currency: string;
-  exchange_rate: number;
-  shared_amount_in_inr: number;
-  tds_percentage: number;
-  tds_amount: number;
-  gross_commission_payable: number;
-  net_pay: number;
-}
-
 // Updated interface for the new commission note detail structure
 interface CommissionNoteDetail {
-  items: CommissionNoteItem[];
+  commission_note: {
+    id: number;
+    university_name: string;
+    university_country: string;
+    agent_name: string;
+    agent_business_name: string;
+    agent_address: string;
+  };
+  items: Array<{
+    id: number;
+    invoice_item_id: number;
+    application_id: number;
+    installment_no: number;
+    student: string;
+    course_name: string;
+    study_level: string;
+    intake_year: number;
+    invoice_currency: string;
+    note_currency: string | null;
+    commissionable_tuition_fee: number;
+    invoice_amount: number;
+    amount_received_in_default: number;
+    bank_charges: number;
+    agent_share_percentage: number;
+    agent_commission_default: number;
+    final_agent_payable: number;
+    net_pay: number;
+    // Optional fields that might come from API
+    gst_percentage?: number;
+    gst_amount?: number;
+    tds_percentage?: number;
+    tds_amount?: number;
+  }>;
   summary: {
     total_items: number;
-    currency_summary: string[];
-    exchange_rates: Record<string, number>;
     totals: {
-      total_commissionable_amount: number;
-      total_full_commission: number;
-      total_gst_amount: number;
-      total_commission_after_gst: number;
-      total_agent_amount_in_inr: number;
-      total_gross_payable: number;
-      total_tds_amount: number;
+      total_agent_commission: number;
+      total_final_payable: number;
       total_net_payable: number;
+      // Optional fields that might come from API
+      total_gst_amount?: number;
+      total_tds_amount?: number;
     };
   };
 }
@@ -126,6 +128,199 @@ interface Pagination {
   pages: number;
 }
 
+// Mark as Paid Modal Props
+interface MarkAsPaidModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (file: File) => Promise<void>;
+  noteId: number | null;
+  isSubmitting: boolean;
+}
+
+const MarkAsPaidModal: React.FC<MarkAsPaidModalProps> = ({ isOpen, onClose, onSubmit, noteId, isSubmitting }) => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      // Check if file is PDF or image
+      if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+        setSelectedFile(file);
+      } else {
+        alert('Please upload a PDF or image file');
+      }
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      // Check if file is PDF or image
+      if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+        setSelectedFile(file);
+      } else {
+        alert('Please upload a PDF or image file');
+      }
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (selectedFile) {
+      await onSubmit(selectedFile);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full animate-fade-in-up">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <Upload className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Mark as Paid
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Upload payment proof for Commission Note #{noteId}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          <div
+            className={`relative border-2 border-dashed rounded-xl p-8 transition-all ${
+              dragActive
+                ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                : selectedFile
+                ? 'border-green-500 bg-green-50/50 dark:bg-green-900/10'
+                : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.gif"
+              onChange={handleFileChange}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              disabled={isSubmitting}
+            />
+
+            <div className="text-center">
+              {selectedFile ? (
+                <>
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
+                    <FileText className="w-8 h-8 text-green-600 dark:text-green-400" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    {selectedFile.name}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    {(selectedFile.size / 1024).toFixed(2)} KB
+                  </p>
+                  <button
+                    onClick={handleRemoveFile}
+                    className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium"
+                  >
+                    Remove file
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
+                    <Upload className="w-8 h-8 text-gray-500 dark:text-gray-400" />
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    <span className="font-semibold text-green-600 dark:text-green-400">Click to upload</span> or drag and drop
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500">
+                    PDF, PNG, JPG, GIF (Max 10MB)
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Info Message */}
+          <div className="mt-4 flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              Please upload a clear copy of the payment proof. This will be used to verify the payment and mark the commission as paid.
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!selectedFile || isSubmitting}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                <span>Processing...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle size={16} />
+                <span>Confirm Payment</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function PaymentsTable() {
   const [notes, setNotes] = useState<CommissionNote[]>([]);
   const [activeNoteDetail, setActiveNoteDetail] = useState<CommissionNoteDetail & { comments?: Comment[] } | null>(null);
@@ -149,7 +344,11 @@ export default function PaymentsTable() {
   const [commentText, setCommentText] = useState("");
   const [postingComment, setPostingComment] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [sendingMail, setSendingMail] = useState(false);
   const [markingAsPaid, setMarkingAsPaid] = useState(false);
+  
+  // Mark as paid modal state
+  const [isMarkAsPaidModalOpen, setIsMarkAsPaidModalOpen] = useState(false);
   
   // Add ref to track initial mount and prevent unnecessary fetches
   const isInitialMount = useRef(true);
@@ -335,7 +534,7 @@ export default function PaymentsTable() {
     }
   }, [BASE_URL, token, active, pagination.limit, activeNoteId, appliedFilters]);
 
-  // Fetch comments for a commission note (updated endpoint)
+  // Fetch comments for a commission note
   const fetchComments = useCallback(async (noteId: number) => {
     try {
       const response = await fetch(
@@ -408,30 +607,83 @@ export default function PaymentsTable() {
     }
   }, [BASE_URL, token, fetchComments]);
 
-  // Mark commission note as paid
-  const markAsPaid = useCallback(async (noteId: number) => {
+  // Send commission note email
+  const sendEmail = useCallback(async (noteId: number) => {
     if (!noteId) return;
     
     try {
-      setMarkingAsPaid(true);
+      setSendingMail(true);
       
       const response = await fetch(
-        `${BASE_URL}/tenant/commission-note/mark-paid`,
+        `${BASE_URL}/tenant/commission-note/${noteId}/send`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            commission_note_id: noteId
-          })
+          }
         }
       );
       
       const data = await response.json();
       
       if (data.status === "success") {
+        // Show success dialog
+        setDialog({
+          isOpen: true,
+          type: 'success',
+          message: data.message || "Commission note sent via email successfully!"
+        });
+        
+        // Refresh the notes list to update status
+        fetchCommissionNotes(pagination.page);
+      } else {
+        // Show error dialog
+        setDialog({
+          isOpen: true,
+          type: 'error',
+          message: data.message || "Failed to send email"
+        });
+      }
+    } catch (err) {
+      setDialog({
+        isOpen: true,
+        type: 'error',
+        message: err instanceof Error ? err.message : "An error occurred while sending email"
+      });
+    } finally {
+      setSendingMail(false);
+    }
+  }, [BASE_URL, token, fetchCommissionNotes, pagination.page]);
+
+  // Mark commission note as paid with file upload
+  const markAsPaid = useCallback(async (file: File) => {
+    if (!activeNoteId) return;
+    
+    try {
+      setMarkingAsPaid(true);
+      
+      const formData = new FormData();
+      formData.append('payment_proof', file);
+      formData.append('commission_note_id', activeNoteId.toString());
+      
+      const response = await fetch(
+        `${BASE_URL}/tenant/commission-note/mark-paid`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (data.status === "success") {
+        // Close the modal
+        setIsMarkAsPaidModalOpen(false);
+        
         // Show success dialog
         setDialog({
           isOpen: true,
@@ -443,8 +695,8 @@ export default function PaymentsTable() {
         fetchCommissionNotes(pagination.page);
         
         // If the current note is the one that was marked as paid, refresh its details
-        if (activeNoteId === noteId) {
-          fetchCommissionNoteDetail(noteId);
+        if (activeNoteId) {
+          fetchCommissionNoteDetail(activeNoteId);
         }
       } else {
         // Show error dialog
@@ -463,17 +715,17 @@ export default function PaymentsTable() {
     } finally {
       setMarkingAsPaid(false);
     }
-  }, [BASE_URL, token, fetchCommissionNotes, fetchCommissionNoteDetail, activeNoteId, pagination.page]);
+  }, [BASE_URL, token, activeNoteId, fetchCommissionNotes, fetchCommissionNoteDetail, pagination.page]);
 
-   const closeDialog = () => {
+  const closeDialog = () => {
     setDialog(prev => ({ ...prev, isOpen: false }));
   };
 
-    const StatusDialog = () => {
+  const StatusDialog = () => {
     if (!dialog.isOpen) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 ">
+      <div className="fixed inset-0 z-999999 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full animate-fade-in">
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
@@ -559,7 +811,7 @@ export default function PaymentsTable() {
     }
   }, [BASE_URL, token]);
 
-  // Post a new comment (updated endpoint and payload)
+  // Post a new comment
   const postComment = useCallback(async (noteId: number, comment: string) => {
     if (!comment.trim() || !activeNoteDetail) return;
     
@@ -699,12 +951,19 @@ export default function PaymentsTable() {
     }
   };
 
-  // Handle mark as paid
+  // Handle send email
+  const handleSendEmail = () => {
+    if (activeNoteId) {
+      if (window.confirm("Are you sure you want to send this commission note via email?")) {
+        sendEmail(activeNoteId);
+      }
+    }
+  };
+
+  // Handle mark as paid - open modal instead of confirm
   const handleMarkAsPaid = () => {
     if (activeNoteId) {
-      if (window.confirm("Are you sure you want to mark this commission note as paid?")) {
-        markAsPaid(activeNoteId);
-      }
+      setIsMarkAsPaidModalOpen(true);
     }
   };
 
@@ -736,10 +995,17 @@ export default function PaymentsTable() {
   };
 
   // Format currency
-  const formatCurrency = (amount: number | string, currency: string = 'USD') => {
+  const formatCurrency = (amount: number | string | undefined, currency: string = 'USD') => {
     if (amount === undefined || amount === null) return '-';
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     return `${currency} ${numAmount.toFixed(2)}`;
+  };
+
+  // Format INR currency
+  const formatINR = (amount: number | string | undefined) => {
+    if (amount === undefined || amount === null) return '-';
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return `₹${numAmount.toFixed(2)}`;
   };
 
   // Get status color
@@ -915,8 +1181,17 @@ export default function PaymentsTable() {
 
 return (
     <>
-      {/* Add Dialog */}
+      {/* Status Dialog */}
       <StatusDialog />
+
+      {/* Mark as Paid Modal */}
+      <MarkAsPaidModal
+        isOpen={isMarkAsPaidModalOpen}
+        onClose={() => setIsMarkAsPaidModalOpen(false)}
+        onSubmit={markAsPaid}
+        noteId={activeNoteId}
+        isSubmitting={markingAsPaid}
+      />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -1053,12 +1328,24 @@ return (
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                     Commission Note #{activeNoteId}
                   </h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Agent ID: {notes.find(n => n.id === activeNoteId)?.agent_id || '-'}
-                  </p>
+                  <div className="mt-2 space-y-1">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">Agent:</span> {activeNoteDetail.commission_note?.agent_name || '-'}
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">Business:</span> {activeNoteDetail.commission_note?.agent_business_name || '-'}
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">University:</span> {activeNoteDetail.commission_note?.university_name || '-'} ({activeNoteDetail.commission_note?.university_country || '-'})
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">Address:</span> {activeNoteDetail.commission_note?.agent_address || '-'}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                  {/* Download Button */}
                   <button
                     onClick={handleDownloadPdf}
                     disabled={downloadingPdf}
@@ -1066,6 +1353,16 @@ return (
                   >
                     <Download size={16} />
                     {downloadingPdf ? "Downloading..." : "Download"}
+                  </button>
+
+                  {/* Send Mail Button */}
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={sendingMail}
+                    className="inline-flex items-center gap-2 px-3 py-2 border border-green-600 text-green-600 dark:border-green-500 dark:text-green-400 rounded-lg text-sm hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50"
+                  >
+                    <Mail size={16} />
+                    {sendingMail ? "Sending..." : "Send Mail"}
                   </button>
 
                   {notes.find(n => n.id === activeNoteId)?.status !== 'commission_payment_done' && (
@@ -1081,23 +1378,6 @@ return (
                 </div>
               </div>
 
-              {/* Currency Summary */}
-              {activeNoteDetail.summary?.currency_summary && (
-                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
-                    <span className="font-medium">Currencies:</span> {activeNoteDetail.summary.currency_summary.join(', ')}
-                  </p>
-                  {activeNoteDetail.summary.exchange_rates && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      <span className="font-medium">Exchange Rates:</span>{' '}
-                      {Object.entries(activeNoteDetail.summary.exchange_rates)
-                        .map(([curr, rate]) => `1 ${curr} = ${rate} INR`)
-                        .join(', ')}
-                    </p>
-                  )}
-                </div>
-              )}
-
               {/* Items Table - Scrollable */}
               {activeNoteDetail.items && activeNoteDetail.items.length > 0 && (
                 <div>
@@ -1112,31 +1392,87 @@ return (
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Course</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">App ID</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Inst</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Commission</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">GST</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">After GST</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Currency</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Invoice Amt</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Received</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bank Charges</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Agent Share</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">INR Amt</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">TDS</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Agent Commission</th>
+                          
+                          {/* Optional GST column */}
+                          {activeNoteDetail.items.some(item => item.gst_percentage !== undefined) && (
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">GST</th>
+                          )}
+                          
+                          {/* Optional GST Amount column */}
+                          {activeNoteDetail.items.some(item => item.gst_amount !== undefined) && (
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">GST Amt</th>
+                          )}
+                          
+                          {/* Optional TDS column */}
+                          {activeNoteDetail.items.some(item => item.tds_percentage !== undefined) && (
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">TDS</th>
+                          )}
+                          
+                          {/* Optional TDS Amount column */}
+                          {activeNoteDetail.items.some(item => item.tds_amount !== undefined) && (
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">TDS Amt</th>
+                          )}
+                          
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Final Payable</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Net Pay</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                         {activeNoteDetail.items.map((item, index) => (
-                          <tr key={item.invoice_item_id || index} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.student}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 max-w-[200px] truncate" title={`${item.course_name} (${item.study_level}, ${item.intake_year})`}>
-                              {item.course_name}
+                          <tr key={item.id || item.invoice_item_id || index} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.student || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 max-w-[200px] truncate" title={`${item.course_name || ''} (${item.study_level || ''}, ${item.intake_year || ''})`}>
+                              {item.course_name || '-'}
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.application_id}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.installment_no}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{formatCurrency(item.commission_amount, item.currency)}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.gst_percentage}%</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{formatCurrency(item.commission_after_gst, item.currency)}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.agent_share_percentage}%</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">₹{item.shared_amount_in_inr.toFixed(2)}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.tds_percentage}%</td>
-                            <td className="px-4 py-3 text-sm font-medium text-green-600 dark:text-green-400">₹{item.net_pay.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.application_id || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.installment_no || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.invoice_currency || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{formatCurrency(item.invoice_amount, item.invoice_currency)}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{formatCurrency(item.amount_received_in_default, item.invoice_currency)}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{formatCurrency(item.bank_charges, item.invoice_currency)}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.agent_share_percentage || 0}%</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{formatCurrency(item.agent_commission_default, item.invoice_currency)}</td>
+                            
+                            {/* Optional GST column */}
+                            {activeNoteDetail.items.some(i => i.gst_percentage !== undefined) && (
+                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                                {item.gst_percentage !== undefined ? `${item.gst_percentage}%` : '-'}
+                              </td>
+                            )}
+                            
+                            {/* Optional GST Amount column */}
+                            {activeNoteDetail.items.some(i => i.gst_amount !== undefined) && (
+                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                                {item.gst_amount !== undefined ? formatCurrency(item.gst_amount, item.invoice_currency) : '-'}
+                              </td>
+                            )}
+                            
+                            {/* Optional TDS column */}
+                            {activeNoteDetail.items.some(i => i.tds_percentage !== undefined) && (
+                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                                {item.tds_percentage !== undefined ? `${item.tds_percentage}%` : '-'}
+                              </td>
+                            )}
+                            
+                            {/* Optional TDS Amount column */}
+                            {activeNoteDetail.items.some(i => i.tds_amount !== undefined) && (
+                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                                {item.tds_amount !== undefined ? formatCurrency(item.tds_amount, item.invoice_currency) : '-'}
+                              </td>
+                            )}
+                            
+                            <td className="px-4 py-3 text-sm font-medium text-green-600 dark:text-green-400">
+                              {formatCurrency(item.final_agent_payable, item.invoice_currency)}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-medium text-green-600 dark:text-green-400">
+                              {formatCurrency(item.net_pay, item.invoice_currency)}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1149,45 +1485,50 @@ return (
               {activeNoteDetail.summary?.totals && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                   <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Total Commission</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Total Items</p>
                     <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      {formatCurrency(activeNoteDetail.summary.totals.total_full_commission, activeNoteDetail.summary.currency_summary[0])}
+                      {activeNoteDetail.summary.total_items || 0}
                     </p>
                   </div>
+                  
                   <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Total GST</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Total Agent Commission</p>
                     <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      {formatCurrency(activeNoteDetail.summary.totals.total_gst_amount, activeNoteDetail.summary.currency_summary[0])}
+                      {formatINR(activeNoteDetail.summary.totals.total_agent_commission)}
                     </p>
                   </div>
+
+                  {/* Optional GST Total */}
+                  {activeNoteDetail.summary.totals.total_gst_amount !== undefined && (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Total GST</p>
+                      <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        {formatINR(activeNoteDetail.summary.totals.total_gst_amount)}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Optional TDS Total */}
+                  {activeNoteDetail.summary.totals.total_tds_amount !== undefined && (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Total TDS</p>
+                      <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        {formatINR(activeNoteDetail.summary.totals.total_tds_amount)}
+                      </p>
+                    </div>
+                  )}
+                  
                   <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">After GST</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Total Final Payable</p>
                     <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      {formatCurrency(activeNoteDetail.summary.totals.total_commission_after_gst, activeNoteDetail.summary.currency_summary[0])}
+                      {formatINR(activeNoteDetail.summary.totals.total_final_payable)}
                     </p>
                   </div>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Agent Amount (INR)</p>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      ₹{activeNoteDetail.summary.totals.total_agent_amount_in_inr.toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Gross Payable</p>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      ₹{activeNoteDetail.summary.totals.total_gross_payable.toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Total TDS</p>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      ₹{activeNoteDetail.summary.totals.total_tds_amount.toFixed(2)}
-                    </p>
-                  </div>
+                  
                   <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg col-span-2 sm:col-span-1">
-                    <p className="text-xs text-green-600 dark:text-green-400">Net Payable</p>
+                    <p className="text-xs text-green-600 dark:text-green-400">Total Net Payable</p>
                     <p className="text-lg font-semibold text-green-700 dark:text-green-300">
-                      ₹{activeNoteDetail.summary.totals.total_net_payable.toFixed(2)}
+                      {formatINR(activeNoteDetail.summary.totals.total_net_payable)}
                     </p>
                   </div>
                 </div>
@@ -1263,6 +1604,19 @@ return (
         }
         .animate-fade-in {
           animation: fadeIn 0.2s ease-out;
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 0.3s ease-out;
         }
       `}</style>
     </>

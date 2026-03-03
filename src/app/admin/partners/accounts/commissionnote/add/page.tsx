@@ -338,63 +338,84 @@ const AddCommissionNote = () => {
     return true;
   };
 
-  const handleSubmit = async () => {
-    if (!selectedAgent || !selectedUniversity || selectedApplicationIds.length === 0) {
-      setError("Please select agent, university, and at least one application");
-      return;
-    }
+const handleSubmit = async () => {
+  if (!selectedAgent || !selectedUniversity || selectedApplicationIds.length === 0) {
+    setError("Please select agent, university, and at least one application");
+    return;
+  }
 
-    // Validate required admin inputs
-    if (!validateAdminInputs()) {
-      return;
-    }
+  // Validate required admin inputs
+  if (!validateAdminInputs()) {
+    return;
+  }
 
-    try {
-      setSubmitting(true);
-      setError(null);
+  try {
+    setSubmitting(true);
+    setError(null);
 
-      // Prepare payload with admin inputs
-      const selectedAppsWithInputs = applications
-        .filter(app => selectedApplicationIds.includes(app.invoice_item_id))
-        .map(app => ({
-          invoice_item_id: app.invoice_item_id,
-          admin_inputs: adminInputValues[app.invoice_item_id] || {}
-        }));
-
-      const payload = {
-        agent_id: selectedAgent.agent_id,
-        university_id: selectedUniversity.university_id,
-        items: selectedAppsWithInputs
-      };
-
-      const response = await fetch(
-        `${BASE_URL}/tenant/commission-note`,
-        {
-          method: "POST",
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
+    // Build items_data array for all selected applications
+    const itemsData = applications
+      .filter(app => selectedApplicationIds.includes(app.invoice_item_id))
+      .map(app => {
+        const adminInputs = adminInputValues[app.invoice_item_id] || {};
+        
+        // Build item object with only the fields that have values
+        const item: any = {
+          invoice_item_id: app.invoice_item_id
+        };
+        
+        // Add fields only if they have values
+        if (adminInputs.amount_received_in_default !== undefined && adminInputs.amount_received_in_default !== null) {
+          item.amount_received_in_default = adminInputs.amount_received_in_default;
         }
-      );
-      
-      const data = await response.json();
-      
-      if (data.status === "success") {
-        setSuccess(true);
-        setTimeout(() => {
-          router.push('/admin/partners/accounts/commissionnote');
-        }, 2000);
-      } else {
-        throw new Error(data.message || "Failed to create commission note");
+        if (adminInputs.bank_charges !== undefined && adminInputs.bank_charges !== null) {
+          item.bank_charges = adminInputs.bank_charges;
+        }
+        if (adminInputs.gst_percentage !== undefined && adminInputs.gst_percentage !== null) {
+          item.gst_percentage = adminInputs.gst_percentage;
+        }
+        if (adminInputs.tds_percentage !== undefined && adminInputs.tds_percentage !== null) {
+          item.tds_percentage = adminInputs.tds_percentage;
+        }
+        
+        return item;
+      });
+
+    // Create single payload object with agent_id, university_id, and items_data array
+    const payload = {
+      agent_id: selectedAgent.agent_id,
+      university_id: selectedUniversity.university_id,
+      items_data: itemsData
+    };
+
+    const response = await fetch(
+      `${BASE_URL}/tenant/commission-note`,
+      {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setSubmitting(false);
+    );
+    
+    const data = await response.json();
+    
+    if (data.status === "success") {
+      setSuccess(true);
+      setTimeout(() => {
+        router.push('/admin/partners/accounts/commissionnote');
+      }, 2000);
+    } else {
+      throw new Error(data.message || "Failed to create commission note");
     }
-  };
+  } catch (err) {
+    setError(err instanceof Error ? err.message : "An error occurred");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   // Check if an application requires admin inputs
   const requiresAdminInputs = (application: Application): boolean => {

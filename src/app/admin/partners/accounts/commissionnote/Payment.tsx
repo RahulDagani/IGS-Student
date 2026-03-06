@@ -10,23 +10,23 @@ import Link from "next/link";
 interface CommissionNote {
   id: number;
   commission_note_number: string;
+  financial_year: string;
+  sequence_number: number;
   agent_id: number;
   university_id: number;
-  po_number: string | null;
   po_date: string | null;
-  currency: string;
-  gst_percentage: string;
-  tds_percentage: string;
-  total_commissionable_amount: string;
-  total_full_commission: string;
+  commission_note_currency: string;
+  total_commissionable_tuition_fee: string;
+  total_commission_amount_invoice_currency: string;
+  total_bank_charges: string;
+  total_commission_amt_after_bank_charges: string;
   total_gst_amount: string;
-  total_commission_after_gst: string;
-  total_agent_commission: string;
-  total_company_retained: string;
-  total_commission_amount: string;
   total_tds_amount: string;
-  total_net_payable: string;
+  total_net_payable_default: string;
   status: string;
+  sent_at: string | null;
+  payment_proof: string | null;
+  paid_at: string | null;
   remarks: string | null;
   created_by: number;
   created_at: string;
@@ -34,52 +34,38 @@ interface CommissionNote {
   business_name: string;
 }
 
-// Update the CommissionNoteDetail interface to match the API response
 interface CommissionNoteDetail {
   commission_note: {
     id: number;
-    commission_note_number: string;
-    po_date: string;
+    note_number: string;
+    date: string;
+    university: string;
+    agent_business: string;
     status: string;
-    university_name: string;
-    university_country: string;
-    agent_name: string;
-    agent_business_name: string;
-    agent_address: string;
-    agent_email: string;
-    agent_phone: string;
-    total_commissionable_amount: string;
-    total_received_in_default: string;
-    total_agent_commission: string;
-    total_gst_amount: string;
-    total_tds_amount: string;
-    total_net_payable_default: string;
+    currency: string;
   };
   items: Array<{
     id: number;
-    invoice_item_id: number;
-    application_id: number;
-    installment_no: number;
     student: string;
-    course_name: string;
-    study_level: string;
-    intake_year: number;
-    commission_type: string;
+    course: string;
+    intake: string;
+    installment: number;
     commissionable_tuition_fee: string;
-    invoice_amount: string;
-    amount_received_in_default: string;
+    commission_amount_invoice_currency: string;
     bank_charges: string;
-    agent_share_percentage: string;
-    agent_commission_default: string;
+    commission_amt_after_bank_charges: string;
+    exchange_rate: string;
+    net_commission_amt: string;
+    partner_share_percentage: string;
+    partner_share_amt: string;
+    gst_percentage: string;
+    gst_amount: string;
+    tds_percentage: string;
+    tds_amount: string;
     net_pay: string;
   }>;
   summary: {
-    total_items: number;
-    totals: {
-      total_agent_commission: string;
-      total_final_payable: string;
-      total_net_payable: string;
-    };
+    total_net_payable: string;
   };
 }
 
@@ -1261,7 +1247,7 @@ return (
                     </p>
 
                     <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
-                      {formatCurrency(note.total_commission_amount, note.currency)}
+                      {formatCurrency(parseFloat(note.total_commission_amount_invoice_currency), note.commission_note_currency)}
                     </p>
 
                     <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
@@ -1327,39 +1313,28 @@ return (
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {/* Commission Note  */}
-            #{activeNoteDetail.commission_note?.commission_note_number || activeNoteId} <span className={`text-xs px-3 py-1.5 rounded-full ${getStatusColor(activeNoteDetail.commission_note?.status || '')}`}>
-            {(activeNoteDetail.commission_note?.status || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-          </span>
+            Commission Note #{activeNoteDetail.commission_note?.note_number || activeNoteId} 
+            <span className={`ml-2 text-xs px-3 py-1.5 rounded-full ${getStatusColor(activeNoteDetail.commission_note?.status || '')}`}>
+              {(activeNoteDetail.commission_note?.status || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </span>
           </h2>
           <div className="mt-2 space-y-1">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              <span className="font-medium">Agent:</span> {activeNoteDetail.commission_note?.agent_name || '-'}
+              <span className="font-medium">Date:</span> {formatDate(activeNoteDetail.commission_note?.date) || '-'}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              <span className="font-medium">Business:</span> {activeNoteDetail.commission_note?.agent_business_name || '-'}
+              <span className="font-medium">Agent Business:</span> {activeNoteDetail.commission_note?.agent_business || '-'}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              <span className="font-medium">Email:</span> {activeNoteDetail.commission_note?.agent_email || '-'}
+              <span className="font-medium">University:</span> {activeNoteDetail.commission_note?.university || '-'}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              <span className="font-medium">Phone:</span> {activeNoteDetail.commission_note?.agent_phone || '-'}
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              <span className="font-medium">University:</span> {activeNoteDetail.commission_note?.university_name || '-'} ({activeNoteDetail.commission_note?.university_country || '-'})
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              <span className="font-medium">Address:</span> {activeNoteDetail.commission_note?.agent_address || '-'}
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              <span className="font-medium">PO Date:</span> {formatDate(activeNoteDetail.commission_note?.po_date) || '-'}
+              <span className="font-medium">Currency:</span> {activeNoteDetail.commission_note?.currency || '-'}
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          
-          
           {/* Download Button */}
           <button
             onClick={handleDownloadPdf}
@@ -1393,13 +1368,11 @@ return (
         </div>
       </div>
 
-      
-
       {/* Items Table */}
       {activeNoteDetail.items && activeNoteDetail.items.length > 0 && (
         <div>
           <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">
-            Commission Items ({activeNoteDetail.summary?.total_items || activeNoteDetail.items.length})
+            Commission Items ({activeNoteDetail.items.length})
           </h3>
           <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -1407,31 +1380,42 @@ return (
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Student</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Course</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">App ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Intake</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Inst</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Invoice Amt</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Received</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Comm. Fee</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Comm. Amt</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bank Charges</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Agent Share</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Agent Commission</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">After Bank</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ex. Rate</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Net Comm.</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Partner Share</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Partner Amt</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">GST</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">GST Amt</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">TDS</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">TDS Amt</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Net Pay</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                 {activeNoteDetail.items.map((item, index) => (
-                  <tr key={item.id || item.invoice_item_id || index} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <tr key={item.id || index} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.student || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 max-w-[200px] truncate" title={`${item.course_name || ''} (${item.study_level || ''}, ${item.intake_year || ''})`}>
-                      {item.course_name || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.application_id || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.installment_no || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.invoice_amount || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.amount_received_in_default || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.course || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.intake || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.installment || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.commissionable_tuition_fee || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.commission_amount_invoice_currency || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.bank_charges || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.agent_share_percentage || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.agent_commission_default || '-'}</td>
-                    
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.commission_amt_after_bank_charges || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.exchange_rate || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.net_commission_amt || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.partner_share_percentage || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.partner_share_amt || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.gst_percentage || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.gst_amount || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.tds_percentage || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{item.tds_amount || '-'}</td>
                     <td className="px-4 py-3 text-sm font-medium text-green-600 dark:text-green-400">
                       {item.net_pay || '-'}
                     </td>
@@ -1443,55 +1427,17 @@ return (
         </div>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <p className="text-xs text-gray-500 dark:text-gray-400">Total Commissionable</p>
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {activeNoteDetail.commission_note?.total_commissionable_amount || '-'}
-          </p>
-        </div>
-        
-        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <p className="text-xs text-gray-500 dark:text-gray-400">Total Received</p>
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {activeNoteDetail.commission_note?.total_received_in_default || '-'}
-          </p>
-        </div>
-        
-        <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-          <p className="text-xs text-gray-500 dark:text-gray-400">Agent Commission</p>
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {activeNoteDetail.commission_note?.total_agent_commission || '-'}
-          </p>
-        </div>
-        
-        {activeNoteDetail.commission_note?.total_gst_amount !== '0.00 USD' && (
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-xs text-gray-500 dark:text-gray-400">GST Amount</p>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {activeNoteDetail.commission_note?.total_gst_amount || '-'}
+      {/* Summary */}
+      {activeNoteDetail.summary && (
+        <div className="flex justify-end">
+          <div className="w-full sm:w-64 p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
+            <p className="text-xs text-green-600 dark:text-green-400">Total Net Payable</p>
+            <p className="text-lg font-semibold text-green-700 dark:text-green-300">
+              {activeNoteDetail.summary.total_net_payable || '-'}
             </p>
           </div>
-        )}
-        
-        {activeNoteDetail.commission_note?.total_tds_amount !== '0.00 USD' && (
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-xs text-gray-500 dark:text-gray-400">TDS Amount</p>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {activeNoteDetail.commission_note?.total_tds_amount || '-'}
-            </p>
-          </div>
-        )}
-        
-        <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
-          <p className="text-xs text-green-600 dark:text-green-400">Net Payable</p>
-          <p className="text-sm font-semibold text-green-700 dark:text-green-300">
-            {activeNoteDetail.commission_note?.total_net_payable_default || '-'}
-          </p>
         </div>
-      </div>
-
+      )}
 
       {/* Comments Section - Keep as is */}
       <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-6">

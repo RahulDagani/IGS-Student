@@ -833,8 +833,8 @@ const AddCommissionNote = () => {
                                           fieldName,
                                           e.target.value
                                         )}
-                                        placeholder={field.currency || 'Enter value'}
-                                        className={`w-full px-2 py-1 text-sm border rounded-md focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 ${
+                                        placeholder={'Enter value'}
+                                        className={`w-full px-2 py-1 text-sm  text-black dark:text-white border rounded-md focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 ${
                                           field.currency ? 'pl-8' : 'pl-2'
                                         } ${
                                           field.required && 

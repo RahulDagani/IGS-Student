@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import SetupSettingsSidebar from "@/app/admin/layout/SetupSettingsSidebar";
-import { Save, X } from "lucide-react";
+import { Save, X, Upload, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 
@@ -20,6 +20,8 @@ interface GeneralSettings {
   twitter_link: string;
   linkedin_link: string;
   enable_email_otp: number;
+  logo?: string;
+  logo_url?: string;
 }
 
 export default function GeneralSettingsPage() {
@@ -39,6 +41,11 @@ export default function GeneralSettingsPage() {
     enable_email_otp: 0,
   });
 
+  const [logo, setLogo] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [existingLogo, setExistingLogo] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -47,7 +54,7 @@ export default function GeneralSettingsPage() {
   const [error, setError] = useState<string>("");
 
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
-    const { token } = useAuth();
+  const { token } = useAuth();
 
   // Fetch settings data
   useEffect(() => {
@@ -65,6 +72,15 @@ export default function GeneralSettingsPage() {
     }
   }, [success, error]);
 
+  // Cleanup preview URL when component unmounts or logo changes
+  useEffect(() => {
+    return () => {
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+    };
+  }, [logoPreview]);
+
   const showToast = (message: string, type: "success" | "error") => {
     if (type === "success") {
       setSuccess(message);
@@ -77,10 +93,10 @@ export default function GeneralSettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch(`${BASE_URL}/tenant/settings/general`,{
+      const response = await fetch(`${BASE_URL}/tenant/settings/general`, {
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
       });
       
@@ -107,6 +123,14 @@ export default function GeneralSettingsPage() {
           linkedin_link: settings.linkedin_link || "",
           enable_email_otp: settings.enable_email_otp || 0,
         });
+        
+        // Set existing logo if available
+        if (settings.logo_url) {
+          setExistingLogo(settings.logo_url);
+        } else if (settings.logo) {
+          // Construct logo URL if only filename is stored
+          setExistingLogo(`${BASE_URL}/uploads/tenant/logo/${settings.logo}`);
+        }
       } else {
         // Use default empty values if no data exists
         showToast("No existing settings found. Using defaults.", "error");
@@ -137,22 +161,81 @@ export default function GeneralSettingsPage() {
     });
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/svg+xml'];
+      if (!allowedTypes.includes(file.type)) {
+        showToast("Please upload a valid image file (JPEG, PNG, or SVG)", "error");
+        return;
+      }
+
+      // Validate file size (max 1MB as per your logoUpload config)
+      if (file.size > 1 * 1024 * 1024) {
+        showToast("Logo must be less than 1MB", "error");
+        return;
+      }
+
+      setLogo(file);
+      
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setLogoPreview(previewUrl);
+      
+      // Clear existing logo preview
+      setExistingLogo(null);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogo(null);
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+      setLogoPreview(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
     try {
+      // Create FormData object for file upload
+      const formDataToSend = new FormData();
+      
+      // Append all form fields
+      Object.entries(formData).forEach(([key, value]) => {
+        formDataToSend.append(key, String(value));
+      });
+
+      // Append logo if selected
+      if (logo) {
+        formDataToSend.append('logo', logo);
+      }
+
       const response = await fetch(`${BASE_URL}/tenant/settings/general`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           'Authorization': `Bearer ${token}`
+          // Don't set Content-Type header when using FormData
+          // Browser will set it automatically with the correct boundary
         },
-        body: JSON.stringify(formData),
+        body: formDataToSend,
       });
 
       if (response.ok) {
+        const data = await response.json();
         showToast("Settings saved successfully!", "success");
+        
+        // Refresh settings to get updated logo URL
+        await fetchSettings();
+        
+        // Clear logo preview and file input
+        handleRemoveLogo();
       } else {
         const errorData = await response.json();
         showToast(
@@ -185,7 +268,7 @@ export default function GeneralSettingsPage() {
       <SetupSettingsSidebar />
 
       {/* Main Content */}
-      <div className="bg-[#111827] flex-1 mt-6 ml-0 lg:ml-6 lg:mt-0 mb-6 space-y-8">
+      <div className="bg-[#111827] flex-1 mt-6 ml-0 lg:ml-6 lg:mt-0 mb-6 space-y-8 p-6">
         {/* Toast Notifications */}
         {success && (
           <div className="p-4 bg-green-500/10 border border-green-500 rounded-lg flex justify-between items-center">
@@ -217,6 +300,71 @@ export default function GeneralSettingsPage() {
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Logo Upload Section */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-200 mb-4">
+                Company Logo
+              </h3>
+              <div className="flex items-start space-x-6">
+                {/* Logo Preview */}
+                <div className="flex-shrink-0">
+                  <div className="relative w-32 h-32 bg-[#1F2937] rounded-lg border-2 border-dashed border-gray-700 overflow-hidden">
+                    {(logoPreview || existingLogo) ? (
+                      <Image
+                        src={logoPreview || existingLogo || ''}
+                        alt="Company Logo"
+                        fill
+                        className="object-contain"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageIcon className="w-8 h-8 text-gray-600" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Upload Controls */}
+                <div className="flex-1">
+                  <div className="flex items-center space-x-4">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleLogoChange}
+                      accept="image/jpeg,image/jpg,image/png,image/svg+xml"
+                      className="hidden"
+                      id="logo-upload"
+                    />
+                    <label
+                      htmlFor="logo-upload"
+                      className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+                    >
+                      <Upload className="w-4 h-4" />
+                      {logoPreview || existingLogo ? 'Change Logo' : 'Upload Logo'}
+                    </label>
+                    
+                    {(logoPreview || existingLogo) && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  
+                  <p className="mt-2 text-sm text-gray-400">
+                    Accepted formats: JPEG, PNG, SVG (max. 1MB)
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Recommended size: 200x200 pixels or larger
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Company Information */}
             <div>
               <h3 className="text-lg font-medium text-gray-200 mb-4">

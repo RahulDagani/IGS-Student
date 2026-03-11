@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Mail, Phone, Send, Facebook, Twitter, Instagram, Linkedin, ArrowUp } from "lucide-react";
+import Link from "next/link";
 
 export default function Footer() {
   return (
@@ -74,8 +75,8 @@ export default function Footer() {
               <li>Documentation</li>
               <li>Live Chat</li>
               <li>Mail Us</li>
-              <li>Privacy</li>
-              <li>Faqs</li>
+              <li><Link href={"/privacy-policy"}>Privacy Policy</Link> </li>
+              <li><Link href={"/data-deletion"}>Data Deletion</Link></li>
             </ul>
           </div>
 

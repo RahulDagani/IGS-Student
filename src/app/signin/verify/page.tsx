@@ -181,8 +181,8 @@ export default function VerifyEmailPage() {
   // Redirect if user is already verified
   useEffect(() => {
     if (user?.email_verified) {
-      const redirectPath = user.role_key === 'student' ? '/student' : '/agent';
-      router.push(redirectPath);
+      
+      router.push("/student");
     }
   }, [user, router]);
 
@@ -283,8 +283,8 @@ export default function VerifyEmailPage() {
           
           // Redirect after 2 seconds
           setTimeout(() => {
-            const redirectPath = updatedUser.role_key === 'student' ? '/student' : '/agent';
-            router.push(redirectPath);
+            
+            router.push('/student');
           }, 2000);
         }
       } else {

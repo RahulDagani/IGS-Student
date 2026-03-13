@@ -24,43 +24,11 @@ export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
     if (!isAuthenticated) {
 
       let signinRoute = "/signin"; // default
-      
-      if (pathname?.startsWith("/student")) {
-        signinRoute = "/signin/student";
-      } else if (pathname?.startsWith("/partner")) {
-        signinRoute = "/signin/agent";
-      }
 
 
       const returnUrl = encodeURIComponent(pathname || "/");
       router.replace(`${signinRoute}?returnUrl=${returnUrl}`);
 
-    } else if (user && !allowedRoles.includes(user.panel_type)) {
-
-      if(adminToken && user.panel_type == "agent"){ //Prevent Admin from /signin after session change for Agent access
-        router.replace(`/partner`);
-        return;
-      }
-      else if(adminToken && user.panel_type == "admin"){ //Prevent admin from /signin/agent after session change for ReLogin of Admin
-        router.replace(`/admin/partners/agents`);
-        return;
-      }else{
-          let signinRoute = "/signin";
-        if (pathname?.startsWith("/student")) {
-          signinRoute = "/signin/student";
-        } else if (pathname?.startsWith("/partner")) {
-          signinRoute = "/signin/agent";
-        }else if(pathname?.startsWith("/admin")){
-          signinRoute = "/signin"
-        }
-
-        const returnUrl = encodeURIComponent(pathname || "/");
-        router.replace(`${signinRoute}?returnUrl=${returnUrl}`);
-      }
-
-
-      
-      // router.replace("/unauthorized");
     }
 
     

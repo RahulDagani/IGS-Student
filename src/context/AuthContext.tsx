@@ -102,14 +102,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     Cookies.remove("token");
     Cookies.remove("adminToken");
    
-    if(userType ==   "agent"){
-      window.location.href = '/signin/agent';
-
-      }else if(userType == "student"){
-        window.location.href = '/signin/student';
-      }else{
-        window.location.href = '/signin';
-      }
+    
+    window.location.href = '/signin';
+      
   };
 
   const value: AuthContextType = {

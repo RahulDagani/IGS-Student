@@ -15,13 +15,9 @@ export default function LogoutClient() {
       try {
         logout(userType);
 
-        if (userType === "agent") {
-          router.push("/signin/agent");
-        } else if (userType === "student") {
-          router.push("/signin/student");
-        } else {
+       
           router.push("/signin");
-        }
+        
       } catch (error) {
         console.error("Logout failed:", error);
         router.push("/signin");

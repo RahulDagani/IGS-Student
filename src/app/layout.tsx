@@ -6,6 +6,8 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from "@/context/AuthContext";
 import RootLayoutClient from '@/components/RootLayoutClient';
 
+import { GoogleOAuthProvider } from '@react-oauth/google';
+
 const outfit = Outfit({
   subsets: ["latin"],
 });
@@ -18,15 +20,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${outfit.className} dark:bg-gray-900`}>
-        <AuthProvider>
-          <ThemeProvider>
-            <SidebarProvider>
-              <RootLayoutClient>
-                {children}
-              </RootLayoutClient>
-            </SidebarProvider>
-          </ThemeProvider>
-        </AuthProvider>
+        
+         <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
+          <AuthProvider>
+            <ThemeProvider>
+              <SidebarProvider>
+                <RootLayoutClient>
+                  {children}
+                </RootLayoutClient>
+              </SidebarProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </GoogleOAuthProvider>
       </body>
     </html>
   );

@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { LogIn, Eye, EyeOff } from "lucide-react";
-import { useRouter, useSearchParams  } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-
 import { Suspense } from 'react';
 import { useAuth } from "@/context/AuthContext";
+import { GoogleLoginButton } from "@/components/GoogleLoginButton";
 
 interface FormData {
   email: string;
@@ -97,7 +97,7 @@ function StudentLoginContent() {
   
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; submit?: string }>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   const [formData, setFormData] = useState<FormData>({
     email: "",
     password: "",
@@ -111,7 +111,7 @@ function StudentLoginContent() {
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email is invalid";
     
     if (!formData.password) newErrors.password = "Password is required";
-    if (formData.password.length < 6) {
+    else if (formData.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters";
     }
 
@@ -148,25 +148,19 @@ function StudentLoginContent() {
         const { user, token } = data.data;
        
         if (user && token) {
-          
-            login(user, token);
+          login(user, token);
 
-            if(user.email_verified != 1){
+          if(user.email_verified != 1){
             router.push('/signin/verify');
-          }else{
-
+          } else {
             router.push(callbackUrl);
           }
-        
-          
         } else {
           throw new Error(data.message || "Login failed");
         }
-        
       } else {
         throw new Error(data.message || "Login failed");
       }
-      
     } catch (error) {
       setErrors({ submit: error instanceof Error ? error.message : "Login failed" });
     } finally {
@@ -181,15 +175,22 @@ function StudentLoginContent() {
       [name]: type === "checkbox" ? checked : value,
     }));
 
-    // Clear error when user starts typing
     if (errors[name as keyof FormErrors]) {
       setErrors(prev => ({ ...prev, [name]: undefined }));
     }
   };
 
+  const handleGoogleSuccess = () => {
+    // Optional: Add any post-login success handling
+    console.log("Google login successful");
+  };
+
+  const handleGoogleError = (error: string) => {
+    setErrors({ submit: error });
+  };
+
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
-      {/* Left Side - Form Content */}
       <div className="flex flex-col flex-1 bg-white dark:bg-gray-900">
         <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto px-4 sm:px-0">
           <div>
@@ -200,6 +201,31 @@ function StudentLoginContent() {
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Enter your email and password to access your student portal
               </p>
+            </div>
+
+<div className="mb-6">
+  <GoogleLoginButton 
+    onSuccess={() => {
+      // Optional: Add any post-login success handling
+      console.log("Google login successful");
+    }}
+    onError={(error) => {
+      setErrors({ submit: error });
+    }}
+    role="student" // Specify role
+  />
+</div>
+
+            {/* Divider */}
+            <div className="relative mb-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300 dark:border-gray-700"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white dark:bg-gray-900 text-gray-500">
+                  Or continue with
+                </span>
+              </div>
             </div>
 
             {/* Student Login Form */}
@@ -287,7 +313,7 @@ function StudentLoginContent() {
 
             <div className="mt-3">
               <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
-                 {" Don't have an account? "}
+                 {"Don't have an account? "}
                 <Link
                   href="/signup"
                   className="text-brand-500 hover:text-brand-600 dark:text-brand-400"

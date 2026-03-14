@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import countries from "country-list-with-dial-code-and-flag";
+import { GoogleLoginButton } from "@/components/GoogleLoginButton";
 
 
 // Types for country data
@@ -387,9 +388,9 @@ export default function StudentRegistrationPage() {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<"details" | "otp">("details");
   const allCountries = countries.getAll() as Country[];
-const defaultCountry = allCountries.find(c => c.code === "US") || allCountries[0];
+  const defaultCountry = allCountries.find(c => c.code === "US") || allCountries[0];
 
-const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountry);
+  const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountry);
   const [formData, setFormData] = useState({
     name: "",
     phoneNumber: "",
@@ -440,6 +441,19 @@ const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountry);
   const showAlertMessage = (type: 'success' | 'error' | 'info', message: string) => {
     setAlert({ type, message });
     setShowAlert(true);
+  };
+
+  // Add Google login handlers
+  const handleGoogleSuccess = () => {
+    // Optional: Add any post-login success handling
+    console.log("Google login successful");
+    // You might want to redirect to student dashboard or home page
+    router.push('/student');
+  };
+
+  const handleGoogleError = (error: string) => {
+    setErrors({ submit: error });
+    showAlertMessage('error', error);
   };
 
   const validateDetails = (): boolean => {
@@ -628,7 +642,7 @@ const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountry);
           
           // Show success message for 2 seconds then redirect
           setTimeout(() => {
-            router.push('/student');
+            router.push('/');
           }, 2000);
         }
       } else {
@@ -733,7 +747,16 @@ const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountry);
             </div>
 
             {/* Alert Messages */}
-            
+            {showAlert && alert && (
+              <Alert
+                type={alert.type}
+                message={alert.message}
+                onClose={() => {
+                  setShowAlert(false);
+                  setAlert(null);
+                }}
+              />
+            )}
 
             {verificationSuccessful ? (
               <div className="text-center py-10">
@@ -749,232 +772,248 @@ const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountry);
                 <div className="w-16 h-1 bg-brand-500 mx-auto rounded-full animate-pulse"></div>
               </div>
             ) : (
-              <form onSubmit={step === "details" ? handleSubmitDetails : handleVerifyOtp}>
-                <div className="space-y-6">
-                  {step === "details" ? (
-                    <>
-                      <div>
-                        <Label required>Full Name</Label>
-                        <InputField 
-                          type="text"
-                          name="name"
-                          placeholder="Enter your full name"
-                          value={formData.name}
-                          onChange={handleChange}
-                          error={errors.name}
-                          icon={User}
-                        />
-                      </div>
-
-                      <div>
-  <Label required>Phone Number</Label>
-  <PhoneInput
-    name="phoneNumber"
-    value={formData.phoneNumber}
-    onChange={handleChange}
-    error={errors.phoneNumber}
-    selectedCountry={selectedCountry}
-    onCountryChange={handleCountryChange}
-  />
-</div>
-
-                      <div>
-                        <Label required>Email Address</Label>
-                        <InputField 
-                          type="email"
-                          name="email"
-                          placeholder="student@university.edu"
-                          value={formData.email}
-                          onChange={handleChange}
-                          error={errors.email}
-                          icon={Mail}
-                        />
-                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                          We'll send a verification code to this email.
-                        </p>
-                      </div>
-
-                      {/* Password Field with Strength Indicator */}
-                      <PasswordInputField
-                        value={formData.password}
-                        onChange={handleChange}
-                        name="password"
-                        placeholder="Create a password (min. 8 characters)"
-                        error={errors.password}
-                        showPassword={showPassword}
-                        onTogglePassword={() => setShowPassword(!showPassword)}
-                        label="Password"
+              <>
+                {/* Only show Google Sign Up option on the details step */}
+                {step === "details" && (
+                  <>
+                    <div className="mb-6">
+                      <GoogleLoginButton 
+                        onSuccess={handleGoogleSuccess}
+                        onError={handleGoogleError}
+                        role="student"
                       />
-                      <PasswordStrength password={formData.password} />
-                      
-                      {/* Password Requirements */}
-                      {formData.password && (
-                        <div className="mt-2 space-y-1">
-                          <p className="text-xs text-gray-600 dark:text-gray-400">Requirements:</p>
-                          <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
-                            <li className={`flex items-center ${formData.password.length >= 8 ? 'text-green-500' : ''}`}>
-                              {formData.password.length >= 8 ? '✓' : '•'} At least 8 characters
-                            </li>
-                            <li className={`flex items-center ${/(?=.*[A-Z])/.test(formData.password) ? 'text-green-500' : ''}`}>
-                              {/(?=.*[A-Z])/.test(formData.password) ? '✓' : '•'} One uppercase letter
-                            </li>
-                            <li className={`flex items-center ${/(?=.*[0-9])/.test(formData.password) ? 'text-green-500' : ''}`}>
-                              {/(?=.*[0-9])/.test(formData.password) ? '✓' : '•'} One number
-                            </li>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="relative mb-6">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300 dark:border-gray-700"></div>
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                        <span className="px-2 bg-white dark:bg-gray-900 text-gray-500">
+                          Or sign up with email
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <form onSubmit={step === "details" ? handleSubmitDetails : handleVerifyOtp}>
+                  <div className="space-y-6">
+                    {step === "details" ? (
+                      <>
+                        <div>
+                          <Label required>Full Name</Label>
+                          <InputField 
+                            type="text"
+                            name="name"
+                            placeholder="Enter your full name"
+                            value={formData.name}
+                            onChange={handleChange}
+                            error={errors.name}
+                            icon={User}
+                          />
+                        </div>
+
+                        <div>
+                          <Label required>Phone Number</Label>
+                          <PhoneInput
+                            name="phoneNumber"
+                            value={formData.phoneNumber}
+                            onChange={handleChange}
+                            error={errors.phoneNumber}
+                            selectedCountry={selectedCountry}
+                            onCountryChange={handleCountryChange}
+                          />
+                        </div>
+
+                        <div>
+                          <Label required>Email Address</Label>
+                          <InputField 
+                            type="email"
+                            name="email"
+                            placeholder="student@university.edu"
+                            value={formData.email}
+                            onChange={handleChange}
+                            error={errors.email}
+                            icon={Mail}
+                          />
+                          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                            We'll send a verification code to this email.
+                          </p>
+                        </div>
+
+                        {/* Password Field with Strength Indicator */}
+                        <PasswordInputField
+                          value={formData.password}
+                          onChange={handleChange}
+                          name="password"
+                          placeholder="Create a password (min. 8 characters)"
+                          error={errors.password}
+                          showPassword={showPassword}
+                          onTogglePassword={() => setShowPassword(!showPassword)}
+                          label="Password"
+                        />
+                        <PasswordStrength password={formData.password} />
+                        
+                        {/* Password Requirements */}
+                        {formData.password && (
+                          <div className="mt-2 space-y-1">
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Requirements:</p>
+                            <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+                              <li className={`flex items-center ${formData.password.length >= 8 ? 'text-green-500' : ''}`}>
+                                {formData.password.length >= 8 ? '✓' : '•'} At least 8 characters
+                              </li>
+                              <li className={`flex items-center ${/(?=.*[A-Z])/.test(formData.password) ? 'text-green-500' : ''}`}>
+                                {/(?=.*[A-Z])/.test(formData.password) ? '✓' : '•'} One uppercase letter
+                              </li>
+                              <li className={`flex items-center ${/(?=.*[0-9])/.test(formData.password) ? 'text-green-500' : ''}`}>
+                                {/(?=.*[0-9])/.test(formData.password) ? '✓' : '•'} One number
+                              </li>
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Confirm Password Field */}
+                        <PasswordInputField
+                          value={formData.confirmPassword}
+                          onChange={handleChange}
+                          name="confirmPassword"
+                          placeholder="Confirm your password"
+                          error={errors.confirmPassword}
+                          showPassword={showConfirmPassword}
+                          onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+                          label="Confirm Password"
+                        />
+
+                        {/* Password Tips */}
+                        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
+                          <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">
+                            🔒 Password Security Tips:
+                          </p>
+                          <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1 list-disc list-inside">
+                            <li>Use a combination of letters, numbers, and symbols</li>
+                            <li>Avoid using personal information like birthdays</li>
+                            <li>Don't reuse passwords from other accounts</li>
+                            <li>Consider using a password manager</li>
                           </ul>
                         </div>
-                      )}
-
-                      {/* Confirm Password Field */}
-                      <PasswordInputField
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        name="confirmPassword"
-                        placeholder="Confirm your password"
-                        error={errors.confirmPassword}
-                        showPassword={showConfirmPassword}
-                        onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
-                        label="Confirm Password"
-                      />
-
-                      {/* Password Tips */}
-                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
-                        <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">
-                          🔒 Password Security Tips:
-                        </p>
-                        <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1 list-disc list-inside">
-                          <li>Use a combination of letters, numbers, and symbols</li>
-                          <li>Avoid using personal information like birthdays</li>
-                          <li>Don't reuse passwords from other accounts</li>
-                          <li>Consider using a password manager</li>
-                        </ul>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3">
-                            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                            <div>
-                              <p className="text-sm font-medium text-green-800 dark:text-green-300">
-                                Registration submitted successfully!
-                              </p>
-                              <p className="text-sm text-green-700 dark:text-green-400 mt-1">
-                                Verification code sent to <strong>{formData.email}</strong>. 
-                              </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3">
+                              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                                  Registration submitted successfully!
+                                </p>
+                                <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                                  Verification code sent to <strong>{formData.email}</strong>. 
+                                </p>
+                              </div>
                             </div>
+                            <button
+                              type="button"
+                              onClick={goToPreviousStep}
+                              className="text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 flex-shrink-0"
+                            >
+                              Edit details
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={goToPreviousStep}
-                            className="text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 flex-shrink-0"
-                          >
-                            Edit details
-                          </button>
                         </div>
-                      </div>
 
-                      <div>
-                        <Label required>Verification Code (OTP)</Label>
-                        <InputField 
-                          type="text"
-                          name="otp"
-                          placeholder="Enter 6-digit OTP"
-                          value={otp}
-                          onChange={handleChange}
-                          error={errors.otp}
-                          icon={Lock}
-                        />
-                        
-                        <div className="mt-3 flex justify-between">
-                          <button
-                            type="button"
-                            onClick={handleResendOtp}
-                            disabled={resendTimer > 0 || loading}
-                            className="text-sm text-brand-500 hover:text-brand-600 disabled:text-gray-400 dark:text-brand-400 disabled:cursor-not-allowed"
-                          >
-                            {loading ? (
-                              <span className="flex items-center gap-1">
-                                <div className="w-3 h-3 border border-brand-500 border-t-transparent rounded-full animate-spin" />
-                                Sending...
-                              </span>
-                            ) : resendTimer > 0 ? (
-                              `Resend OTP in ${resendTimer}s`
-                            ) : (
-                              "Didn't receive code? Resend OTP"
-                            )}
-                          </button>
+                        <div>
+                          <Label required>Verification Code (OTP)</Label>
+                          <InputField 
+                            type="text"
+                            name="otp"
+                            placeholder="Enter 6-digit OTP"
+                            value={otp}
+                            onChange={handleChange}
+                            error={errors.otp}
+                            icon={Lock}
+                          />
+                          
+                          <div className="mt-3 flex justify-between">
+                            <button
+                              type="button"
+                              onClick={handleResendOtp}
+                              disabled={resendTimer > 0 || loading}
+                              className="text-sm text-brand-500 hover:text-brand-600 disabled:text-gray-400 dark:text-brand-400 disabled:cursor-not-allowed"
+                            >
+                              {loading ? (
+                                <span className="flex items-center gap-1">
+                                  <div className="w-3 h-3 border border-brand-500 border-t-transparent rounded-full animate-spin" />
+                                  Sending...
+                                </span>
+                              ) : resendTimer > 0 ? (
+                                `Resend OTP in ${resendTimer}s`
+                              ) : (
+                                "Didn't receive code? Resend OTP"
+                              )}
+                            </button>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
-                        <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">
-                          📧 Check your email:
-                        </p>
-                        <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
-                          <li>• Look for an email from our system</li>
-                          <li>• Check your spam folder if you don't see it</li>
-                          <li>• The OTP is valid for 10 minutes</li>
-                          <li>• Enter the 6-digit code exactly as shown</li>
-                        </ul>
-                      </div>
-                    </>
-                  )}
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
+                          <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">
+                            📧 Check your email:
+                          </p>
+                          <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
+                            <li>• Look for an email from our system</li>
+                            <li>• Check your spam folder if you don't see it</li>
+                            <li>• The OTP is valid for 10 minutes</li>
+                            <li>• Enter the 6-digit code exactly as shown</li>
+                          </ul>
+                        </div>
+                      </>
+                    )}
 
-                  {/* Display submit errors from API */}
-                  {/* {errors.submit && !showAlert && (
-                    <Alert
-                      type="error"
-                      message={errors.submit}
-                      onClose={() => setErrors(prev => ({ ...prev, submit: undefined }))}
-                    />
-                  )} */}
+                    {/* Display submit errors from API */}
+                    {errors.submit && !showAlert && (
+                      <Alert
+                        type="error"
+                        message={errors.submit}
+                        onClose={() => setErrors(prev => ({ ...prev, submit: undefined }))}
+                      />
+                    )}
 
-                  {showAlert && alert && (
-              <Alert
-                type={alert.type}
-                message={alert.message}
-                onClose={() => {
-                  setShowAlert(false);
-                  setAlert(null);
-                }}
-              />
-            )}
-
-                  <div>
-                    <Button 
-                      type="submit"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : step === "details" ? (
-                        <Save className="w-5 h-5" />
-                      ) : (
-                        <CheckCircle className="w-5 h-5" />
-                      )}
-                      {loading 
-                        ? "PROCESSING..." 
-                        : step === "details" 
-                          ? "REGISTER & SEND OTP" 
-                          : "VERIFY & COMPLETE REGISTRATION"}
-                    </Button>
-                  </div>
-
-                  {step === "otp" && (
-                    <div className="text-center">
-                      <button
-                        type="button"
-                        onClick={goToPreviousStep}
-                        className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    <div>
+                      <Button 
+                        type="submit"
+                        disabled={loading}
                       >
-                        ← Back to edit details
-                      </button>
+                        {loading ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : step === "details" ? (
+                          <Save className="w-5 h-5" />
+                        ) : (
+                          <CheckCircle className="w-5 h-5" />
+                        )}
+                        {loading 
+                          ? "PROCESSING..." 
+                          : step === "details" 
+                            ? "REGISTER & SEND OTP" 
+                            : "VERIFY & COMPLETE REGISTRATION"}
+                      </Button>
                     </div>
-                  )}
-                </div>
-              </form>
+
+                    {step === "otp" && (
+                      <div className="text-center">
+                        <button
+                          type="button"
+                          onClick={goToPreviousStep}
+                          className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                        >
+                          ← Back to edit details
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </form>
+              </>
             )}
 
             {!verificationSuccessful && (
@@ -982,7 +1021,7 @@ const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountry);
                 <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400">
                   Already have an account?{" "}
                   <Link
-                    href="/signin/student"
+                    href="/signin"
                     className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
                   >
                     Sign In

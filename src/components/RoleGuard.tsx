@@ -24,11 +24,15 @@ export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
     if (!isAuthenticated) {
 
       let signinRoute = "/signin"; // default
-
-
       const returnUrl = encodeURIComponent(pathname || "/");
       router.replace(`${signinRoute}?returnUrl=${returnUrl}`);
 
+    }
+
+    if(user && !user.phone_number){
+      let signinRoute = "/signin/phone"; // default
+      const returnUrl = encodeURIComponent(pathname || "/");
+      router.replace(`${signinRoute}?returnUrl=${returnUrl}`);
     }
 
     

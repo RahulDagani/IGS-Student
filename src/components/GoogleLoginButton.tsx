@@ -46,8 +46,8 @@ export const GoogleLoginButton = ({
 
         const data = await response.json();
 
-        if (response.ok) {
-          if (data.status === "success" || data.status === "details_pending") {
+        if (data.success) {
+          if (data.status === "success" || data.status === "verified" || data.status === "details_pending") {
             const { user, token } = data.data;
             
             if (user && token) {
@@ -83,14 +83,22 @@ export const GoogleLoginButton = ({
         }
       } catch (error) {
         console.error('Google login error:', error);
-        if (onError) onError(error instanceof Error ? error.message : "Login failed");
+        if (onError){
+
+          onError(error instanceof Error ? error.message : "Login failed");
+          setTimeout(()=> onError("") ,3000);
+
+        }
       } finally {
         setLoading(false);
       }
     },
     onError: (error) => {
       console.error('Google OAuth error:', error);
-      if (onError) onError("Google authentication failed");
+      if (onError){
+        onError("Google authentication failed");
+        setTimeout(()=> onError("") ,3000);
+      } 
     },
     flow: 'implicit',
     scope: 'email profile',

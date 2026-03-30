@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Phone, ChevronLeftIcon, CheckCircle, X, ChevronDown } from "lucide-react";
+import { Phone, ChevronLeftIcon, CheckCircle, X, ChevronDown, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -14,6 +14,54 @@ interface Country {
   code: string;
   flag: string;
 }
+
+// InputField component
+const InputField = ({ 
+  type, 
+  placeholder, 
+  value, 
+  onChange, 
+  name,
+  error,
+  icon: Icon,
+  disabled = false,
+  required = false
+}: { 
+  type: string; 
+  placeholder: string; 
+  value: string; 
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  name: string;
+  error?: string;
+  icon?: React.ComponentType<{className?: string}>;
+  disabled?: boolean;
+  required?: boolean;
+}) => (
+  <div>
+    <div className="relative">
+      {Icon && (
+        <Icon className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
+          disabled ? "text-gray-300 dark:text-gray-600" : "text-gray-400"
+        }`} />
+      )}
+      <input
+        type={type}
+        name={name}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        required={required}
+        className={`w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-700 dark:text-white ${
+          error ? "border-red-500" : ""
+        } ${Icon ? "pl-10" : ""} ${
+          disabled ? "bg-gray-50 dark:bg-gray-800 cursor-not-allowed" : ""
+        }`}
+      />
+    </div>
+    {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+  </div>
+);
 
 // Phone Input with Country Code
 const PhoneInput = ({
@@ -226,8 +274,18 @@ export default function SavePhonePage() {
   const router = useRouter();
   const { login, token } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [fetchingUser, setFetchingUser] = useState(true);
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [error, setError] = useState<string>();
+  const [formData, setFormData] = useState({
+    firstName: "",
+    middleName: "",
+    lastName: "",
+  });
+  const [errors, setErrors] = useState<{
+    firstName?: string;
+    lastName?: string;
+    phoneNumber?: string;
+  }>({});
   const [alert, setAlert] = useState<{type: 'success' | 'error' | 'info'; message: string} | null>(null);
   
   const allCountries = countries.getAll() as Country[];
@@ -236,27 +294,81 @@ export default function SavePhonePage() {
 
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
-  const validatePhone = (): boolean => {
+  // Fetch user data on component mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!token) {
+        setFetchingUser(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${BASE_URL}/student`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+          setFormData({
+            firstName: data.data.first_name || "",
+            middleName: data.data.middle_name || "",
+            lastName: data.data.last_name || "",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      } finally {
+        setFetchingUser(false);
+      }
+    };
+
+    fetchUserData();
+  }, [token, BASE_URL]);
+
+  const validateForm = (): boolean => {
+    const newErrors: {
+      firstName?: string;
+      lastName?: string;
+      phoneNumber?: string;
+    } = {};
+
+    // First name validation
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = "First name is required";
+    } else if (formData.firstName.trim().length < 2) {
+      newErrors.firstName = "First name must be at least 2 characters";
+    }
+
+    // Last name validation
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = "Last name is required";
+    } else if (formData.lastName.trim().length < 2) {
+      newErrors.lastName = "Last name must be at least 2 characters";
+    }
+
+    // Phone validation
     if (!phoneNumber.trim()) {
-      setError("Phone number is required");
-      return false;
+      newErrors.phoneNumber = "Phone number is required";
+    } else {
+      const phoneDigits = phoneNumber.replace(/\D/g, '');
+      if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+        newErrors.phoneNumber = "Please enter a valid phone number";
+      }
     }
-    
-    // Remove any non-digit characters for validation
-    const phoneDigits = phoneNumber.replace(/\D/g, '');
-    if (phoneDigits.length < 7 || phoneDigits.length > 15) {
-      setError("Please enter a valid phone number");
-      return false;
-    }
-    
-    setError(undefined);
-    return true;
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validatePhone()) return;
+    if (!validateForm()) return;
 
     setLoading(true);
     setAlert(null);
@@ -265,46 +377,56 @@ export default function SavePhonePage() {
       // Combine country code with phone number and remove all non-digit characters
       const fullPhoneNumber = `${selectedCountry.dial_code}${phoneNumber.replace(/\D/g, '')}`;
       
-      const response = await fetch(`${BASE_URL}/save-phone`, {
+      // Prepare payload with name fields
+      const payload: {
+        first_name: string;
+        last_name: string;
+        phone_number: string;
+        middle_name?: string;
+      } = {
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+        phone_number: fullPhoneNumber,
+      };
+
+      // Only add middle_name if it's not empty
+      if (formData.middleName.trim()) {
+        payload.middle_name = formData.middleName.trim();
+      }
+      
+      const response = await fetch(`${BASE_URL}/student/save-basic-profile`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // Include auth token if the user is already logged in
           "Authorization": `Bearer ${token}` 
         },
-        body: JSON.stringify({
-          phone_number: fullPhoneNumber
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
       
       if (response.ok && data.success) {
-        // Now the response matches the login format
         // Login the user with the returned data
         if (data.data?.user && data.data?.token) {
           login(data.data.user, data.data.token);
           
           setAlert({
             type: 'success',
-            message: data.message || 'Phone number saved successfully! Redirecting...'
+            message: data.message || 'Profile updated successfully! Redirecting...'
           });
 
-          // Handle redirect based on user role and status
+          // Redirect to home page
           setTimeout(() => {
-            
-              // Regular user redirect
-              router.push('/');
-            
+            router.push('/');
           }, 2000);
         } else {
           throw new Error("Invalid response format from server");
         }
       } else {
-        throw new Error(data.message || "Failed to save phone number");
+        throw new Error(data.message || "Failed to save profile");
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to save phone number. Please try again.";
+      const errorMessage = error instanceof Error ? error.message : "Failed to save profile. Please try again.";
       setAlert({
         type: 'error',
         message: errorMessage
@@ -314,16 +436,40 @@ export default function SavePhonePage() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+    
+    // Clear error when user starts typing
+    if (errors[name as keyof typeof errors]) {
+      setErrors(prev => ({ ...prev, [name]: undefined }));
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Allow only digits, spaces, and basic phone number characters
     const value = e.target.value.replace(/[^\d\s\-\(\)\+]/g, '');
     setPhoneNumber(value);
-    if (error) setError(undefined);
+    if (errors.phoneNumber) setErrors(prev => ({ ...prev, phoneNumber: undefined }));
   };
 
   const handleCountryChange = (country: Country) => {
     setSelectedCountry(country);
   };
+
+  if (fetchingUser) {
+    return (
+      <div className="min-h-screen flex flex-1 items-center justify-center bg-white dark:bg-gray-900">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading your information...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-1 flex-col bg-white dark:bg-gray-900">
@@ -338,10 +484,10 @@ export default function SavePhonePage() {
 
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90 sm:text-3xl mb-2">
-            Save Phone Number
+            Complete Your Profile
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Enter your phone number below.
+            Please provide your name and phone number to continue.
           </p>
         </div>
 
@@ -354,13 +500,60 @@ export default function SavePhonePage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* First Name Field */}
+          <div>
+            <Label required>First Name</Label>
+            <InputField 
+              type="text"
+              name="firstName"
+              placeholder="Enter your first name"
+              value={formData.firstName}
+              onChange={handleNameChange}
+              error={errors.firstName}
+              icon={User}
+              disabled={loading}
+              required
+            />
+          </div>
+
+          {/* Middle Name Field - Optional */}
+          <div>
+            <Label>Middle Name <span className="text-gray-400 text-xs">(Optional)</span></Label>
+            <InputField 
+              type="text"
+              name="middleName"
+              placeholder="Enter your middle name (if any)"
+              value={formData.middleName}
+              onChange={handleNameChange}
+              icon={User}
+              disabled={loading}
+            />
+          </div>
+
+          {/* Last Name Field */}
+          <div>
+            <Label required>Last Name</Label>
+            <InputField 
+              type="text"
+              name="lastName"
+              placeholder="Enter your last name"
+              value={formData.lastName}
+              onChange={handleNameChange}
+              error={errors.lastName}
+              icon={User}
+              disabled={loading}
+              required
+            />
+          </div>
+
+          {/* Phone Number Field */}
           <div>
             <Label required>Phone Number</Label>
             <PhoneInput
               name="phoneNumber"
               value={phoneNumber}
-              onChange={handleChange}
-              error={error}
+              onChange={handlePhoneChange}
+              error={errors.phoneNumber}
               selectedCountry={selectedCountry}
               onCountryChange={handleCountryChange}
               disabled={loading}
@@ -371,7 +564,7 @@ export default function SavePhonePage() {
             {loading ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              "Save Phone Number"
+              "Save Profile"
             )}
           </Button>
         </form>

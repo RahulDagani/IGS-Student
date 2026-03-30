@@ -392,7 +392,9 @@ export default function StudentRegistrationPage() {
 
   const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountry);
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
     phoneNumber: "",
     email: "",
     password: "",
@@ -401,7 +403,9 @@ export default function StudentRegistrationPage() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [errors, setErrors] = useState<{
-    name?: string;
+    firstName?: string;
+    middleName?: string;
+    lastName?: string;
     phoneNumber?: string;
     email?: string;
     password?: string;
@@ -458,19 +462,30 @@ export default function StudentRegistrationPage() {
 
   const validateDetails = (): boolean => {
     const newErrors: {
-      name?: string;
+      firstName?: string;
+      middleName?: string;
+      lastName?: string;
       phoneNumber?: string;
       email?: string;
       password?: string;
       confirmPassword?: string;
     } = {};
 
-    // Name validation
-    if (!formData.name.trim()) {
-      newErrors.name = "Full name is required";
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = "Name must be at least 2 characters";
+    // First name validation
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = "First name is required";
+    } else if (formData.firstName.trim().length < 2) {
+      newErrors.firstName = "First name must be at least 2 characters";
     }
+
+    // Last name validation
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = "Last name is required";
+    } else if (formData.lastName.trim().length < 2) {
+      newErrors.lastName = "Last name must be at least 2 characters";
+    }
+
+    // Middle name is optional - no validation needed
 
     // Phone validation
     if (!formData.phoneNumber.trim()) {
@@ -535,18 +550,35 @@ export default function StudentRegistrationPage() {
     
     try {
       // Combine country code with phone number
-    const fullPhoneNumber = `${selectedCountry.dial_code}${formData.phoneNumber.replace(/\D/g, '')}`;
+      const fullPhoneNumber = `${selectedCountry.dial_code}${formData.phoneNumber.replace(/\D/g, '')}`;
+      
+      // Prepare payload with first_name, middle_name (optional), last_name
+      const payload: {
+        first_name: string;
+        last_name: string;
+        phone_number: string;
+        email: string;
+        password: string;
+        middle_name?: string;
+      } = {
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+        phone_number: fullPhoneNumber,
+        email: formData.email,
+        password: formData.password,
+      };
+
+      // Only add middle_name if it's not empty
+      if (formData.middleName.trim()) {
+        payload.middle_name = formData.middleName.trim();
+      }
+
       const response = await fetch(`${BASE_URL}/student/save`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          phone_number: fullPhoneNumber,
-          email: formData.email,
-          password: formData.password,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -658,8 +690,8 @@ export default function StudentRegistrationPage() {
   };
 
   const handleCountryChange = (country: Country) => {
-  setSelectedCountry(country);
-};
+    setSelectedCountry(country);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -671,18 +703,18 @@ export default function StudentRegistrationPage() {
       if (errors.otp) {
         setErrors(prev => ({ ...prev, otp: undefined }));
       }
-    }  else if (name === "phoneNumber") {
-    // Allow only digits, spaces, and basic phone number characters
-    const phoneValue = value.replace(/[^\d\s\-\(\)\+]/g, '');
-    setFormData(prev => ({
-      ...prev,
-      [name]: phoneValue,
-    }));
-    
-    if (errors.phoneNumber) {
-      setErrors(prev => ({ ...prev, phoneNumber: undefined }));
-    }
-  } else {
+    } else if (name === "phoneNumber") {
+      // Allow only digits, spaces, and basic phone number characters
+      const phoneValue = value.replace(/[^\d\s\-\(\)\+]/g, '');
+      setFormData(prev => ({
+        ...prev,
+        [name]: phoneValue,
+      }));
+      
+      if (errors.phoneNumber) {
+        setErrors(prev => ({ ...prev, phoneNumber: undefined }));
+      }
+    } else {
       setFormData(prev => ({
         ...prev,
         [name]: value,
@@ -802,15 +834,44 @@ export default function StudentRegistrationPage() {
                   <div className="space-y-6">
                     {step === "details" ? (
                       <>
+                        {/* First Name Field */}
                         <div>
-                          <Label required>Full Name</Label>
+                          <Label required>First Name</Label>
                           <InputField 
                             type="text"
-                            name="name"
-                            placeholder="Enter your full name"
-                            value={formData.name}
+                            name="firstName"
+                            placeholder="Enter your first name"
+                            value={formData.firstName}
                             onChange={handleChange}
-                            error={errors.name}
+                            error={errors.firstName}
+                            icon={User}
+                          />
+                        </div>
+
+                        {/* Middle Name Field - Optional */}
+                        <div>
+                          <Label>Middle Name <span className="text-gray-400 text-xs">(Optional)</span></Label>
+                          <InputField 
+                            type="text"
+                            name="middleName"
+                            placeholder="Enter your middle name (if any)"
+                            value={formData.middleName}
+                            onChange={handleChange}
+                            error={errors.middleName}
+                            icon={User}
+                          />
+                        </div>
+
+                        {/* Last Name Field */}
+                        <div>
+                          <Label required>Last Name</Label>
+                          <InputField 
+                            type="text"
+                            name="lastName"
+                            placeholder="Enter your last name"
+                            value={formData.lastName}
+                            onChange={handleChange}
+                            error={errors.lastName}
                             icon={User}
                           />
                         </div>

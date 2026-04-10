@@ -6,6 +6,8 @@ import { useParams, useSearchParams } from "next/navigation";
 import ProfileForm from "./Profile";
 import Applications from "./Applications";
 import DocumentsPage from "./Documents";
+import { Bell } from "lucide-react";
+import Link from "next/link";
 
 
 interface Student {
@@ -13,6 +15,7 @@ interface Student {
   email: string;
   phone: string;
   profile_status: string,
+  is_email_verified: number,
   total_applications: number,
   total_pending_documents: number
 
@@ -66,6 +69,7 @@ export default function StudentDetailsPage() {
         name: data.student.name,
         email: data.student.email,
         phone: data.student.phone,
+        is_email_verified: data.student.is_email_verified,
         profile_status : data.profile_status,
         total_applications: data.total_applications,
         total_pending_documents: data.total_pending_documents
@@ -109,6 +113,9 @@ export default function StudentDetailsPage() {
 
   return (
     <div className="space-y-6">
+    {student.is_email_verified == 0 && <div className="flex items-center text-sm font-semibold px-4 py-4 rounded mb-4 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400">
+            <Bell size={20} className="mr-2"></Bell> Your email is not verified. Kindly verify it to receive notifications. <Link href="/logout" className=" ml-4 font-normal underline">Verify now ›</Link> 
+            </div>}
       {/* Header Section */}
       <div className="row parentTabsRespFlex">
         <style jsx>{`

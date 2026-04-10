@@ -35,7 +35,7 @@ export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
       router.replace(`${signinRoute}?returnUrl=${returnUrl}`);
     }
 
-    
+    console.log(user, isAuthenticated)
 
     
   }, [loading, isAuthenticated, user, allowedRoles, router, pathname]);

@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -9,65 +9,28 @@ import {
 } from "@/components/ui/table";
 import Badge from "@/components/ui/badge/Badge";
 import { useAuth } from "@/context/AuthContext";
+import { Wallet, Plus, X, Clock } from "lucide-react";
+import Link from "next/link";
 
 interface WalletTransaction {
   id: number;
-  tenant_id: number;
-  user_id: number;
-  wallet_id: number;
   type: "credit" | "debit";
-  amount: string;
-  transaction_ref: string;
   gateway: string;
-  gateway_transaction_id: string | null;
-  status: "pending" | "completed" | "failed";
+  status: "success" | "pending" | "failed";
+  amount: number;
+  balance_before: number;
+  balance_after: number;
+  transaction_ref: string;
+  razorpay_order_id: string | null;
+  razorpay_payment_id: string | null;
   description: string;
-  // metadata: any;
   created_at: string;
 }
 
-interface PendingPayment {
-  id: number;
-  tenant_id: number;
-  user_id: number;
-  application_id: string;
-  application_fee: string;
-  fee_status: string;
-  created_at: string;
-  updated_at: string;
-  student_email: string;
-  course_name: string;
-  university_name: string;
-  country_code: string;
-  tuition_fee: string;
-  currency_code: string;
-  duration_min: number;
-  duration_max: number;
-  duration_unit: string;
-}
-
-interface WalletBalance {
-  balance: string | number;
-  currency: string;
-}
-
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-}
-
-interface TransactionsResponse {
-  transactions: WalletTransaction[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-  };
-}
-
-interface PendingPaymentsResponse {
-  pendingPayments: PendingPayment[];
-  totalAmount: number;
+interface WalletData {
+  wallet: { id: number; balance: number; currency: string };
+  payment_gateway_key: string | null;
+  recentTransactions: WalletTransaction[];
 }
 
 type SortField = keyof WalletTransaction | "";
@@ -75,774 +38,377 @@ type SortDirection = "asc" | "desc";
 
 interface FilterOptions {
   transactionType: string;
-  referenceType: string;
   status: string;
 }
 
-interface FilterModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onApply: (filters: FilterOptions) => void;
-}
+const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
-const FilterModal: React.FC<FilterModalProps> = ({
-  isOpen,
-  onClose,
-  onApply,
-}) => {
-  const [selectedTransactionType, setSelectedTransactionType] = useState<string>("all");
-  const [selectedStatus, setSelectedStatus] = useState<string>("all");
-
-  const handleApply = () => {
-    const filters: FilterOptions = {
-      transactionType: selectedTransactionType,
-      referenceType: "all", // Keeping this for compatibility
-      status: selectedStatus,
-    };
-    onApply(filters);
-    onClose();
-  };
-
-  const handleReset = () => {
-    setSelectedTransactionType("all");
-    setSelectedStatus("all");
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex z-999999">
-      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Filter Transactions
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          {/* Transaction Type Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Transaction Type
-            </label>
-            <select
-              value={selectedTransactionType}
-              onChange={(e) => setSelectedTransactionType(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="all">All Types</option>
-              <option value="credit">Credit</option>
-              <option value="debit">Debit</option>
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Status
-            </label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="completed">Completed</option>
-              <option value="failed">Failed</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-6">
-          <button
-            onClick={handleReset}
-            className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            Reset
-          </button>
-          <button
-            onClick={handleApply}
-            className="flex-1 px-4 py-2 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10"
-          >
-            Apply Filters
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-interface AddBalanceModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onRecharge: (amount: number) => void;
-}
-
-const AddBalanceModal: React.FC<AddBalanceModalProps> = ({
-  isOpen,
-  onClose,
-  onRecharge,
-}) => {
-  const [amount, setAmount] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) return;
-
-    setIsLoading(true);
-    try {
-      await onRecharge(parseFloat(amount));
-      setAmount("");
-      onClose();
-    } catch (error) {
-      console.error("Failed to recharge:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-999999">
-      <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Add Balance
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Amount
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter amount"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              required
-            />
-          </div>
-
-          <div className="flex gap-3 mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading || !amount || parseFloat(amount) <= 0}
-              className="flex-1 px-4 py-2 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? "Processing..." : "Add Balance"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
+const loadRazorpayScript = (): Promise<boolean> =>
+  new Promise(resolve => {
+    if (document.getElementById("rzp-script")) return resolve(true);
+    const s = document.createElement("script");
+    s.id = "rzp-script";
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
 
 export default function WalletHistoryTable() {
+  const { token, user } = useAuth();
+
+  const [walletData, setWalletData] = useState<WalletData | null>(null);
+  const [allTransactions, setAllTransactions] = useState<WalletTransaction[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingTotal, setPendingTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [topupOpen, setTopupOpen] = useState(false);
+  const [topupAmount, setTopupAmount] = useState("");
+  const [topupLoading, setTopupLoading] = useState(false);
+  const [topupError, setTopupError] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortField, setSortField] = useState<SortField>("");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
-  const [isAddBalanceModalOpen, setIsAddBalanceModalOpen] = useState<boolean>(false);
-  const [filters, setFilters] = useState<FilterOptions>({
-    transactionType: "all",
-    referenceType: "all",
-    status: "all",
-  });
+  const [filters, setFilters] = useState<FilterOptions>({ transactionType: "all", status: "all" });
 
-  // API states
-  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
-  const [walletBalance, setWalletBalance] = useState<WalletBalance | null>(null);
-  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
-  const { token } = useAuth();
-
-
-  // Fetch data on component mount
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    setIsLoading(true);
-    setError(null);
+  const fetchWallet = async () => {
+    if (!token) return;
     try {
-      await Promise.all([
-        fetchTransactions(),
-        fetchWalletBalance(),
-        fetchPendingPayments(),
+      setLoading(true);
+      const [walletRes, pendingRes] = await Promise.all([
+        fetch(`${BASE_URL}/student/wallet/balance`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${BASE_URL}/student/applications/pending`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
-    } catch (err) {
-      setError("Failed to fetch data");
-      console.error("Error fetching data:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchTransactions = async () => {
-    const response = await fetch(`${BASE_URL}/student/wallet/transactions`,{
-      headers: {
-          'Authorization': `Bearer ${token}`
-        }
-    });
-    const result: ApiResponse<TransactionsResponse> = await response.json();
-    
-    if (result.success) {
-      setTransactions(result.data.transactions);
-    } else {
-      throw new Error("Failed to fetch transactions");
-    }
-  };
-
-
-
-  const fetchWalletBalance = async () => {
-  try {
-     const response = await fetch(`${BASE_URL}/student/wallet/balance`,{
-      headers: {
-          'Authorization': `Bearer ${token}`
-        }
-    });
-    const result = await response.json();
-    
-    if (result.success && result.data) {
-      // Ensure balance is a valid number
-      const balance = result.data.wallet.balance;
-      const numericBalance = typeof balance === 'string' ? parseFloat(balance) : balance;
-      
-      if (!isNaN(numericBalance)) {
-        setWalletBalance({
-          ...result.data,
-          balance: numericBalance
-        });
-      } else {
-        setWalletBalance({
-          balance: 0,
-          currency: 'USD'
-        });
+      const walletJson = await walletRes.json();
+      if (walletJson.success) {
+        setWalletData(walletJson.data);
+        setAllTransactions(walletJson.data.recentTransactions || []);
       }
-    } else {
-      throw new Error("Failed to fetch wallet balance");
-    }
-  } catch (err) {
-    console.error("Error fetching wallet balance:", err);
-    setWalletBalance({
-      balance: 0,
-      currency: 'USD'
-    });
-  }
-};
-
-
-
-  const fetchPendingPayments = async () => {
-    const response = await fetch(`${BASE_URL}/student/applications/pending`,{
-      headers: {
-          'Authorization': `Bearer ${token}`
-        }
-    });
-    const result: ApiResponse<PendingPaymentsResponse> = await response.json();
-    
-    if (result.success) {
-      setPendingPayments(result.data.pendingPayments);
-    } else {
-      throw new Error("Failed to fetch pending payments");
+      const pendingJson = await pendingRes.json();
+      if (pendingJson.success) {
+        setPendingCount(pendingJson.data.pendingPayments?.length ?? 0);
+        setPendingTotal(pendingJson.data.totalAmount ?? 0);
+      }
+    } catch (err) {
+      console.error("fetchWallet error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRecharge = async (amount: number) => {
-    const response = await fetch(`${BASE_URL}/student/wallet/recharge`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization" : `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        amount: amount,
-        gateway: "stripe",
-      }),
-    });
+  useEffect(() => { fetchWallet(); }, [token]);
 
-    const result = await response.json();
-    
-    if (result.success) {
-      // Refresh wallet balance and transactions
-      await Promise.all([fetchWalletBalance(), fetchTransactions()]);
-    } else {
-      throw new Error(result.message || "Failed to recharge wallet");
+  const handleTopup = async () => {
+    const amount = parseFloat(topupAmount);
+    if (!amount || amount <= 0) { setTopupError("Enter a valid amount"); return; }
+    setTopupError(null);
+    setTopupLoading(true);
+
+    try {
+      const orderRes = await fetch(`${BASE_URL}/student/wallet/topup/order`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      const orderJson = await orderRes.json();
+      if (!orderJson.success) throw new Error(orderJson.message || "Failed to create order");
+
+      const { order_id, amount: rzpAmount, currency, key_id } = orderJson.data;
+
+      const loaded = await loadRazorpayScript();
+      if (!loaded) throw new Error("Failed to load Razorpay. Check your internet connection.");
+
+      const options = {
+        key: key_id,
+        amount: rzpAmount,
+        currency,
+        order_id,
+        name: "Wallet Top-up",
+        description: `Add ${currency} ${amount.toFixed(2)} to wallet`,
+        prefill: { name: user?.name || "", email: user?.email || "" },
+        theme: { color: "#2563eb" },
+        handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+          try {
+            const verifyRes = await fetch(`${BASE_URL}/student/wallet/topup/verify`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+            const verifyJson = await verifyRes.json();
+            if (verifyJson.success) {
+              setTopupOpen(false);
+              setTopupAmount("");
+              fetchWallet();
+            } else {
+              setTopupError(verifyJson.message || "Payment verification failed");
+            }
+          } catch {
+            setTopupError("Verification failed. Contact support.");
+          }
+        },
+        modal: { ondismiss: () => setTopupLoading(false) },
+      };
+
+      // @ts-ignore — Razorpay loaded via CDN script
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err: unknown) {
+      setTopupError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setTopupLoading(false);
     }
   };
 
-  const handlePayPendingPayments = async (applicationIds: number[]) => {
-    const response = await fetch(`${BASE_URL}/student/applications/pay`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization" : `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        application_ids: applicationIds,
-        payment_method: "wallet",
-      }),
-    });
-
-    const result = await response.json();
-    
-    if (result.success) {
-      // Refresh all data
-      await fetchData();
-    } else {
-      throw new Error(result.message || "Failed to process payment");
-    }
-  };
-
-  // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
-    const filtered = transactions.filter((transaction) => {
-      const matchesSearch = 
-        transaction.transaction_ref.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        transaction.gateway.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesTransactionType = filters.transactionType === "all" || transaction.type === filters.transactionType;
-      const matchesStatus = filters.status === "all" || transaction.status === filters.status;
-      
-      return matchesSearch && matchesTransactionType && matchesStatus;
+    const filtered = allTransactions.filter(t => {
+      const matchesSearch =
+        (t.transaction_ref || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (t.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (t.razorpay_payment_id || "").toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = filters.transactionType === "all" || t.type === filters.transactionType;
+      const matchesStatus = filters.status === "all" || t.status === filters.status;
+      return matchesSearch && matchesType && matchesStatus;
     });
 
-    // Sorting
     if (sortField) {
       filtered.sort((a, b) => {
-        let aValue = a[sortField];
-        let bValue = b[sortField];
-        
-        if (typeof aValue === "string" && typeof bValue === "string") {
-          aValue = aValue.toLowerCase();
-          bValue = bValue.toLowerCase();
-        }
-
-        if(aValue && bValue){
-          if (aValue < bValue) {
-          return sortDirection === "asc" ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortDirection === "asc" ? 1 : -1;
-        }
-        }
-        
-        
+        let aVal: string | number = (a as unknown as Record<string, string | number>)[sortField as string];
+        let bVal: string | number = (b as unknown as Record<string, string | number>)[sortField as string];
+        if (typeof aVal === "string") aVal = aVal.toLowerCase();
+        if (typeof bVal === "string") bVal = bVal.toLowerCase();
+        if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+        if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
         return 0;
       });
     }
-
     return filtered;
-  }, [transactions, searchTerm, filters, sortField, sortDirection]);
+  }, [allTransactions, searchTerm, filters, sortField, sortDirection]);
 
   const handleSort = (field: keyof WalletTransaction) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
+    if (sortField === field) setSortDirection(d => d === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDirection("asc"); }
   };
 
   const getSortIcon = (field: keyof WalletTransaction) => {
-    if (sortField !== field) return "↕️";
+    if (sortField !== field) return "↕";
     return sortDirection === "asc" ? "↑" : "↓";
   };
 
-  const getTransactionTypeColor = (type: WalletTransaction["type"]) => {
-    switch (type) {
-      case "credit":
-        return "success";
-      case "debit":
-        return "error";
-      default:
-        return "primary";
-    }
-  };
-
-  const getStatusColor = (status: WalletTransaction["status"]) => {
-    switch (status) {
-      case "completed":
-        return "success";
-      case "pending":
-        return "warning";
-      case "failed":
-        return "error";
-      default:
-        return "primary";
-    }
-  };
-
-  const formatAmount = (amount: string) => {
-    const numericAmount = parseFloat(amount);
-    const formatted = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: walletData?.wallet?.currency || "INR",
       minimumFractionDigits: 2,
-    }).format(Math.abs(numericAmount));
-    
-    return numericAmount >= 0 ? `+${formatted}` : `-${formatted}`;
-  };
+    }).format(Math.abs(amount));
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
-const formatBalance = (balance: string | number | null | undefined) => {
-  // Handle null, undefined, or empty values
-  if (balance === null || balance === undefined || balance === '') {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(0);
-  }
+  const totalCredits = allTransactions.filter(t => t.type === "credit" && t.status === "success").reduce((s, t) => s + parseFloat(String(t.amount)), 0);
+  const totalDebits = allTransactions.filter(t => t.type === "debit" && t.status === "success").reduce((s, t) => s + parseFloat(String(t.amount)), 0);
 
-  // Convert to number, handling invalid cases
-  const numericBalance = typeof balance === 'string' ? parseFloat(balance) : balance;
-  
-  // Check if the parsed value is a valid number
-  if (isNaN(numericBalance)) {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(0);
-  }
-
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(numericBalance);
-};
-
-  const handleApplyFilters = (newFilters: FilterOptions) => {
-    setFilters(newFilters);
-  };
-
-  const hasActiveFilters = filters.transactionType !== "all" || filters.status !== "all";
-
-  const clearAllFilters = () => {
-    setFilters({
-      transactionType: "all",
-      referenceType: "all",
-      status: "all",
-    });
-  };
-
-  const totalPendingAmount = pendingPayments.reduce((sum, payment) => {
-    return sum + parseFloat(payment.application_fee);
-  }, 0);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-gray-600 dark:text-gray-400">Loading...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-red-600 dark:text-red-400">{error}</div>
-      </div>
-    );
+  if (loading) {
+    return <div className="flex items-center justify-center h-48 text-gray-500">Loading wallet...</div>;
   }
 
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Available Balance Card */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">Available Balance</div>
-             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-  {walletBalance ? formatBalance(walletBalance.balance) : formatBalance(0)}
-</div>
-            </div>
-            <button
-              onClick={() => setIsAddBalanceModalOpen(true)}
-              className="px-3 py-1 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600"
-            >
-              Add Balance
-            </button>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Current Balance</p>
+            <Wallet className="w-5 h-5 text-blue-500" />
           </div>
-        </div>
-
-        {/* Total Credits Card */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Total Credits</div>
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {formatBalance(
-              transactions
-                .filter(t => t.type === 'credit' && t.status === 'completed')
-                .reduce((sum, t) => sum + parseFloat(t.amount), 0).toString()
-            )}
-          </div>
-        </div>
-
-        {/* Pending Payments Card */}
-        <div 
-          className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-          onClick={() => {
-            // Redirect to pending payments page
-            window.location.href = '/student/wallet/pending-payments';
-          }}
-        >
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">Pending Payments</div>
-              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                {formatBalance(totalPendingAmount.toString())}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {pendingPayments.length} application(s) pending
-              </div>
-            </div>
-            {pendingPayments.length > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePayPendingPayments(pendingPayments.map(p => p.id));
-                }}
-                className="px-3 py-1 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600"
-              >
-                Pay All
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Search and Filter Controls */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        {/* Search Input */}
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search by transaction reference, description, or gateway..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-14 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:bg-white/[0.03] dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-            />
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Filter Button and Active Filters */}
-        <div className="flex items-center gap-3">
-          {hasActiveFilters && (
-            <button
-              onClick={clearAllFilters}
-              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              Clear All
-            </button>
-          )}
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+            {formatCurrency(walletData?.wallet?.balance || 0)}
+          </p>
           <button
-            onClick={() => setIsFilterModalOpen(true)}
-            className="dark:bg-dark-900 h-11 px-4 rounded-lg border border-gray-200 bg-transparent text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 flex items-center gap-2"
+            onClick={() => { setTopupOpen(true); setTopupError(null); setTopupAmount(""); }}
+            className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
-            </svg>
-            Apply Filters
+            <Plus className="w-3.5 h-3.5" /> Top-up Wallet
           </button>
         </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Credits</p>
+          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalCredits)}</p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Debits</p>
+          <p className="text-2xl font-bold text-red-500 dark:text-red-400">{formatCurrency(totalDebits)}</p>
+        </div>
+
+        <Link
+          href="/student/wallet/pending-payments"
+          className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors"
+        >
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Pending Payments</p>
+            <Clock className="w-5 h-5 text-orange-500" />
+          </div>
+          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(pendingTotal)}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{pendingCount} application(s) pending</p>
+        </Link>
       </div>
 
-      {/* Active Filters Display */}
-      {hasActiveFilters && (
-        <div className="flex flex-wrap gap-2">
-          {filters.transactionType !== "all" && (
-            <Badge size="sm" color="primary">
-              Transaction: {filters.transactionType}
-            </Badge>
-          )}
-          {filters.status !== "all" && (
-            <Badge size="sm" color="primary">
-              Status: {filters.status}
-            </Badge>
-          )}
+      {/* Topup Modal */}
+      {topupOpen && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Top-up Wallet</h3>
+              <button onClick={() => setTopupOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Enter the amount to add. You'll be redirected to Razorpay to complete the payment securely.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount (INR)</label>
+              <input
+                type="number"
+                min="1"
+                value={topupAmount}
+                onChange={e => { setTopupAmount(e.target.value); setTopupError(null); }}
+                placeholder="e.g. 500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:bg-gray-800 dark:text-white"
+              />
+              {topupError && <p className="text-xs text-red-500 mt-1">{topupError}</p>}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setTopupOpen(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleTopup}
+                disabled={topupLoading || !topupAmount}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {topupLoading ? "Processing..." : "Proceed to Pay"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-        <div className="max-w-full overflow-x-auto">
-          <div className="min-w-[800px]">
-            <Table>
-              {/* Table Header */}
-              <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-                <TableRow>
-                  {[
-                    { key: "created_at", label: "Date" },
-                    { key: "type", label: "Transaction Type" },
-                    { key: "status", label: "Status" },
-                    { key: "amount", label: "Amount" },
-                    { key: "transaction_ref", label: "Transaction Reference" },
-                    { key: "description", label: "Description" },
-                    { key: "gateway", label: "Gateway" },
-                  ].map(({ key, label }) => (
-                    <TableCell
-                      key={key}
-                      isHeader
-                      className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => handleSort(key as keyof WalletTransaction)}
-                    >
-                      <div className="flex items-center gap-1">
-                        {label}
-                        <span className="text-xs">{getSortIcon(key as keyof WalletTransaction)}</span>
-                      </div>
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHeader>
-
-              {/* Table Body */}
-              <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                {filteredAndSortedData.length > 0 ? (
-                  filteredAndSortedData.map((transaction) => (
-                    <TableRow key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <TableCell className="px-5 py-4 text-start min-w-[200px]">
-                        <div className="text-gray-800 text-theme-sm dark:text-white/90">
-                          {formatDate(transaction.created_at)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <Badge
-                          size="sm"
-                          color={getTransactionTypeColor(transaction.type)}
-                        >
-                          {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <Badge
-                          size="sm"
-                          color={getStatusColor(transaction.status)}
-                        >
-                          {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <span className={`font-medium text-theme-sm ${
-                          transaction.type === 'credit' 
-                            ? 'text-green-600 dark:text-green-400' 
-                            : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {formatAmount(transaction.amount)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-gray-600 text-start text-theme-sm dark:text-gray-400">
-                        {transaction.transaction_ref}
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="text-gray-800 text-theme-sm dark:text-white/90 max-w-[200px] truncate">
-                          {transaction.description}
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-gray-600 text-start text-theme-sm dark:text-gray-400">
-                        {transaction.gateway.charAt(0).toUpperCase() + transaction.gateway.slice(1)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      
-                      className="px-5 py-8 text-center text-gray-500 text-theme-sm dark:text-gray-400"
-                    >
-                      No transactions found matching your criteria.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+      {/* Filters + Search */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+          <input
+            type="text"
+            placeholder="Search by ref, description, payment ID..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full sm:w-72 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:bg-gray-800 dark:text-white"
+          />
+          <div className="flex gap-2">
+            <select
+              value={filters.transactionType}
+              onChange={e => setFilters(f => ({ ...f, transactionType: e.target.value }))}
+              className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm dark:bg-gray-800 dark:text-white focus:outline-none"
+            >
+              <option value="all">All Types</option>
+              <option value="credit">Credit</option>
+              <option value="debit">Debit</option>
+            </select>
+            <select
+              value={filters.status}
+              onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}
+              className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm dark:bg-gray-800 dark:text-white focus:outline-none"
+            >
+              <option value="all">All Status</option>
+              <option value="success">Success</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {/* Results Count */}
-      <div className="text-sm text-gray-500 dark:text-gray-400">
-        Showing {filteredAndSortedData.length} of {transactions.length} transactions
+      {/* Transactions Table */}
+      <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="border-b border-gray-100 dark:border-gray-700">
+              <TableRow>
+                {[
+                  { label: "Date", field: "created_at" },
+                  { label: "Type", field: "type" },
+                  { label: "Amount", field: "amount" },
+                  { label: "Balance Before", field: "balance_before" },
+                  { label: "Balance After", field: "balance_after" },
+                  { label: "Status", field: "status" },
+                  { label: "Ref / Payment ID", field: "transaction_ref" },
+                  { label: "Description", field: "description" },
+                ].map(col => (
+                  <TableCell
+                    key={col.field}
+                    isHeader
+                    className="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 cursor-pointer select-none whitespace-nowrap"
+                    onClick={() => handleSort(col.field as keyof WalletTransaction)}
+                  >
+                    {col.label} {getSortIcon(col.field as keyof WalletTransaction)}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredAndSortedData.length === 0 ? (
+                <TableRow>
+                  <td colSpan={8} className="text-center py-10 text-gray-400 text-sm">
+                    No transactions found.
+                  </td>
+                </TableRow>
+              ) : (
+                filteredAndSortedData.map(txn => (
+                  <TableRow key={txn.id} className="border-b border-gray-50 dark:border-gray-800 last:border-0">
+                    <TableCell className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {formatDate(txn.created_at)}
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <Badge color={txn.type === "credit" ? "success" : "error"}>
+                        {txn.type.charAt(0).toUpperCase() + txn.type.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className={`px-4 py-3 text-sm font-semibold ${txn.type === "credit" ? "text-green-600" : "text-red-500"}`}>
+                      {txn.type === "credit" ? "+" : "-"}{formatCurrency(txn.amount)}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                      {formatCurrency(txn.balance_before || 0)}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                      {formatCurrency(txn.balance_after || 0)}
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <Badge color={txn.status === "success" ? "success" : txn.status === "pending" ? "warning" : "error"}>
+                        {txn.status.charAt(0).toUpperCase() + txn.status.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">
+                      {txn.razorpay_payment_id || txn.transaction_ref || "—"}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-[200px] truncate">
+                      {txn.description || "—"}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
-
-      {/* Filter Modal */}
-      <FilterModal
-        isOpen={isFilterModalOpen}
-        onClose={() => setIsFilterModalOpen(false)}
-        onApply={handleApplyFilters}
-      />
-
-      {/* Add Balance Modal */}
-      <AddBalanceModal
-        isOpen={isAddBalanceModalOpen}
-        onClose={() => setIsAddBalanceModalOpen(false)}
-        onRecharge={handleRecharge}
-      />
     </div>
   );
 }

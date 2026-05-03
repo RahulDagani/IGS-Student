@@ -133,36 +133,30 @@ export default function PendingPaymentsPage() {
     }
   };
 
+  const payApplication = async (applicationId: number) => {
+    const response = await fetch(`${BASE_URL}/student/wallet/pay-from-wallet`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ application_id: applicationId }),
+    });
+    const result = await response.json();
+    if (!result.success) throw new Error(result.message || "Payment failed");
+  };
+
   const handlePaySelected = async () => {
     if (selectedPayments.length === 0) return;
-
     setIsPaying(true);
     setPaymentStatus("idle");
-    
     try {
-      const response = await fetch(`${BASE_URL}/student/applications/pay`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          application_ids: selectedPayments,
-          payment_method: "wallet",
-        }),
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setPaymentStatus("success");
-        // Refresh data
-        await fetchData();
-        setSelectedPayments([]);
-      } else {
-        setPaymentStatus("error");
-        throw new Error(result.message || "Failed to process payment");
+      for (const id of selectedPayments) {
+        await payApplication(id);
       }
+      setPaymentStatus("success");
+      setSelectedPayments([]);
+      await fetchData();
     } catch (err) {
       setPaymentStatus("error");
       console.error("Payment error:", err);
@@ -174,30 +168,10 @@ export default function PendingPaymentsPage() {
   const handlePaySingle = async (paymentId: number) => {
     setIsPaying(true);
     setPaymentStatus("idle");
-    
     try {
-      const response = await fetch(`${BASE_URL}/student/applications/pay`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          application_ids: [paymentId],
-          payment_method: "wallet",
-        }),
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setPaymentStatus("success");
-        // Refresh data
-        await fetchData();
-      } else {
-        setPaymentStatus("error");
-        throw new Error(result.message || "Failed to process payment");
-      }
+      await payApplication(paymentId);
+      setPaymentStatus("success");
+      await fetchData();
     } catch (err) {
       setPaymentStatus("error");
       console.error("Payment error:", err);
@@ -206,41 +180,25 @@ export default function PendingPaymentsPage() {
     }
   };
 
-  const formatAmount = (amount: string) => {
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount)) return "$0.00";
-    
-    return new Intl.NumberFormat('en-US', {
+  const formatAmount = (amount: string | number) => {
+    const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    if (isNaN(numericAmount)) return "₹0.00";
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'INR',
       minimumFractionDigits: 2,
     }).format(numericAmount);
   };
 
   const formatBalance = (balance: string | number | null | undefined) => {
-    if (balance === null || balance === undefined || balance === '') {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 2,
-      }).format(0);
-    }
-
-    const numericBalance = typeof balance === 'string' ? parseFloat(balance) : balance;
-    
-    if (isNaN(numericBalance)) {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 2,
-      }).format(0);
-    }
-
-    return new Intl.NumberFormat('en-US', {
+    const num = balance === null || balance === undefined || balance === ''
+      ? 0
+      : typeof balance === 'string' ? parseFloat(balance) : balance;
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'INR',
       minimumFractionDigits: 2,
-    }).format(numericBalance);
+    }).format(isNaN(num as number) ? 0 : (num as number));
   };
 
   const formatDate = (dateString: string) => {

@@ -50,22 +50,28 @@ interface SpecificDocument extends BaseDocument {
 interface Document extends BaseDocument {
   study_level_id?: number;
   study_level_name?: string;
+  country_code?: string;
   tenant_id?: number;
   application_id?: number;
   document_type?: string;
   course_name?: string;
   university_name?: string;
   is_common?: boolean;
+  doc_category?: 'study_level' | 'country' | 'specific';
 }
 
 interface ApiResponse {
   success: number;
   data: {
-    common_documents: {
+    study_level_documents: {
       list: CommonDocument[];
       status: string;
     };
-    specific_documents: {
+    country_wise_documents: {
+      list: BaseDocument[];
+      status: string;
+    };
+    application_specific_documents: {
       list: SpecificDocument[];
       status: string;
     };
@@ -84,6 +90,10 @@ interface UploadError {
   [key: number]: string;
 }
 
+interface UploadSuccess {
+  [key: number]: boolean;
+}
+
 interface DocumentsPageProps {
   onDocumentUpload: () => void; // Optional if not always provided
 }
@@ -100,6 +110,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
   const [uploading, setUploading] = useState<UploadState>({});
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
   const [uploadErrors, setUploadErrors] = useState<UploadError>({});
+  const [uploadSuccess, setUploadSuccess] = useState<UploadSuccess>({});
   const [selectedFile, setSelectedFile] = useState<{ [key: number]: File | null }>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -126,19 +137,25 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
         const data: ApiResponse = await response.json();
         
         if (data.success) {
-          // Combine common and specific documents
-          const commonDocs = data.data.common_documents.list.map(doc => ({
+          const studyLevelDocs = (data.data.study_level_documents?.list ?? []).map(doc => ({
             ...doc,
-            is_common: true
+            is_common: true,
+            doc_category: 'study_level' as const,
           }));
-          
-          const specificDocs = data.data.specific_documents.list.map(doc => ({
+
+          const countryDocs = (data.data.country_wise_documents?.list ?? []).map(doc => ({
             ...doc,
-            is_common: false
+            is_common: true,
+            doc_category: 'country' as const,
           }));
-          
-          // Merge both lists
-          setDocuments([...commonDocs, ...specificDocs]);
+
+          const specificDocs = (data.data.application_specific_documents?.list ?? []).map(doc => ({
+            ...doc,
+            is_common: false,
+            doc_category: 'specific' as const,
+          }));
+
+          setDocuments([...studyLevelDocs, ...countryDocs, ...specificDocs]);
         } else {
           throw new Error('Failed to fetch documents');
         }
@@ -209,14 +226,10 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
     }
   };
 
-  // Upload file function - handles both common and specific documents
-  const uploadFile = async (documentId: number, isCommon: boolean, applicationId: number | null) => {
+  const uploadFile = async (documentId: number, isCommon: boolean, applicationId: number | null, doc_category?: string) => {
     const file = selectedFile[documentId];
     if (!file) {
-      setUploadErrors(prev => ({ 
-        ...prev, 
-        [documentId]: 'Please select a file first' 
-      }));
+      setUploadErrors(prev => ({ ...prev, [documentId]: 'Please select a file first' }));
       return;
     }
 
@@ -230,7 +243,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
 
     try {
       const xhr = new XMLHttpRequest();
-      
+
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) {
           const progress = (event.loaded / event.total) * 100;
@@ -258,30 +271,32 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
         xhr.onerror = () => reject(new Error('Network error occurred'));
       });
 
-      
-      const endpoint = isCommon 
-        ? `${BASE_URL}/student/application/upload/common/document`
-        : `${BASE_URL}/student/application/upload/document/${applicationId}`;
-      
+      let endpoint: string;
+      if (doc_category === 'country') {
+        endpoint = `${BASE_URL}/student/upload/country-document`;
+      } else if (isCommon) {
+        endpoint = `${BASE_URL}/student/application/upload/common/document`;
+      } else {
+        endpoint = `${BASE_URL}/student/application/upload/document/${applicationId}`;
+      }
+
       xhr.open('PUT', endpoint);
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.send(formData);
 
       await uploadPromise;
-      
-      
+
       setSelectedFile(prev => ({ ...prev, [documentId]: null }));
-      
-      
-      if (onDocumentUpload) {
-        onDocumentUpload(); // Call the callback if provided
-      }
+      setUploadSuccess(prev => ({ ...prev, [documentId]: true }));
+      setTimeout(() => setUploadSuccess(prev => ({ ...prev, [documentId]: false })), 3000);
+
+      if (onDocumentUpload) onDocumentUpload();
       setRefreshTrigger(prev => prev + 1);
-      
+
     } catch (err) {
-      setUploadErrors(prev => ({ 
-        ...prev, 
-        [documentId]: err instanceof Error ? err.message : 'Upload failed' 
+      setUploadErrors(prev => ({
+        ...prev,
+        [documentId]: err instanceof Error ? err.message : 'Upload failed'
       }));
       console.error('Upload error:', err);
     } finally {
@@ -290,31 +305,40 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
     }
   };
 
-  // File input component
-  const FileInput = ({ documentId, isCommon, currentFileName, applicationId = null }: { 
-    documentId: number, 
-    isCommon: boolean,
-    currentFileName?: string,
-    applicationId?: number | null,
+  const FileInput = ({ documentId, isCommon, applicationId = null, doc_category }: {
+    documentId: number;
+    isCommon: boolean;
+    applicationId?: number | null;
+    doc_category?: string;
   }) => {
     const isUploading = uploading[documentId];
-    const progress = uploadProgress[documentId];
+    const progress = uploadProgress[documentId] ?? 0;
     const fileError = uploadErrors[documentId];
+    const success = uploadSuccess[documentId];
     const selectedFileForDoc = selectedFile[documentId];
 
     return (
-      <div className="flex flex-col gap-3 min-w-[250px]">
+      <div className="w-64 flex flex-col gap-2">
+        {success && (
+          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-md">
+            <CheckCircle size={15} />
+            Uploaded successfully
+          </div>
+        )}
+
         {fileError && (
-          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded-md">
-            <AlertCircle size={16} />
+          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-md">
+            <AlertCircle size={15} />
             {fileError}
           </div>
         )}
 
         <div className="flex gap-2">
-          <label className="flex items-center gap-2 cursor-pointer border dark:text-white border-gray-300 dark:border-gray-600 px-4 py-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700">
-            <UploadCloud size={16} />
-            Choose File
+          <label className="flex items-center gap-1.5 cursor-pointer border dark:text-white border-gray-300 dark:border-gray-600 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50 dark:hover:bg-gray-700 shrink-0">
+            <UploadCloud size={14} />
+            {selectedFileForDoc
+              ? <span className="max-w-[80px] truncate">{selectedFileForDoc.name}</span>
+              : 'Choose File'}
             <input
               type="file"
               className="hidden"
@@ -322,11 +346,12 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
               disabled={isUploading}
             />
           </label>
-          
+
           <button
-            onClick={() => uploadFile(documentId, isCommon, applicationId)}
+            type="button"
+            onClick={() => uploadFile(documentId, isCommon, applicationId, doc_category)}
             disabled={isUploading || !selectedFileForDoc}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm shrink-0 ${
               isUploading || !selectedFileForDoc
                 ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed'
                 : 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600'
@@ -334,39 +359,26 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
           >
             {isUploading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
                 Uploading...
               </>
             ) : (
               <>
-                <UploadCloud size={16} />
+                <UploadCloud size={14} />
                 Upload
               </>
             )}
           </button>
         </div>
 
-        {selectedFileForDoc && !isUploading && (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Selected: <span className="font-medium">{selectedFileForDoc.name}</span>
-          </div>
-        )}
-
-        {currentFileName && !selectedFileForDoc && !isUploading && (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Current: <span className="font-medium">{currentFileName}</span>
-          </div>
-        )}
-
         {isUploading && (
           <div className="w-full">
-            <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
-              <span>Uploading...</span>
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
               <span>{Math.round(progress)}%</span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
               <div
-                className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300"
+                className="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -383,7 +395,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
     const isCommon = doc.is_common === true;
 
     return (
-      <div 
+      <div
         className={`border-l-4 ${statusConfig.borderColor} ${statusConfig.bgColor} p-5 rounded-md mb-4`}
       >
         <div className="flex justify-between items-start">
@@ -400,7 +412,6 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
               )}
             </div>
 
-            {/* University and course info for specific documents */}
             {!isCommon && doc.university_name && (
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
                 <Building size={14} />
@@ -443,14 +454,16 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
             </div>
           </div>
 
-          <div className="ml-4">
-            <FileInput 
-              documentId={doc.id} 
-              isCommon={isCommon}
-              currentFileName={fileName !== 'No file uploaded' ? fileName : undefined}
-              applicationId={!isCommon ? doc.application_id : null}
-            />
-          </div>
+          {activeTab !== 'Igs' && (
+            <div className="ml-4">
+              <FileInput
+                documentId={doc.id}
+                isCommon={isCommon}
+                applicationId={!isCommon ? doc.application_id : null}
+                doc_category={doc.doc_category}
+              />
+            </div>
+          )}
         </div>
 
         {doc.file_url && (
@@ -462,18 +475,20 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
               className="bg-white dark:bg-gray-800 border flex items-center dark:border-gray-600 px-3 py-1 rounded-md text-sm dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             >
               {fileName}
-              <Eye size={16} className='ml-2'/>
+              <Eye size={16} className="ml-2" />
             </a>
 
-            {activeTab == "Igs" && <a
-  href={doc.file_url}
-  download
-  className="inline-flex items-center justify-center rounded-md border bg-white px-3 py-[2px] text-gray-600 transition hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-  title="Download file"
->
-  Download
-  <Download size={16} className='ml-2'/>
-</a>}
+            {activeTab === 'Igs' && (
+              <a
+                href={doc.file_url}
+                download
+                className="inline-flex items-center justify-center rounded-md border bg-white px-3 py-[2px] text-gray-600 transition hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                title="Download file"
+              >
+                Download
+                <Download size={16} className="ml-2" />
+              </a>
+            )}
           </div>
         )}
       </div>

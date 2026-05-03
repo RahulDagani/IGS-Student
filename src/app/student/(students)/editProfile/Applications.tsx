@@ -140,6 +140,7 @@ interface ChatMessage {
   created_by_name: string | null;
   created_by_email: string;
   file_url: string | null;
+  is_mine: number;
 }
 
 interface ChatUploadState {
@@ -370,11 +371,6 @@ const updateCredentials = async () => {
     }
   };
 
-  useEffect(() => {
-    if (activeProgram && (commentTab === 'Igs' || commentTab === 'student')) {
-      loadMessages(activeProgram);
-    }
-  }, [commentTab, activeProgram]);
 
   const handleFileSelect = (documentId: number, file: File) => {
     setSelectedFile(file);
@@ -495,20 +491,7 @@ const updateCredentials = async () => {
       const data = await response.json();
       
       if (data.success) {
-        if (commentTab === 'student') {
-          const messagesResponse = await fetch(`${BASE_URL}/student/application/comments/${activeProgram}?who_has_created=agent`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          const messagesData = await messagesResponse.json();
-          if (messagesData.success) {
-            setMessages(messagesData.data);
-          }
-        } else {
-          loadMessages(activeProgram);
-        }
+        await loadMessages(activeProgram);
         
         setNewMessage('');
         removeChatFile();
@@ -603,35 +586,32 @@ const updateCredentials = async () => {
     }
 
     return messages.map((message) => {
-      const isStudent = message.who_has_created === 'student';
-      const isTenant = message.who_has_created === 'tenant';
-      
-      const senderName = message.created_by_name || 
-                        (isStudent ? 'You' : 'IGS Team');
+      const isMine = message.is_mine === 1;
+      const senderName = message.created_by_name || (isMine ? 'You' : 'IGS Team');
 
       return (
-        <div key={message.id} className="flex gap-3 mb-6">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-            isStudent 
+        <div key={message.id} className={`flex gap-3 mb-6 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+          <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-semibold ${
+            isMine
               ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
               : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400'
           }`}>
             {senderName.charAt(0).toUpperCase()}
           </div>
           <div className={`rounded-lg p-4 max-w-xl ${
-            isStudent
+            isMine
               ? 'bg-blue-100 dark:bg-blue-900/30'
               : 'bg-gray-100 dark:bg-gray-700'
           }`}>
-            <div className="flex justify-between items-start mb-2">
+            <div className={`flex justify-between items-start mb-2 gap-4 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
               <p className={`font-medium ${
-                isStudent
+                isMine
                   ? 'text-blue-700 dark:text-blue-400'
                   : 'text-gray-700 dark:text-gray-300'
               }`}>
                 {senderName}
               </p>
-              <span className="text-xs text-gray-500 dark:text-gray-400 my-auto ml-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400 my-auto">
                 {formatMessageTime(message.created_at)}
               </span>
             </div>

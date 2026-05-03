@@ -1,94 +1,32 @@
 "use client"
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Badge from "@/components/ui/badge/Badge";
-import { DockIcon, DollarSign, GraduationCap, MapPin, Calendar, Book, Building2, Star, X, ChevronDown, ChevronUp, Heart } from "lucide-react";
+import { DockIcon, DollarSign, GraduationCap, MapPin, Calendar, Book, Building2, Star, X, ChevronDown, ChevronUp, Heart, Search, SlidersHorizontal } from "lucide-react";
 import { useAuth } from '@/context/AuthContext';
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Country, State } from "country-state-city";
 import Image from "next/image";
 
+const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
-// Interfaces matching the API response structure
-interface StudyLevel {
-  id: number;
-  name: string;
-}
+// ─── Interfaces ────────────────────────────────────────────────────────────────
 
-interface Student {
-  user_id: number;
-  email: string;
-  phone: string;
-  status: string;
-  first_name: string;
-  last_name: string;
-  passport_number: string;
-  dob: string;
-  created_at: string;
-}
-
-interface Discipline {
-  id: number;
-  name: string;
-}
-
-interface University {
-  id: number;
-  university: string;
-  country_code: string;
-  state_code: string;
-  city_code: string;
-}
-
-interface LocationCountry {
-  country_code: string;
-}
-
-interface LocationState {
-  state_code: string;
-  country_code: string;
-}
-
-interface LocationCity {
-  city_code: string;
-}
-
-// interface Intake {
-//   id: number;
-//   intake: string;
-// }
-
-interface Deadline {
-  id: number;
-  deadline_type: string;
-  deadline_date: string;
-  extended_date: string | null;
-  is_closed: number;
-  notes: string | null;
-}
-
-interface Intake {
-  id: number;
-  intake_id: number;
-  intake_name: string;
-  intake_year: number;
-  deadlines: Deadline[];
-}
-
-interface IntakeYear {
-  intake_year: number;
-}
+interface StudyLevel { id: number; name: string; }
+interface Discipline { id: number; name: string; }
+interface University { id: number; university: string; country_code: string; state_code: string; city_code: string; }
+interface LocationCountry { country_code: string; }
+interface LocationState { state_code: string; country_code: string; }
+interface LocationCity { city_code: string; }
+interface IntakeOption { id: number; intake: string; }
+interface IntakeYear { intake_year: number; }
 
 interface FiltersData {
   studyLevels: StudyLevel[];
   disciplines: Discipline[];
   universities: University[];
-  locations: {
-    countries: LocationCountry[];
-    states: LocationState[];
-    cities: LocationCity[];
-  };
-  intakes: Intake[];
+  locations: { countries: LocationCountry[]; states: LocationState[]; cities: LocationCity[]; };
+  intakes: IntakeOption[];
   intakeYears: IntakeYear[];
 }
 
@@ -130,25 +68,9 @@ interface Course {
   discipline_name: string;
   university_logo_url: string;
   is_shortlisted?: number | null;
-  intakes?: {
-    intake_id: number;
-    intake_year: number;
-    intake_name: string;
-  }[];
+  intakes?: { intake_id: number; intake_year: number; intake_name: string; }[];
 }
 
-interface ApiResponse {
-  success: boolean;
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
-  data: Course[];
-}
-
-// Filter Options Interface for Student Portal
 interface FilterOptions {
   disciplines: number[];
   studyLevels: number[];
@@ -158,18 +80,9 @@ interface FilterOptions {
   cities: string[];
   intakes: number[];
   intakeYears: number[];
-  search?: string;
 }
 
-// Filter Modal Component for Student Portal
-interface FilterModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onFilterApply: (filters: FilterOptions) => void;
-  filterOptions: FiltersData | null;
-  appliedFilters: FilterOptions;
-  onFiltersChange: (filters: FilterOptions) => void;
-}
+// ─── Helpers ────────────────────────────────────────────────────────────────────
 
 const getCountryName = (code: string | undefined | null) => {
   if (!code) return '';
@@ -183,418 +96,227 @@ const getStateName = (code: string | undefined | null) => {
   return state ? state.name : code;
 };
 
+// ─── Filter Modal ───────────────────────────────────────────────────────────────
+
+interface FilterModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onFilterApply: (filters: FilterOptions) => void;
+  filterOptions: FiltersData | null;
+  appliedFilters: FilterOptions;
+  onFiltersChange: (filters: FilterOptions) => void;
+}
+
 const FilterModal: React.FC<FilterModalProps> = ({
-  isOpen,
-  onClose,
-  onFilterApply,
-  filterOptions,
-  appliedFilters,
-  onFiltersChange,
+  isOpen, onClose, onFilterApply, filterOptions, appliedFilters, onFiltersChange,
 }) => {
   const [localFilters, setLocalFilters] = useState<FilterOptions>(appliedFilters);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    disciplines: true,
-    locations: true,
-    universities: true,
-    studyLevels: true,
-    intakes: true,
-    intakeYears: true,
+    disciplines: true, locations: true, universities: true, studyLevels: true, intakes: true, intakeYears: true,
   });
 
-  // Helper function to get state label
-  const getStateLabel = (stateCode: string, countryCode: string) => {
-    const state = State.getStateByCodeAndCountry(stateCode, countryCode);
-    return state
-      ? `${state.name} (${state.isoCode}, ${state.countryCode})`
-      : "Unknown State";
-  };
-
-  // Get filtered states based on selected countries
   const getFilteredStates = useMemo(() => {
-    if (!filterOptions?.locations.states) return [];
-    
-    // If no countries selected, show all states
-    if (localFilters.countries.length === 0) return [];
-    
-    // Filter states based on selected countries
-    return filterOptions.locations.states.filter(state => {
-      // Find the country for this state
-      // This assumes state_code format includes country info or we need to map it
-      // Since we don't have direct mapping, we'll need to get all states for selected countries
-      
-      // For now, we'll show all states since we don't have country-state mapping in the data
-      // You might need to update your API to include country_code with states
-      return true;
-      
-      // If your API response includes country_code in states, you can use:
-      // return localFilters.countries.includes(state.country_code);
-    });
+    if (!filterOptions?.locations.states || localFilters.countries.length === 0) return [];
+    return filterOptions.locations.states;
   }, [filterOptions?.locations.states, localFilters.countries]);
 
-  // Initialize local filters when modal opens
   useEffect(() => {
-    if (isOpen) {
-      setLocalFilters(appliedFilters);
-    }
+    if (isOpen) setLocalFilters(appliedFilters);
   }, [isOpen, appliedFilters]);
 
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
+  const toggleSection = (section: string) =>
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
 
-  // Handle checkbox changes for arrays
   const handleCheckboxChange = (key: keyof FilterOptions, value: number | string, checked: boolean) => {
     setLocalFilters(prev => {
       const currentArray = prev[key] as (number | string)[];
-      let newArray: (number | string)[];
-      
-      if (checked) {
-        // Add value to array
-        newArray = [...currentArray, value];
-      } else {
-        // Remove value from array
-        newArray = currentArray.filter(item => item !== value);
-        
-        // If unchecking a country, clear states from that country
-        if (key === 'countries') {
-          // This would require mapping states to countries
-          // Implement if your data structure supports it
-        }
-      }
-      
-      const newFilters = {
-        ...prev,
-        [key]: newArray
-      };
-      
-      // Update parent component
+      const newArray = checked ? [...currentArray, value] : currentArray.filter(item => item !== value);
+      const newFilters = { ...prev, [key]: newArray };
       onFiltersChange(newFilters);
       return newFilters;
     });
   };
 
-  // Handle select changes for arrays (multi-select)
-  const handleMultiSelectChange = (key: keyof FilterOptions, e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => {
-      if (key === 'intakes' || key === 'intakeYears' || key === 'studyLevels') {
-        return Number(option.value);
-      }
-      return option.value;
-    });
-    
-    const newFilters = {
-      ...localFilters,
-      [key]: selectedOptions
-    };
-    
-    setLocalFilters(newFilters);
-    onFiltersChange(newFilters);
-  };
+  const isSelected = (key: keyof FilterOptions, value: number | string) =>
+    (localFilters[key] as (number | string)[]).includes(value);
 
   const handleReset = () => {
-    const resetFilters: FilterOptions = {
-      disciplines: [],
-      studyLevels: [],
-      universities: [],
-      countries: [],
-      states: [],
-      cities: [],
-      intakes: [],
-      intakeYears: [],
-    };
-    setLocalFilters(resetFilters);
-    onFiltersChange(resetFilters);
+    const reset: FilterOptions = { disciplines: [], studyLevels: [], universities: [], countries: [], states: [], cities: [], intakes: [], intakeYears: [] };
+    setLocalFilters(reset);
+    onFiltersChange(reset);
   };
 
-  const handleApply = () => {
-    onFilterApply(localFilters);
-    onClose();
-  };
+  const handleApply = () => { onFilterApply(localFilters); onClose(); };
 
-  // Check if a value is selected in an array
-  const isSelected = (key: keyof FilterOptions, value: number | string) => {
-    const array = localFilters[key] as (number | string)[];
-    return array.includes(value);
-  };
+  const totalSelected = Object.values(localFilters).reduce((s, v) => s + (Array.isArray(v) ? v.length : 0), 0);
 
   if (!isOpen || !filterOptions) return null;
 
+  const CheckboxList = ({ items, filterKey, getLabel, getId }: {
+    items: any[];
+    filterKey: keyof FilterOptions;
+    getLabel: (item: any) => string;
+    getId: (item: any) => number | string;
+  }) => (
+    <div className="grid grid-cols-2 gap-1 max-h-48 overflow-y-auto pr-1">
+      {items.map((item) => (
+        <label key={getId(item)} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isSelected(filterKey, getId(item))}
+            onChange={(e) => handleCheckboxChange(filterKey, getId(item), e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 shrink-0"
+          />
+          <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{getLabel(item)}</span>
+        </label>
+      ))}
+    </div>
+  );
+
+  const Section = ({ title, sectionKey, count, children }: { title: string; sectionKey: string; count?: number; children: React.ReactNode }) => (
+    <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
+      <button type="button" onClick={() => toggleSection(sectionKey)} className="flex items-center justify-between w-full py-2 text-left">
+        <span className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-white">
+          {title}
+          {count ? <span className="bg-brand-500 text-white text-xs rounded-full px-1.5 py-0.5">{count}</span> : null}
+        </span>
+        {expandedSections[sectionKey] ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+      </button>
+      {expandedSections[sectionKey] && <div className="mt-2">{children}</div>}
+    </div>
+  );
+
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-            Filter Programs
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            <X className="w-6 h-6" />
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-99999 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-[680px] max-h-[90vh] flex flex-col shadow-2xl">
+
+        {/* Sticky Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filter Programs</h3>
+            {totalSelected > 0 && (
+              <p className="text-xs text-brand-500 mt-0.5">{totalSelected} filter{totalSelected > 1 ? 's' : ''} selected</p>
+            )}
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Locations Filter - Changed to Checkboxes */}
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => toggleSection('locations')}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <h4 className="block text-lg font-medium text-gray-700 dark:text-gray-300">
-                Preferred Study Destination
-              </h4>
-              {expandedSections.locations ? (
-                <ChevronUp className="w-4 h-4 text-gray-500" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-gray-500" />
-              )}
-            </button>
-            
-            {expandedSections.locations && (
-              <div className="space-y-4">
-                {/* Countries */}
-                <div className="space-y-2">
-                  <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Countries
-                  </h5>
-                  <div className="grid grid-cols-2 space-y-2 max-h-32 overflow-y-auto">
-                    {filterOptions.locations.countries.map((country) => (
-                      <label
-                        key={country.country_code}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected('countries', country.country_code)}
-                          onChange={(e) => handleCheckboxChange('countries', country.country_code, e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">
-                          {getCountryName(country.country_code)}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+        {/* Scrollable Body */}
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
 
-                {/* States - Conditionally rendered */}
-                <div className="space-y-2">
-                  <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    States/Provinces
-                  </h5>
-                  
-                  {localFilters.countries.length === 0 ? (
-                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                        Select a country to view states/provinces.
-                      </p>
-                    </div>
-                  ) : getFilteredStates.length === 0 ? (
-                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                        No states/provinces available for the selected countries.
-                      </p>
-                    </div>
+          {/* Destination */}
+          <Section title="Study Destination" sectionKey="locations" count={localFilters.countries.length + localFilters.states.length + localFilters.cities.length || undefined}>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Countries</p>
+                <CheckboxList
+                  items={filterOptions.locations.countries}
+                  filterKey="countries"
+                  getLabel={(c) => getCountryName(c.country_code)}
+                  getId={(c) => c.country_code}
+                />
+              </div>
+
+              {localFilters.countries.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">States / Provinces</p>
+                  {getFilteredStates.length === 0 ? (
+                    <p className="text-sm text-gray-400 dark:text-gray-500 italic">No states available for selected countries.</p>
                   ) : (
-                    <div className="grid grid-cols-2 space-y-2 max-h-32 overflow-y-auto">
-                      {getFilteredStates.map((state) => (
-                        <label
-                          key={state.state_code}
-                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected('states', state.state_code)}
-                            onChange={(e) => handleCheckboxChange('states', state.state_code, e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                            disabled={localFilters.countries.length === 0}
-                          />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            {state.state_code}
-                            
-                          </span>
-                        </label>
-                      ))}
-                    </div>
+                    <CheckboxList
+                      items={getFilteredStates}
+                      filterKey="states"
+                      getLabel={(s) => s.state_code}
+                      getId={(s) => s.state_code}
+                    />
                   )}
                 </div>
-
-                {/* Cities - Conditionally rendered (optional) */}
-                {localFilters.states.length > 0 && (
-                  <div className="space-y-2">
-                    <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Cities
-                    </h5>
-                    <div className="grid grid-cols-2 space-y-2 max-h-32 overflow-y-auto">
-                      {filterOptions.locations.cities.map((city) => (
-                        <label
-                          key={city.city_code}
-                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected('cities', city.city_code)}
-                            onChange={(e) => handleCheckboxChange('cities', city.city_code, e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                          />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            {city.city_code}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            {(localFilters.countries.length > 0 || localFilters.states.length > 0 || localFilters.cities.length > 0) && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Selected: {localFilters.countries.length + localFilters.states.length + localFilters.cities.length} location(s)
-              </p>
-            )}
-          </div>
-
-          {/* ... rest of the filters remain the same ... */}
-          {/* Study Levels Filter */}
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => toggleSection('studyLevels')}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <h4 className="block text-lg font-medium text-gray-700 dark:text-gray-300">
-                Study Levels
-              </h4>
-              {expandedSections.studyLevels ? (
-                <ChevronUp className="w-4 h-4 text-gray-500" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-gray-500" />
               )}
-            </button>
-            
-            {expandedSections.studyLevels && (
-              <select
-                value={localFilters.studyLevels.map(String)}
-                onChange={(e) => handleMultiSelectChange('studyLevels', e)}
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring focus:ring-brand-500/10 focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                
-              >
-                {filterOptions.studyLevels.map((level) => (
-                  <option key={level.id} value={level.id}>
-                    {level.name}
-                  </option>
-                ))}
-              </select>
-            )}
-           
-          </div>
 
-          {/* Disciplines Filter */}
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => toggleSection('disciplines')}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <h4 className="block text-lg font-medium text-gray-700 dark:text-gray-300">
-                Disciplines
-              </h4>
-              {expandedSections.disciplines ? (
-                <ChevronUp className="w-4 h-4 text-gray-500" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-gray-500" />
+              {localFilters.states.length > 0 && filterOptions.locations.cities.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Cities</p>
+                  <CheckboxList
+                    items={filterOptions.locations.cities}
+                    filterKey="cities"
+                    getLabel={(c) => c.city_code}
+                    getId={(c) => c.city_code}
+                  />
+                </div>
               )}
-            </button>
-            
-            {expandedSections.disciplines && (
-              <div className="grid grid-cols-2 space-y-2 max-h-48 overflow-y-auto">
-                {filterOptions.disciplines.map((discipline) => (
-                  <label
-                    key={discipline.id}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected('disciplines', discipline.id)}
-                      onChange={(e) => handleCheckboxChange('disciplines', discipline.id, e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {discipline.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-            {localFilters.disciplines.length > 0 && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Selected: {localFilters.disciplines.length} discipline(s)
-              </p>
-            )}
-          </div>
+            </div>
+          </Section>
 
-          {/* Universities Filter */}
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => toggleSection('universities')}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <h4 className="block text-lg font-medium text-gray-700 dark:text-gray-300">
-                Universities
-              </h4>
-              {expandedSections.universities ? (
-                <ChevronUp className="w-4 h-4 text-gray-500" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-gray-500" />
-              )}
-            </button>
-            
-            {expandedSections.universities && (
-              <div className="grid grid-cols-2 space-y-2 max-h-48 overflow-y-auto">
-                {filterOptions.universities.map((university) => (
-                  <label
-                    key={university.id}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected('universities', university.id)}
-                      onChange={(e) => handleCheckboxChange('universities', university.id, e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {university.university}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-            {localFilters.universities.length > 0 && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Selected: {localFilters.universities.length} university(ies)
-              </p>
-            )}
-          </div>
+          {/* Study Levels */}
+          <Section title="Study Level" sectionKey="studyLevels" count={localFilters.studyLevels.length || undefined}>
+            <CheckboxList
+              items={filterOptions.studyLevels}
+              filterKey="studyLevels"
+              getLabel={(l) => l.name}
+              getId={(l) => l.id}
+            />
+          </Section>
+
+          {/* Disciplines */}
+          <Section title="Discipline" sectionKey="disciplines" count={localFilters.disciplines.length || undefined}>
+            <CheckboxList
+              items={filterOptions.disciplines}
+              filterKey="disciplines"
+              getLabel={(d) => d.name}
+              getId={(d) => d.id}
+            />
+          </Section>
+
+          {/* Universities */}
+          <Section title="University" sectionKey="universities" count={localFilters.universities.length || undefined}>
+            <CheckboxList
+              items={filterOptions.universities}
+              filterKey="universities"
+              getLabel={(u) => u.university}
+              getId={(u) => u.id}
+            />
+          </Section>
+
+          {/* Intake */}
+          {filterOptions.intakes.length > 0 && (
+            <Section title="Intake" sectionKey="intakes" count={localFilters.intakes.length || undefined}>
+              <CheckboxList
+                items={filterOptions.intakes}
+                filterKey="intakes"
+                getLabel={(i) => i.intake}
+                getId={(i) => i.id}
+              />
+            </Section>
+          )}
+
+          {/* Intake Year */}
+          {filterOptions.intakeYears.length > 0 && (
+            <Section title="Intake Year" sectionKey="intakeYears" count={localFilters.intakeYears.length || undefined}>
+              <CheckboxList
+                items={filterOptions.intakeYears}
+                filterKey="intakeYears"
+                getLabel={(y) => String(y.intake_year)}
+                getId={(y) => y.intake_year}
+              />
+            </Section>
+          )}
         </div>
 
-        <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+        {/* Sticky Footer */}
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0 bg-white dark:bg-gray-900 rounded-b-2xl">
           <button
             onClick={handleReset}
-            className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            className="flex-1 px-4 py-2.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             Reset All
           </button>
           <button
             onClick={handleApply}
-            className="flex-1 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10"
+            className="flex-1 px-4 py-2.5 text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white rounded-xl transition-colors"
           >
-            Apply Filters
+            Apply Filters {totalSelected > 0 && `(${totalSelected})`}
           </button>
         </div>
       </div>
@@ -602,7 +324,8 @@ const FilterModal: React.FC<FilterModalProps> = ({
   );
 };
 
-// Application Confirmation Modal Component for Student Portal
+// ─── Confirm Modal ──────────────────────────────────────────────────────────────
+
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -611,222 +334,185 @@ interface ConfirmModalProps {
   loading: boolean;
 }
 
-const ConfirmModal: React.FC<ConfirmModalProps> = ({
-  isOpen,
-  onClose,
-  onConfirm,
-  course,
-  loading,
-}) => {
+const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm, course, loading }) => {
   const [selectedIntakeId, setSelectedIntakeId] = useState<number>(0);
-  const [openIntakeDetails, setOpenIntakeDetails] = useState<number | null>(null);
-  const [appLogin, setAppLogin] = useState<string>("");
-  const [appPassword, setAppPassword] = useState<string>("");
+  const [appLogin, setAppLogin] = useState('');
+  const [appPassword, setAppPassword] = useState('');
 
   const formatFee = (fee: string, currency: string) => {
-    if (!fee || fee === "0.00") return "Free";
+    if (!fee || fee === '0.00') return 'Free';
     return `${currency} ${parseFloat(fee).toLocaleString()}`;
   };
 
-  // Reset selection when course changes
   useEffect(() => {
-    if (course && course.intakes && course.intakes.length > 0) {
-      // Select the first intake by default
+    if (course?.intakes?.length) {
       setSelectedIntakeId(course.intakes[0].intake_id);
     } else {
       setSelectedIntakeId(0);
     }
-    setOpenIntakeDetails(null);
-    setAppLogin("");
-    setAppPassword("");
+    setAppLogin('');
+    setAppPassword('');
   }, [course]);
-
-  const handleSubmit = () => {
-    if (selectedIntakeId === 0) {
-      alert("Please select an intake");
-      return;
-    }
-    onConfirm(selectedIntakeId, appLogin, appPassword);
-  };
-
-  const toggleIntakeDetails = (intakeId: number) => {
-    setOpenIntakeDetails(openIntakeDetails === intakeId ? null : intakeId);
-  };
 
   if (!isOpen || !course) return null;
 
-  const hasIntakes = course.intakes && course.intakes.length > 0;
+  const hasIntakes = !!course.intakes?.length;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999 p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-2xl my-4">
-        <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
-            Confirm Application
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            Please review your application details before submitting:
-          </p>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-99999 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
 
-          <div className="space-y-6">
-            {/* Course Details */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Course Details</h4>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Course:</span>
-                  <span className="text-sm font-medium text-gray-800 dark:text-white text-right">{course.course_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">University:</span>
-                  <span className="text-sm font-medium text-gray-800 dark:text-white text-right">{course.university_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Study Level:</span>
-                  <span className="text-sm font-medium text-gray-800 dark:text-white text-right">{course.study_level_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Application Fee:</span>
-                  <span className="text-sm font-medium text-gray-800 dark:text-white text-right">
-                    {formatFee(course.application_fee, course.currency_code)}
-                  </span>
-                </div>
-              </div>
+        {/* Sticky Header */}
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Confirm Application</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Review your application details before submitting</p>
             </div>
+            <button onClick={onClose} disabled={loading} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
 
-            {/* Intake Selection */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Select Intake</h4>
-              
-              {!hasIntakes ? (
-                <div className="text-sm text-yellow-600 dark:text-yellow-400 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded">
-                  No intakes available for this course.
-                </div>
+        {/* Scrollable Body */}
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+
+          {/* Course Summary */}
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
+            <div className="flex items-start gap-3 mb-3">
+              {course.university_logo_url ? (
+                <Image src={course.university_logo_url} alt={course.university_name} width={48} height={48} className="rounded-lg object-contain shrink-0" />
               ) : (
-                <div className="space-y-3">
-                  {course.intakes?.map((intake) => {
-                    const isSelected = selectedIntakeId === intake.intake_id;
-                    
-                    return (
-                      <div key={intake.intake_id} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                        <div className={`p-3 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' : ''}`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <input
-                                type="radio"
-                                id={`intake-${intake.intake_id}`}
-                                name="intake"
-                                value={intake.intake_id}
-                                checked={isSelected}
-                                onChange={(e) => setSelectedIntakeId(Number(e.target.value))}
-                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                              />
-                              <div>
-                                <label 
-                                  htmlFor={`intake-${intake.intake_id}`}
-                                  className={`font-medium text-gray-800 dark:text-white`}
-                                >
-                                  {intake.intake_name} {intake.intake_year}
-                                </label>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => toggleIntakeDetails(intake.intake_id)}
-                              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                            >
-                              <svg
-                                className={`w-5 h-5 transition-transform ${openIntakeDetails === intake.intake_id ? 'rotate-180' : ''}`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                        
-                        {openIntakeDetails === intake.intake_id && (
-                          <div className="border-t border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-900">
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Intake: {intake.intake_name} {intake.intake_year}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                              Please contact the university for specific deadline information.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                <div className="w-12 h-12 bg-linear-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0">
+                  {course.university_name.slice(0, 2).toUpperCase()}
                 </div>
               )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Application Login
-                </label>
+                <p className="font-semibold text-gray-900 dark:text-white text-sm leading-tight">{course.course_name}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{course.university_name}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Level:</span>
+                <span className="font-medium text-gray-800 dark:text-white">{course.study_level_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500 dark:text-gray-400">App. Fee:</span>
+                <span className="font-medium text-gray-800 dark:text-white">{formatFee(course.application_fee, course.currency_code)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Tuition:</span>
+                <span className="font-medium text-gray-800 dark:text-white">{formatFee(course.tuition_fee, course.currency_code)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Discipline:</span>
+                <span className="font-medium text-gray-800 dark:text-white">{course.discipline_name}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Intake Selection */}
+          <div>
+            <p className="text-sm font-semibold text-gray-800 dark:text-white mb-2">Select Intake</p>
+            {!hasIntakes ? (
+              <div className="text-sm text-amber-700 dark:text-amber-400 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                No intakes are currently available for this program.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {course.intakes?.map((intake) => {
+                  const sel = selectedIntakeId === intake.intake_id;
+                  return (
+                    <label
+                      key={intake.intake_id}
+                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                        sel
+                          ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="intake"
+                        value={intake.intake_id}
+                        checked={sel}
+                        onChange={() => setSelectedIntakeId(intake.intake_id)}
+                        className="h-4 w-4 text-brand-500 focus:ring-brand-500 border-gray-300"
+                      />
+                      <span className={`text-sm font-medium ${sel ? 'text-brand-700 dark:text-brand-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                        {intake.intake_name} {intake.intake_year}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Portal Credentials */}
+          <div>
+            <p className="text-sm font-semibold text-gray-800 dark:text-white mb-2">
+              Portal Credentials <span className="text-xs font-normal text-gray-400">(optional)</span>
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Login / Username</label>
                 <input
                   type="text"
                   value={appLogin}
                   onChange={(e) => setAppLogin(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                  placeholder="Enter application login"
+                  placeholder="Enter login"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300"
                 />
               </div>
-              
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Application Password
-                </label>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Password</label>
                 <input
                   type="text"
                   value={appPassword}
                   onChange={(e) => setAppPassword(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                  placeholder="Enter application password"
+                  placeholder="Enter password"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300"
                 />
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 mt-6">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={loading || !hasIntakes || selectedIntakeId === 0}
-              className="flex-1 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-green-500/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Applying...
-                </>
-              ) : (
-                'Confirm Application'
-              )}
-            </button>
-          </div>
+        {/* Sticky Footer */}
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0 bg-white dark:bg-gray-900 rounded-b-2xl">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(selectedIntakeId, appLogin, appPassword)}
+            disabled={loading || !hasIntakes || selectedIntakeId === 0}
+            className="flex-1 px-4 py-2.5 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Submitting...
+              </>
+            ) : 'Confirm Application'}
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
-// Success/Error Alert Component
+// ─── Alert Modal ────────────────────────────────────────────────────────────────
+
 interface AlertModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -836,328 +522,199 @@ interface AlertModalProps {
 
 const AlertModal: React.FC<AlertModalProps> = ({ isOpen, onClose, type, message }) => {
   if (!isOpen) return null;
-
+  const isSuccess = type === 'success';
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-md">
-        <div className="p-6">
-          <div className={`flex items-center justify-center w-12 h-12 rounded-full mx-auto mb-4 ${
-            type === 'success' ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900'
-          }`}>
-            {type === 'success' ? (
-              <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            )}
-          </div>
-          <h3 className={`text-lg font-semibold text-center mb-2 ${
-            type === 'success' ? 'text-green-800 dark:text-green-400' : 'text-red-800 dark:text-red-400'
-          }`}>
-            {type === 'success' ? 'Application Submitted!' : 'Application Failed'}
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-4">
-            {message}
-          </p>
-          <button
-            onClick={onClose}
-            className={`w-full px-4 py-2 text-sm text-white rounded-lg ${
-              type === 'success' 
-                ? 'bg-green-600 hover:bg-green-700' 
-                : 'bg-red-600 hover:bg-red-700'
-            } focus:outline-hidden focus:ring-2 focus:ring-opacity-50`}
-          >
-            Close
-          </button>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-99999 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl p-6 text-center">
+        <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${isSuccess ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+          {isSuccess ? (
+            <svg className="w-7 h-7 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-7 h-7 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )}
         </div>
+        <h3 className={`text-lg font-semibold mb-2 ${isSuccess ? 'text-green-800 dark:text-green-400' : 'text-red-800 dark:text-red-400'}`}>
+          {isSuccess ? 'Application Submitted!' : 'Application Failed'}
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">{message}</p>
+        <button
+          onClick={onClose}
+          className={`w-full py-2.5 text-sm font-medium text-white rounded-xl ${isSuccess ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} transition-colors`}
+        >
+          Close
+        </button>
       </div>
     </div>
   );
 };
 
-// Course Card Component
-// Course Card Component
-const CourseCard: React.FC<{ 
-  course: Course;
-  onApply: (course: Course) => void;
-}> = ({ course, onApply }) => {
-  const { token } = useAuth();
-  const [isShortlisted, setIsShortlisted] = useState<boolean>(!!course.is_shortlisted);
-  const [isShortlisting, setIsShortlisting] = useState<boolean>(false);
+// ─── Course Card ────────────────────────────────────────────────────────────────
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 3);
-  };
+const CourseCard: React.FC<{ course: Course; onApply: (course: Course) => void }> = ({ course, onApply }) => {
+  const { token } = useAuth();
+  const [isShortlisted, setIsShortlisted] = useState(!!course.is_shortlisted);
+  const [isShortlisting, setIsShortlisting] = useState(false);
 
   const formatDuration = () => {
-    if (course.duration_min === course.duration_max) {
-      return `${course.duration_min} ${course.duration_unit}`;
-    }
-    return `${course.duration_min} - ${course.duration_max} ${course.duration_unit}`;
+    if (course.duration_min === course.duration_max) return `${course.duration_min} ${course.duration_unit}`;
+    return `${course.duration_min}–${course.duration_max} ${course.duration_unit}`;
   };
 
   const formatFee = (fee: string, currency: string) => {
-    if (!fee || fee === "0.00") return "N/A";
+    if (!fee || fee === '0.00') return 'N/A';
     return `${currency} ${parseFloat(fee).toLocaleString()}`;
   };
 
-  // Handle shortlist toggle
   const handleShortlist = async () => {
     if (!token || isShortlisting) return;
-
     setIsShortlisting(true);
     try {
       if (isShortlisted) {
-        // Remove from shortlist
-        const response = await fetch(`${BASE_URL}/student/shortlist/courses/${course.id}`, {
+        const res = await fetch(`${BASE_URL}/student/shortlist/courses/${course.id}`, {
           method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          }
+          headers: { Authorization: `Bearer ${token}` },
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to remove from shortlist');
-        }
-
-        const result = await response.json();
-        if (result.success) {
-          setIsShortlisted(false);
-        } else {
-          throw new Error(result.message || 'Failed to remove from shortlist');
-        }
+        if ((await res.json()).success) setIsShortlisted(false);
       } else {
-        // Add to shortlist
-        const response = await fetch(`${BASE_URL}/student/shortlist/courses`, {
+        const res = await fetch(`${BASE_URL}/student/shortlist/courses`, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            course_id: course.id
-          })
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ course_id: course.id }),
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to add to shortlist');
-        }
-
-        const result = await response.json();
-        if (result.success) {
-          setIsShortlisted(true);
-        } else {
-          throw new Error(result.message || 'Failed to add to shortlist');
-        }
+        if ((await res.json()).success) setIsShortlisted(true);
       }
-    } catch (error) {
-      console.error('Error toggling shortlist:', error);
-      // You could add a toast notification here
-      alert(error instanceof Error ? error.message : 'Failed to update shortlist');
-    } finally {
-      setIsShortlisting(false);
-    }
+    } catch { /* silent */ }
+    finally { setIsShortlisting(false); }
   };
 
+  const InfoRow = ({ icon: Icon, label, value }: { icon: React.FC<any>; label: string; value: React.ReactNode }) => (
+    <div className="flex items-start gap-2 text-sm">
+      <Icon size={16} className="text-gray-400 mt-0.5 shrink-0" />
+      <div>
+        <span className="text-gray-500 dark:text-gray-400">{label}</span>
+        <span className="block font-semibold text-gray-800 dark:text-white">{value}</span>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-md p-5 border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-shadow duration-300">
-  {/* Top Section */}
-  <div className="flex items-start justify-between">
-    {/* University Info */}
-    <div className="flex items-start">
-      <div className="flex shrink-0 justify-center items-center">
-        {course.university_logo_url ? (
-          <Image 
-            src={course.university_logo_url} 
-            alt={`${course.university_name} logo`}
-            height={120}
-            width={120}
-            className="rounded-lg object-contain"
-            priority={true}
-          />
-        ) : (
-          <div className="w-28 h-28 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-            {getInitials(course.university_name)}
+    <div className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200 flex flex-col">
+      <div className="p-5 flex-1">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-start gap-3">
+            {course.university_logo_url ? (
+              <Image
+                src={course.university_logo_url}
+                alt={course.university_name}
+                height={52}
+                width={52}
+                className="rounded-xl object-contain shrink-0 border border-gray-100 dark:border-gray-700"
+                priority
+              />
+            ) : (
+              <div className="w-[52px] h-[52px] bg-linear-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0">
+                {course.university_name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+              </div>
+            )}
+            <div>
+              <h2 className="text-base font-semibold text-gray-800 dark:text-white leading-tight line-clamp-2">
+                {course.course_name}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{course.university_name}</p>
+              {course.is_popular === 1 && (
+                <Badge size="sm" color="warning" className="mt-1">
+                  <Star size={11} className="mr-1" /> Popular
+                </Badge>
+              )}
+            </div>
           </div>
-        )}
-      </div>
-      <div className="ml-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white leading-tight">
-          {course.course_name}
-        </h2>
-        <p className="text-base font-medium text-gray-600 dark:text-gray-300 mt-1">
-          {course.university_name}
-        </p>
-        {course.is_popular === 1 && (
-          <div className="mt-2">
-            <Badge size="sm" color="warning">
-              <Star size={12} className="mr-1" />
-              Popular
-            </Badge>
-          </div>
-        )}
-      </div>
-    </div>
-    
-    {/* Shortlist Button */}
-    <button
-      onClick={handleShortlist}
-      disabled={isShortlisting}
-      className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      title={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
-    >
-      {isShortlisting ? (
-        <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-      ) : isShortlisted ? (
-        <Heart size={20} className="fill-red-500 text-red-500" />
-      ) : (
-        <Heart size={20} className="text-gray-400 hover:text-red-500" />
-      )}
-    </button>
-  </div>
-
-  <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4 space-y-3">
-    {/* Degree */}
-    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-      <GraduationCap size={18}/>
-      <div>
-        <span className="block">Study Level</span>
-        <strong className="block font-semibold text-gray-800 dark:text-white">{course.study_level_name}</strong>
-      </div>
-    </div>
-
-    {/* Duration */}
-    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-      <DockIcon size={18}/>
-      <div>
-        <span className="block">Duration</span>
-        <strong className="block font-semibold text-gray-800 dark:text-white">{formatDuration()}</strong>
-      </div>
-    </div>
-
-    {/* Fees */}
-    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-      <DollarSign size={18}/>
-      <div>
-        <span className="block">Fees</span>
-        <div className="space-y-1">
-          <strong className="block font-semibold text-gray-800 dark:text-white">
-            Tuition: {formatFee(course.tuition_fee, course.currency_code)}
-          </strong>
-          <strong className="block font-semibold text-gray-800 dark:text-white">
-            Application: {formatFee(course.application_fee, course.currency_code)}
-          </strong>
+          <button
+            onClick={handleShortlist}
+            disabled={isShortlisting}
+            title={isShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
+            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0 disabled:opacity-50"
+          >
+            {isShortlisting ? (
+              <svg className="animate-spin h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            ) : (
+              <Heart size={19} className={isShortlisted ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-400'} />
+            )}
+          </button>
         </div>
+
+        {/* Details */}
+        <div className="border-t border-gray-100 dark:border-gray-700 pt-4 space-y-2.5">
+          <InfoRow icon={GraduationCap} label="Study Level" value={course.study_level_name} />
+          <InfoRow icon={DockIcon} label="Duration" value={formatDuration()} />
+          <InfoRow icon={DollarSign} label="Fees" value={
+            <span className="space-y-0.5">
+              <span className="block">Tuition: {formatFee(course.tuition_fee, course.currency_code)}</span>
+              <span className="block">Application: {formatFee(course.application_fee, course.currency_code)}</span>
+            </span>
+          } />
+          <InfoRow icon={Book} label="Discipline" value={course.discipline_name} />
+          <InfoRow icon={Building2} label="Location" value={`${getCountryName(course.country_code)}${course.state_code ? `, ${getStateName(course.state_code)}` : ''}`} />
+        </div>
+
+        {/* Entry Requirements */}
+        {(course.ielts_score || course.pte_score || course.toefl_score || course.duolingo_score || course.gre_score || course.gmat_score) && (
+          <div className="mt-4">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Entry Requirements</p>
+            <div className="flex flex-wrap gap-1.5">
+              {course.ielts_score && <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-full font-medium">IELTS {course.ielts_score}</span>}
+              {course.pte_score && <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-full font-medium">PTE {course.pte_score}</span>}
+              {course.toefl_score && <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-full font-medium">TOEFL {course.toefl_score}</span>}
+              {course.duolingo_score && <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-full font-medium">Duolingo {course.duolingo_score}</span>}
+              {course.gre_score && <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-full font-medium">GRE {course.gre_score}</span>}
+              {course.gmat_score && <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-full font-medium">GMAT {course.gmat_score}</span>}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Card Footer */}
+      <div className="flex gap-2 p-4 border-t border-gray-100 dark:border-gray-700">
+        <Link
+          href={`/student/courses/${course.id}`}
+          className="flex-1 text-center text-sm font-semibold py-2 rounded-xl bg-brand-50 hover:bg-brand-100 dark:bg-brand-900/20 dark:hover:bg-brand-900/40 text-brand-600 dark:text-brand-400 transition-colors"
+        >
+          View Details
+        </Link>
+        <button
+          onClick={() => onApply(course)}
+          className="flex-1 text-sm font-semibold py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white transition-colors"
+        >
+          Apply Now
+        </button>
       </div>
     </div>
-
-    {/* Discipline */}
-    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-      <Book size={18}/>
-      <div>
-        <span className="block">Discipline</span>
-        <strong className="block font-semibold text-gray-800 dark:text-white">{course.discipline_name}</strong>
-      </div>
-    </div>
-
-    {/* Location */}
-    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-      <Building2 size={18}/>
-      <div>
-        <span className="block">Location</span>
-        <strong className="block font-semibold text-gray-800 dark:text-white">
-          {getCountryName(course.country_code)}, {getStateName(course.state_code)}
-        </strong>
-      </div>
-    </div>
-  </div>
-
-  {/* Entry Requirements */}
-  <div className="mt-5">
-    <h3 className="text-sm font-semibold text-gray-800 dark:text-white mb-2">
-      ENTRY REQUIREMENTS
-    </h3>
-    <div className="flex gap-2 flex-wrap">
-      {course.ielts_score && (
-        <span className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full font-semibold text-gray-700 dark:text-gray-300">
-          IELTS: <span className="text-gray-900 dark:text-white">{course.ielts_score}</span>
-        </span>
-      )}
-      {course.pte_score && (
-        <span className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full font-semibold text-gray-700 dark:text-gray-300">
-          PTE: <span className="text-gray-900 dark:text-white">{course.pte_score}</span>
-        </span>
-      )}
-      {course.duolingo_score && (
-        <span className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full font-semibold text-gray-700 dark:text-gray-300">
-          Duolingo: <span className="text-gray-900 dark:text-white">{course.duolingo_score}</span>
-        </span>
-      )}
-      {course.toefl_score && (
-        <span className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full font-semibold text-gray-700 dark:text-gray-300">
-          TOEFL: <span className="text-gray-900 dark:text-white">{course.toefl_score}</span>
-        </span>
-      )}
-      {course.gre_score && (
-        <span className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full font-semibold text-gray-700 dark:text-gray-300">
-          GRE: <span className="text-gray-900 dark:text-white">{course.gre_score}</span>
-        </span>
-      )}
-      {course.gmat_score && (
-        <span className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full font-semibold text-gray-700 dark:text-gray-300">
-          GMAT: <span className="text-gray-900 dark:text-white">{course.gmat_score}</span>
-        </span>
-      )}
-    </div>
-  </div>
-
-  {/* Buttons */}
-  <div className="mt-6 flex gap-3">
-    <Link
-      href={`/student/courses/${course.id}`}
-      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-center dark:bg-indigo-700 dark:hover:bg-indigo-600 text-white font-semibold py-2 rounded-lg text-sm transition-all"
-    >
-      View Course Details
-    </Link>
-    <button
-      onClick={() => onApply(course)}
-      className="flex-1 bg-green-600 hover:bg-green-700 text-center dark:bg-green-700 dark:hover:bg-green-600 text-white font-semibold py-2 rounded-lg text-sm transition-all"
-    >
-      Apply Now
-    </button>
-  </div>
-</div>
   );
 };
-const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+
+// ─── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function StudentProgramsPage() {
   const router = useRouter();
   const { token, logout, user } = useAuth();
   const studentId = user?.id;
+
   const [courses, setCourses] = useState<Course[]>([]);
   const [filtersData, setFiltersData] = useState<FiltersData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingFilters, setLoadingFilters] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
-  
-  // Application states
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
@@ -1165,324 +722,178 @@ export default function StudentProgramsPage() {
   const [alertMessage, setAlertMessage] = useState('');
   const [isApplying, setIsApplying] = useState(false);
 
-    const [students, setStudents] = useState<Student[]>([]);
-    const [isFetchingStudents, setIsFetchingStudents] = useState(false);
-    const [studentError, setStudentError] = useState<string | null>(null);
-
-    
-    
-    
-
-  // Filters for Student Portal - Updated to use arrays
   const [filters, setFilters] = useState<FilterOptions>({
-    disciplines: [],
-    studyLevels: [],
-    universities: [],
-    countries: [],
-    states: [],
-    cities: [],
-    intakes: [],
-    intakeYears: [],
+    disciplines: [], studyLevels: [], universities: [], countries: [], states: [], cities: [], intakes: [], intakeYears: [],
   });
-
-  // Track modal filters separately
   const [modalFilters, setModalFilters] = useState<FilterOptions>(filters);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [hasMore, setHasMore] = useState<boolean>(true);
-  const [totalRecords, setTotalRecords] = useState<number>(0);
-  const [totalPages, setTotalPages] = useState<number>(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const observerRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Build query string for dynamic filters API
-  const buildFilterQueryString = useCallback((filtersToBuild: FilterOptions) => {
+  // ── Query builders ──────────────────────────────────────────────────────────
+
+  const buildFilterQueryString = useCallback((f: FilterOptions, extra?: { search?: string }) => {
     const params = new URLSearchParams();
-    
-    // Add all array filters (multiple params with same key)
-    Object.entries(filtersToBuild).forEach(([key, value]) => {
-      if (Array.isArray(value) && value.length > 0) {
-        value.forEach((val) => {
-          if (key === "studyLevels") {
-            params.append("study_level_id", val.toString());
-          } else if (key === "disciplines") {
-            params.append("discipline_id", val.toString());
-          } else if (key === "universities") {
-            params.append("university_id", val.toString());
-          } else if (key === "countries") {
-            params.append("country_code", val.toString());
-          } else if (key === "states") {
-            params.append("state_code", val.toString());
-          } else if (key === "cities") {
-            params.append("city_code", val.toString());
-          } else if (key === "intakes") {
-            if(val == 0 || !val || val == ""){
-              params.append("intake_id", "");
-            }else{
-              params.append("intake_id", val.toString());
-            }
-          } else if (key === "intakeYears") {
-            params.append("intake_year", val.toString());
-          } else {
-            params.append(key, val.toString());
-          }
-        });
-      }
+    const map: Record<string, string> = {
+      studyLevels: 'study_level_id', disciplines: 'discipline_id', universities: 'university_id',
+      countries: 'country_code', states: 'state_code', cities: 'city_code',
+      intakes: 'intake_id', intakeYears: 'intake_year',
+    };
+    Object.entries(f).forEach(([key, values]) => {
+      if (Array.isArray(values)) values.forEach(v => v !== '' && params.append(map[key] ?? key, String(v)));
     });
-    
+    if (extra?.search) params.append('search', extra.search);
     return params.toString();
   }, []);
 
-  // Fetch filter options from API
-  const fetchFilters = useCallback(async (currentModalFilters?: FilterOptions) => {
+  const buildCoursesQueryString = useCallback((page: number, f: FilterOptions, search: string) => {
+    const qs = buildFilterQueryString(f, { search });
+    const params = new URLSearchParams(qs);
+    params.set('page', String(page));
+    params.set('limit', '10');
+    return params.toString();
+  }, [buildFilterQueryString]);
+
+  // ── Fetch helpers ───────────────────────────────────────────────────────────
+
+  const fetchFilters = useCallback(async (currentFilters?: FilterOptions) => {
     try {
       setLoadingFilters(true);
-      const filtersToUse = currentModalFilters || filters;
-      const queryString = buildFilterQueryString(filtersToUse);
-      const url = `${BASE_URL}/student/course/filters/dynamic${queryString ? `?${queryString}` : ''}`;
-      
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
+      const qs = buildFilterQueryString(currentFilters ?? filters);
+      const res = await fetch(`${BASE_URL}/student/course/filters/dynamic${qs ? `?${qs}` : ''}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (!response.ok) {
-        if (response.status === 403) {
-          logout("student");
-          return;
-        }
-        throw new Error('Failed to fetch filter options');
-      }
-
-      const data = await response.json();
-      
-      if (data.success) {
-        setFiltersData(data.data.filters);
-      } else {
-        throw new Error('Failed to load filter options');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoadingFilters(false);
-    }
+      if (res.status === 403) { logout('student'); return; }
+      const data = await res.json();
+      if (data.success) setFiltersData(data.data.filters);
+    } catch { /* silent */ }
+    finally { setLoadingFilters(false); }
   }, [token, logout, buildFilterQueryString, filters]);
 
-// Build query string for courses API
-const buildCoursesQueryString = useCallback((page: number = 1, filtersToBuild: FilterOptions) => {
-  const params = new URLSearchParams();
-  
-  // Add page parameter
-  params.append('page', page.toString());
-  params.append('limit', '10');
-  
-  // Add all array filters (multiple params with same key)
-  Object.entries(filtersToBuild).forEach(([key, value]) => {
-    if (Array.isArray(value) && value.length > 0) {
-      value.forEach((val) => {
-        // Map filter keys to API parameter names
-        let paramKey = key;
-        if (key === 'studyLevels') paramKey = 'study_level_id';
-        else if (key === 'disciplines') paramKey = 'discipline_id';
-        else if (key === 'universities') paramKey = 'university_id';
-        else if (key === 'countries') paramKey = 'country_code';
-        else if (key === 'states') paramKey = 'state_code';
-        else if (key === 'cities') paramKey = 'city_code';
-        else if (key === 'intakes') paramKey = 'intake_id';
-        else if (key === 'intakeYears') paramKey = 'intake_year';
-        
-        params.append(paramKey, val.toString());
-      });
-    }
-  });
-  
-  // Add search term
-  if (searchTerm) {
-    params.append('search', searchTerm);
-  }
-  
-  return params.toString();
-}, [searchTerm]);
-
-  // Fetch courses from API
-  const fetchCourses = useCallback(async (page: number = 1, loadMore: boolean = false, filtersToUse?: FilterOptions) => {
+  const fetchCourses = useCallback(async (page: number, loadMore: boolean, f: FilterOptions, search: string) => {
     try {
-      if (loadMore) {
-        setIsLoadingMore(true);
-      } else {
-        setLoading(true);
-      }
-      
-      const filtersToApply = filtersToUse || filters;
-      const queryString = buildCoursesQueryString(page, filtersToApply);
-      const url = `${BASE_URL}/student/courses${queryString ? `?${queryString}` : ''}`;
-      
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
+      loadMore ? setIsLoadingMore(true) : setLoading(true);
+      const qs = buildCoursesQueryString(page, f, search);
+      const res = await fetch(`${BASE_URL}/student/courses?${qs}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (!response.ok) {
-        if (response.status === 403) {
-          logout("student");
-          return;
-        }
-        throw new Error('Failed to fetch courses');
-      }
-
-      const data = await response.json();
-      
+      if (res.status === 403) { logout('student'); return; }
+      const data = await res.json();
       if (data.success) {
-        if (loadMore) {
-          // Append new data for infinite scroll
-          setCourses(prev => [...prev, ...data.data]);
-        } else {
-          // Replace data for initial load or filter change
-          setCourses(data.data);
-        }
-        setCurrentPage(data.page || 1);
-        setHasMore(data.hasNextPage || false);
-        setTotalRecords(data.total || 0);
-        setTotalPages(data.totalPages || 1);
-      } else {
-        throw new Error('Failed to load courses');
+        setCourses(prev => loadMore ? [...prev, ...data.data] : data.data);
+        setCurrentPage(data.page ?? 1);
+        setHasMore(data.hasNextPage ?? false);
+        setTotalRecords(data.total ?? 0);
+        setTotalPages(data.totalPages ?? 1);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-      setIsLoadingMore(false);
-    }
-  }, [token, logout, buildCoursesQueryString, filters]);
+    } catch { /* silent */ }
+    finally { setLoading(false); setIsLoadingMore(false); }
+  }, [token, logout, buildCoursesQueryString]);
 
-  // Initial fetch of filters and courses
+  // ── Effects ─────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     fetchFilters();
-    fetchCourses(1, false, filters);
+    fetchCourses(1, false, filters, '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle search with debounce
   useEffect(() => {
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
-
-    const timeout = setTimeout(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
       setCurrentPage(1);
-      fetchCourses(1, false, filters);
-    }, 500); // 500ms debounce
-
-    setSearchTimeout(timeout);
-
-    return () => {
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-    };
+      fetchCourses(1, false, filters, searchTerm);
+    }, 500);
+    return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
   }, [searchTerm]);
 
-  // Handle modal filters change - refetch dynamic filters
-  const handleModalFiltersChange = useCallback((newModalFilters: FilterOptions) => {
-    setModalFilters(newModalFilters);
-    // Refetch filters with new modal filters
-    fetchFilters(newModalFilters);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !isLoadingMore) {
+          fetchCourses(currentPage + 1, true, filters, searchTerm);
+        }
+      },
+      { threshold: 0.5 },
+    );
+    if (observerRef.current) observer.observe(observerRef.current);
+    return () => { if (observerRef.current) observer.unobserve(observerRef.current); };
+  }, [hasMore, loading, isLoadingMore, currentPage, fetchCourses, filters, searchTerm]);
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
+  const handleModalFiltersChange = useCallback((newFilters: FilterOptions) => {
+    setModalFilters(newFilters);
+    fetchFilters(newFilters);
   }, [fetchFilters]);
 
-  // Handle filter apply from modal
   const handleFilterApply = (newFilters: FilterOptions) => {
-    // Update the main filters
     setFilters(newFilters);
     setModalFilters(newFilters);
-    
-    // Reset pagination and fetch courses with new filters
     setCurrentPage(1);
-    fetchCourses(1, false, newFilters);
-    
-    // Close modal
+    fetchCourses(1, false, newFilters, searchTerm);
     setIsFilterModalOpen(false);
   };
 
-  // Reset modal filters when modal opens
   const handleModalOpen = () => {
     setModalFilters(filters);
     setIsFilterModalOpen(true);
   };
 
-  // Intersection Observer for infinite scroll
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading && !isLoadingMore) {
-          fetchCourses(currentPage + 1, true, filters);
-        }
-      },
-      { threshold: 0.5 }
-    );
-
-    if (observerRef.current) {
-      observer.observe(observerRef.current);
+  const handleRemoveFilter = (key: keyof FilterOptions, value?: number | string) => {
+    const newFilters = { ...filters };
+    if (value !== undefined) {
+      (newFilters[key] as (number | string)[]) = (filters[key] as (number | string)[]).filter(v => v !== value);
+    } else {
+      (newFilters[key] as any) = [];
     }
+    setFilters(newFilters);
+    setModalFilters(newFilters);
+    setCurrentPage(1);
+    fetchCourses(1, false, newFilters, searchTerm);
+  };
 
-    return () => {
-      if (observerRef.current) {
-        observer.unobserve(observerRef.current);
-      }
-    };
-  }, [hasMore, loading, isLoadingMore, currentPage, fetchCourses]);
+  const clearAllFilters = () => {
+    const reset: FilterOptions = { disciplines: [], studyLevels: [], universities: [], countries: [], states: [], cities: [], intakes: [], intakeYears: [] };
+    setFilters(reset);
+    setModalFilters(reset);
+    setCurrentPage(1);
+    fetchCourses(1, false, reset, searchTerm);
+  };
 
-
-  // Handle Apply button click
-  const handleApplyClick = async (course: Course) => {
-   
+  const handleApplyClick = (course: Course) => {
     setSelectedCourse(course);
     setIsConfirmModalOpen(true);
   };
 
-  // Handle application submission
-  const handleConfirmApplication = async ( intakeId: number, appLogin: string, appPassword: string) => {
+  const handleConfirmApplication = async (intakeId: number, appLogin: string, appPassword: string) => {
     if (!selectedCourse) return;
-
     setIsApplying(true);
     try {
-      const payload = {
-        course_id: selectedCourse.id,
-        university_id: selectedCourse.university_id,
-        study_level_id: selectedCourse.study_level_id,
-        remarks: "Student wants to apply for this course",
-        course_intake_id: intakeId,
-        student_user_id: studentId,
-        application_login: appLogin,  
-        application_password: appPassword
-      };
-
-      const response = await fetch(`${BASE_URL}/student/application`, {
+      const res = await fetch(`${BASE_URL}/student/application`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          course_id: selectedCourse.id,
+          university_id: selectedCourse.university_id,
+          study_level_id: selectedCourse.study_level_id,
+          course_intake_id: intakeId,
+          student_user_id: studentId,
+          application_login: appLogin,
+          application_password: appPassword,
+          remarks: 'Student wants to apply for this course',
+        }),
       });
-
-      // if (!response.ok) {
-      //   throw new Error('Failed to submit application');
-      // }
-
-      const result = await response.json();
-      
-
+      const result = await res.json();
       if (result.success) {
         const app_id = result.application_id;
         setAlertType('success');
         setAlertMessage(`Your application for ${selectedCourse.course_name} at ${selectedCourse.university_name} has been submitted successfully!`);
-
-        setTimeout(()=>{
-          router.push(`/student/editProfile?tab=applications&app=${app_id}`);
-        },2000)
+        setTimeout(() => router.push(`/student/editProfile?tab=applications&app=${app_id}`), 2000);
       } else {
         throw new Error(result.message || 'Application failed');
       }
@@ -1496,101 +907,37 @@ const buildCoursesQueryString = useCallback((page: number = 1, filtersToBuild: F
     }
   };
 
-  // Close alert modal
-  const handleCloseAlert = () => {
-    setIsAlertModalOpen(false);
-    setSelectedCourse(null);
-  };
+  // ── Derived ─────────────────────────────────────────────────────────────────
 
-  // Handle remove filter
-  const handleRemoveFilter = (key: keyof FilterOptions, value?: number | string) => {
-    const newFilters = { ...filters };
-    
-    if (value) {
-      // Remove specific value from array
-      const array = newFilters[key] as (number | string)[];
-      newFilters[key] = array.filter(item => item !== value) as any;
-    } else {
-      // Clear entire array
-      newFilters[key] = [] as any;
-    }
-    
-    setFilters(newFilters);
-    setModalFilters(newFilters);
-    setCurrentPage(1);
-    fetchCourses(1, false, newFilters);
-  };
+  const hasActiveFilters = Object.values(filters).some(v => Array.isArray(v) && v.length > 0);
+  const filterCount = Object.values(filters).reduce((s, v) => s + (Array.isArray(v) ? v.length : 0), 0);
 
-  const clearAllFilters = () => {
-    const resetFilters: FilterOptions = {
-      disciplines: [],
-      studyLevels: [],
-      universities: [],
-      countries: [],
-      states: [],
-      cities: [],
-      intakes: [],
-      intakeYears: [],
-    };
-    setFilters(resetFilters);
-    setModalFilters(resetFilters);
-    setCurrentPage(1);
-    fetchCourses(1, false, resetFilters);
-  };
-
-  const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
-    return Array.isArray(value) && value.length > 0 && key !== 'search';
-  });
-
-  // Get filter display name
-  const getFilterDisplayName = (key: keyof FilterOptions, value: number | string) => {
+  const getFilterDisplayName = (key: keyof FilterOptions, value: number | string): string => {
     if (!filtersData) return '';
-    
     switch (key) {
-      case 'studyLevels':
-        const level = filtersData.studyLevels.find(opt => opt.id === value);
-        return level?.name || '';
-      case 'disciplines':
-        const discipline = filtersData.disciplines.find(opt => opt.id === value);
-        return discipline?.name || '';
-      case 'universities':
-        const university = filtersData.universities.find(opt => opt.id === value);
-        return university?.university || '';
-      case 'countries':
-        return getCountryName(value.toString());
-      case 'states':
-        return getStateName(value.toString());
-      case 'cities':
-        return value.toString();
-      case 'intakes':
-        const intake = filtersData.intakes.find(opt => opt.id === value);
-        return intake?.intake_name || '';
-      case 'intakeYears':
-        return value.toString();
-      default:
-        return '';
+      case 'studyLevels': return filtersData.studyLevels.find(l => l.id === value)?.name ?? '';
+      case 'disciplines': return filtersData.disciplines.find(d => d.id === value)?.name ?? '';
+      case 'universities': return filtersData.universities.find(u => u.id === value)?.university ?? '';
+      case 'countries': return getCountryName(String(value));
+      case 'states': return String(value);
+      case 'cities': return String(value);
+      case 'intakes': return filtersData.intakes.find(i => i.id === value)?.intake ?? '';
+      case 'intakeYears': return String(value);
+      default: return '';
     }
   };
 
-  // Helper to get filter count
-  const getFilterCount = () => {
-    return Object.values(filters).reduce((total, value) => {
-      if (Array.isArray(value)) {
-        return total + value.length;
-      }
-      return total;
-    }, 0);
-  };
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   if (loading && !isLoadingMore) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex items-center justify-center py-16">
         <div className="text-center">
-          <svg className="animate-spin h-8 w-8 text-brand-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          <svg className="animate-spin h-8 w-8 text-brand-500 mx-auto" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading programs...</p>
+          <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">Loading programs…</p>
         </div>
       </div>
     );
@@ -1598,17 +945,11 @@ const buildCoursesQueryString = useCallback((page: number = 1, filtersToBuild: F
 
   if (error && currentPage === 1) {
     return (
-      <div className="text-center py-12">
-        <div className="text-red-500 text-lg mb-2">Error loading programs</div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{error}</p>
-        <button 
-          onClick={() => {
-            setError(null);
-            fetchFilters();
-            fetchCourses(1, false, filters);
-          }}
-          className="mt-4 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600"
-        >
+      <div className="text-center py-16">
+        <p className="text-red-500 font-medium mb-1">Error loading programs</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{error}</p>
+        <button onClick={() => { setError(null); fetchFilters(); fetchCourses(1, false, filters, searchTerm); }}
+          className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 text-sm">
           Retry
         </button>
       </div>
@@ -1616,146 +957,122 @@ const buildCoursesQueryString = useCallback((page: number = 1, filtersToBuild: F
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-5">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
-            Browse Programs
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Discover and apply to programs that match your interests
-          </p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Browse Programs</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Discover and apply to programs that match your interests</p>
         </div>
-        
-        {/* Programs Summary */}
-        <div className="flex gap-4 text-sm">
+        <div className="flex gap-6 text-sm shrink-0">
           <div className="text-center">
-            <div className="text-lg font-semibold text-gray-800 dark:text-white">
-              {totalRecords || 0}
-            </div>
-            <div className="text-gray-500 dark:text-gray-400">Total Programs</div>
+            <div className="text-xl font-bold text-gray-800 dark:text-white">{totalRecords}</div>
+            <div className="text-gray-400">Total</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-semibold text-green-600 dark:text-green-400">
-              {courses.filter(course => course.is_popular === 1).length}
-            </div>
-            <div className="text-gray-500 dark:text-gray-400">Popular</div>
+            <div className="text-xl font-bold text-green-600">{courses.filter(c => c.is_popular === 1).length}</div>
+            <div className="text-gray-400">Popular</div>
           </div>
         </div>
       </div>
 
-      {/* Search and Filter Controls */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        
-
-        {/* Filter Button */}
-        <div className="flex items-center gap-3">
-          {hasActiveFilters && (
-            <button
-              onClick={clearAllFilters}
-              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              Clear All
+      {/* Search + Filter Bar */}
+      <div className="flex gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search programs, universities…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 dark:focus:border-brand-700"
+          />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X className="w-4 h-4" />
             </button>
           )}
-          <button
-            onClick={handleModalOpen}
-            disabled={loadingFilters}
-            className="h-11 px-4 rounded-lg border border-gray-200 bg-transparent text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
-            </svg>
-            Filter Programs
-            {hasActiveFilters && (
-              <span className="ml-1 bg-brand-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {getFilterCount()}
-              </span>
-            )}
-          </button>
         </div>
+
+        {hasActiveFilters && (
+          <button onClick={clearAllFilters} className="px-3 py-2 text-sm text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 transition-colors">
+            Clear all
+          </button>
+        )}
+
+        <button
+          onClick={handleModalOpen}
+          disabled={loadingFilters}
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          Filters
+          {filterCount > 0 && (
+            <span className="bg-brand-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{filterCount}</span>
+          )}
+        </button>
       </div>
 
-      {/* Active Filters Display */}
+      {/* Active Filter Chips */}
       {hasActiveFilters && (
-        <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-          {Object.entries(filters).map(([key, values]) => {
-            if (!Array.isArray(values) || values.length === 0) return null;
-            
-            return values.map((value) => {
-              const displayName = getFilterDisplayName(key as keyof FilterOptions, value);
-              if (!displayName) return null;
-              
-              return (
-                <Badge key={`${key}-${value}`} size="sm" color="primary">
-                  {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: {displayName}
-                  <button 
-                    onClick={() => handleRemoveFilter(key as keyof FilterOptions, value)}
-                    className="ml-1 text-xs hover:text-red-500"
-                  >
-                    ×
-                  </button>
-                </Badge>
-              );
-            });
-          })}
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(filters).map(([key, values]) =>
+            Array.isArray(values) && values.length > 0
+              ? values.map(value => {
+                  const label = getFilterDisplayName(key as keyof FilterOptions, value);
+                  if (!label) return null;
+                  return (
+                    <span key={`${key}-${value}`} className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 rounded-full text-xs font-medium">
+                      {label}
+                      <button onClick={() => handleRemoveFilter(key as keyof FilterOptions, value)} className="hover:text-red-500 transition-colors">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  );
+                })
+              : null
+          )}
         </div>
       )}
 
-      {/* Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Course Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {courses.length > 0 ? (
-          courses.map((course) => (
-            <CourseCard 
-              key={course.id} 
-              course={course}
-              onApply={handleApplyClick}
-            />
+          courses.map(course => (
+            <CourseCard key={course.id} course={course} onApply={handleApplyClick} />
           ))
         ) : (
-          <div className="col-span-full text-center py-12">
-            <div className="text-gray-500 dark:text-gray-400 text-lg mb-2">
-              No programs found.
-            </div>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mb-2">
-              {hasActiveFilters ? 'Try adjusting your filters' : 'Start browsing programs'}
+          <div className="col-span-full text-center py-16">
+            <div className="text-gray-400 text-4xl mb-3">🎓</div>
+            <p className="text-gray-600 dark:text-gray-400 font-medium mb-1">No programs found</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500">
+              {hasActiveFilters || searchTerm ? 'Try adjusting your search or filters' : 'No programs are available at the moment'}
             </p>
           </div>
         )}
       </div>
 
-      {/* Loading More Indicator */}
+      {/* Load More Spinner */}
       {isLoadingMore && (
-        <div className="text-center py-4">
-          <div className="inline-block">
-            <svg className="animate-spin h-5 w-5 text-brand-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Loading more programs...</p>
-          </div>
+        <div className="flex justify-center py-4">
+          <svg className="animate-spin h-5 w-5 text-brand-500" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
         </div>
       )}
 
-      {/* Intersection Observer Target */}
-      {hasMore && !isLoadingMore && courses.length > 0 && (
-        <div ref={observerRef} className="h-10"></div>
-      )}
+      {/* Intersection observer target */}
+      {hasMore && !isLoadingMore && courses.length > 0 && <div ref={observerRef} className="h-10" />}
 
-      {/* Results Count */}
+      {/* Results count */}
       {courses.length > 0 && (
-        <div className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-gray-400 dark:text-gray-500 text-center">
           Showing {courses.length} of {totalRecords} programs
-          {totalPages > 1 && (
-            <span className="ml-2">
-              (Page {currentPage} of {totalPages})
-            </span>
-          )}
-        </div>
+        </p>
       )}
 
-      {/* Filter Modal */}
+      {/* Modals */}
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
@@ -1765,35 +1082,17 @@ const buildCoursesQueryString = useCallback((page: number = 1, filtersToBuild: F
         onFiltersChange={handleModalFiltersChange}
       />
 
-      {/* Confirmation Modal */}
-      {/* <ConfirmModal
+      <ConfirmModal
         isOpen={isConfirmModalOpen}
         onClose={() => setIsConfirmModalOpen(false)}
         onConfirm={handleConfirmApplication}
         course={selectedCourse}
         loading={isApplying}
-        students={students}
-        isFetchingStudents={isFetchingStudents}
-        studentError={studentError}
-        courseId={String(selectedCourse?.id)}
-        token={token}
-      /> */}
+      />
 
-      {/* Confirmation Modal */}
-<ConfirmModal
-  isOpen={isConfirmModalOpen}
-  onClose={() => setIsConfirmModalOpen(false)}
-  onConfirm={handleConfirmApplication}
-  course={selectedCourse}
-  loading={isApplying}
-/>
-
-      
-
-      {/* Alert Modal */}
       <AlertModal
         isOpen={isAlertModalOpen}
-        onClose={handleCloseAlert}
+        onClose={() => { setIsAlertModalOpen(false); setSelectedCourse(null); }}
         type={alertType}
         message={alertMessage}
       />

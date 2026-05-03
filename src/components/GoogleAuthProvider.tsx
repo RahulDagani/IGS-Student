@@ -8,7 +8,12 @@ export default function GoogleAuthProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [clientId, setClientId] = useState<string | null>(null);
+  // Use the build-time env var as the initial value so SSR/prerendering always
+  // has a GoogleOAuthProvider in the tree (required by useGoogleLogin).
+  // After hydration we fetch the real client ID from the database and swap it in.
+  const [clientId, setClientId] = useState<string>(
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ""
+  );
 
   useEffect(() => {
     const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
@@ -19,16 +24,8 @@ export default function GoogleAuthProvider({
           setClientId(data.client_id);
         }
       })
-      .catch(() => {
-        // silently fail — Google login button will simply not work
-      });
+      .catch(() => {});
   }, []);
-
-  if (!clientId) {
-    // Render children without the provider while the client ID is loading.
-    // The GoogleLoginButton won't be functional yet but the rest of the page renders normally.
-    return <>{children}</>;
-  }
 
   return (
     <GoogleOAuthProvider clientId={clientId}>

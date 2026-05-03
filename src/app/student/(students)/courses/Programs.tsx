@@ -627,9 +627,11 @@ const CourseCard: React.FC<{ course: Course; onApply: (course: Course) => void }
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{course.university_name}</p>
               {course.is_popular === 1 && (
-                <Badge size="sm" color="warning" className="mt-1">
-                  <Star size={11} className="mr-1" /> Popular
-                </Badge>
+                <div className="mt-1">
+                  <Badge size="sm" color="warning" startIcon={<Star size={11} />}>
+                    Popular
+                  </Badge>
+                </div>
               )}
             </div>
           </div>

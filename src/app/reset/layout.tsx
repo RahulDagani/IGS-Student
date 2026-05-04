@@ -34,7 +34,7 @@ export default function AuthLayout({
                               </div>
                 </Link>
                 <p className="text-center text-gray-400 dark:text-white/60">
-                  One platform to scale your student recruitment network
+                  Track your applications and reach your dream university
                 </p>
               </div>
             </div>

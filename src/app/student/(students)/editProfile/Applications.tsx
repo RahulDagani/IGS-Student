@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getSecureFileUrl } from "@/utils/fileUrl";
+import { openSecureFile } from "@/utils/fileUrl";
 import Programs from '../courses/Programs';
 import { getStateByCodeAndCountry } from 'country-state-city/lib/state';
 import { Country, State } from 'country-state-city';
@@ -626,9 +626,8 @@ const updateCredentials = async () => {
             {message.file_url && (
               <div className="mt-2">
                 <a
-                  href={getSecureFileUrl(message.file_url)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); openSecureFile(message.file_url); }}
                   className="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded border dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   {getFileIcon(message.file)}
@@ -963,9 +962,8 @@ const updateCredentials = async () => {
                               <>
                               <div className="flex items-center gap-2 mb-4">
                                 <a
-                                  href={getSecureFileUrl(doc.file_url)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                  href="#"
+                                  onClick={(e) => { e.preventDefault(); openSecureFile(doc.file_url); }}
                                   className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
                                 >
                                   <Eye size={16} />
@@ -973,8 +971,8 @@ const updateCredentials = async () => {
                                 </a>
                                 <span className="text-gray-400">•</span>
                                 <a
-                                  href={getSecureFileUrl(doc.file_url)}
-                                  download
+                                  href="#"
+                                  onClick={(e) => { e.preventDefault(); openSecureFile(doc.file_url); }}
                                   className="flex items-center gap-2 text-green-600 dark:text-green-400 hover:underline"
                                 >
                                   <Download size={16} />

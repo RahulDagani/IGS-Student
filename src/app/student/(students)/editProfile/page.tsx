@@ -32,7 +32,8 @@ export default function StudentDetailsPage() {
   const activeTabFromUrl = searchParams.get("tab");
 
   const [refreshDocuments, setRefreshDocuments] = useState(0);
-  
+  const [refreshProfile, setRefreshProfile] = useState(0);
+
   const { token } = useAuth();
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
@@ -43,6 +44,10 @@ export default function StudentDetailsPage() {
   useEffect(() => {
     fetchStudentDetails();
   }, [refreshDocuments]);
+
+  useEffect(() => {
+    fetchStudentDetails();
+  }, [refreshProfile]);
 
   useEffect(() => {
       if (activeTabFromUrl) {
@@ -305,7 +310,7 @@ export default function StudentDetailsPage() {
       <div className="tab-content mt-6">
         {/* Profile Tab */}
         {activeTab === "profile" && (
-         <ProfileForm />
+         <ProfileForm onProfileSave={() => setRefreshProfile(prev => prev + 1)} />
         )}
 
         {/* Applications Tab */}

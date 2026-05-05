@@ -197,7 +197,7 @@ const PhoneInput = ({
   );
 };
 
-export default function ProfileForm() {
+export default function ProfileForm({ onProfileSave }: { onProfileSave?: () => void }) {
   const router = useRouter();
   const [activeMainTab, setActiveMainTab] = useState<string>("profile");
   const [isLoading, setIsLoading] = useState(true);
@@ -523,6 +523,8 @@ const [selectedEmergencyPhoneCountry, setSelectedEmergencyPhoneCountry] = useSta
           ...prev,
           [sectionId]: { isSaving: false, message: 'Saved successfully!', messageType: 'success' }
         }));
+
+        onProfileSave?.();
 
         if (nextSectionId) {
           setTimeout(() => {

@@ -359,13 +359,14 @@ const [selectedEmergencyPhoneCountry, setSelectedEmergencyPhoneCountry] = useSta
   const isSectionComplete = (sectionId: string): boolean => {
     switch (sectionId) {
       case "personal":
-        return !!(formData.salutation && 
-                 formData.first_name.trim() && 
-                 formData.last_name.trim() && 
-                 formData.email.trim() && 
+        return !!(formData.salutation &&
+                 formData.first_name.trim() &&
+                 formData.last_name.trim() &&
+                 formData.email.trim() &&
                  /^\S+@\S+\.\S+$/.test(formData.email) &&
-                 formData.phone.trim() && 
-                 formData.dob && 
+                 formData.phone.trim() &&
+                 formData.passport_number.trim() &&
+                 formData.dob &&
                  formData.gender);
                  
       case "address":
@@ -398,6 +399,7 @@ const [selectedEmergencyPhoneCountry, setSelectedEmergencyPhoneCountry] = useSta
         if (!formData.email.trim()) errors.email = "Email is required";
         else if (!/^\S+@\S+\.\S+$/.test(formData.email)) errors.email = "Invalid email format";
         if (!formData.phone.trim()) errors.phone = "Phone number is required";
+        if (!formData.passport_number.trim()) errors.passport_number = "Passport number is required";
         if (!formData.dob) errors.dob = "Date of birth is required";
         if (!formData.gender) errors.gender = "Gender is required";
         break;
@@ -867,7 +869,7 @@ const handleEmergencyPhoneCountryChange = (country: Country) => {
         {/* Passport Number */}
         <div>
           <label htmlFor="passport_number" className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-            Passport Number
+            Passport Number *
           </label>
           <input
             type="text"
@@ -876,8 +878,12 @@ const handleEmergencyPhoneCountryChange = (country: Country) => {
             value={formData.passport_number}
             onChange={handleInputChange}
             placeholder="Enter your passport number"
-            className="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+            required
+            className={`dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border bg-transparent px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 ${
+              fieldErrors.passport_number ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
+            }`}
           />
+          {fieldErrors.passport_number && <p className="mt-1 text-sm text-red-500">{fieldErrors.passport_number}</p>}
         </div>
       </div>
     </div>

@@ -289,7 +289,7 @@ export default function StudentDetailsPage() {
                 
                  <span className="flex justify-center items-center">
                   <span>Documents</span> 
-                  <span className="num ml-1 bg-red-700 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                  <span className={`num ml-1 ${student.total_pending_documents > 0 ? 'bg-red-700' : 'bg-green-500'} text-white rounded-full w-4 h-4 flex items-center justify-center text-xs`}>
                       {student.total_pending_documents}
                     </span>
                   </span>

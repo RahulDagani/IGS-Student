@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useParams ,useSearchParams} from "next/navigation";
 
 
-import { User, Calendar, Phone, Mail, MapPin, Globe, Users, Plus, AlertTriangle, Award, BookOpen, ChevronDown, ChevronUp, Briefcase, GraduationCap, Sparkles } from "lucide-react";
+import { User, Calendar, Mail, MapPin, Globe, Users, AlertTriangle, Award, BookOpen, ChevronDown, ChevronUp, Briefcase, GraduationCap, Sparkles, CheckCircle, XCircle } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { Country, State, City } from "country-state-city";
@@ -51,6 +51,12 @@ interface FormSection {
   icon: React.ComponentType<any>;
   description?: string;
   completed: boolean;
+}
+
+interface SectionStatus {
+  isSaving: boolean;
+  message: string;
+  messageType: string;
 }
 
 // Types for country data
@@ -194,7 +200,6 @@ const PhoneInput = ({
 export default function ProfileForm() {
   const router = useRouter();
   const [activeMainTab, setActiveMainTab] = useState<string>("profile");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const { token } = useAuth();
 
@@ -242,8 +247,12 @@ export default function ProfileForm() {
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [selectedState, setSelectedState] = useState<string>("");
   const [error, setError] = useState<string>("");
-  const [validationMessage, setValidationMessage] = useState<string>("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [sectionStatus, setSectionStatus] = useState<Record<string, SectionStatus>>({
+    personal: { isSaving: false, message: '', messageType: '' },
+    address: { isSaving: false, message: '', messageType: '' },
+    emergency: { isSaving: false, message: '', messageType: '' },
+  });
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     personal: true,
     address: false,
@@ -256,16 +265,11 @@ const [selectedEmergencyPhoneCountry, setSelectedEmergencyPhoneCountry] = useSta
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
     useEffect(()=> {
-      window.scrollTo({
-          top: 0,
-          behavior: 'smooth'
-        });
-  
-        setTimeout(()=> {
-          setValidationMessage("")
-          setError("")
-        },3000)
-    }, [validationMessage, error])
+      if (error) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(()=> setError(""), 3000);
+      }
+    }, [error])
 
   // Fetch student data on component mount
   useEffect(() => {
@@ -280,9 +284,28 @@ const [selectedEmergencyPhoneCountry, setSelectedEmergencyPhoneCountry] = useSta
         
         if (response.ok) {
           const { data } = await response.json();
-         
-          // Transform API data to match form structure
+
           if (data) {
+            const originalPhone = data.phone || '';
+            const originalEmergencyPhone = data.emergency_c_phone || '';
+            const allCountries = phoneCountries.getAll() as Country[];
+
+            let detectedPhoneCountry = allCountries.find(c => originalPhone.startsWith(c.dial_code));
+            let phoneWithoutCode = originalPhone;
+            if (detectedPhoneCountry) {
+              phoneWithoutCode = originalPhone.substring(detectedPhoneCountry.dial_code.length);
+            } else {
+              detectedPhoneCountry = allCountries.find(c => c.code === "IN") || allCountries.find(c => c.code === "US") || allCountries[0];
+            }
+
+            let detectedEmergencyCountry = allCountries.find(c => originalEmergencyPhone.startsWith(c.dial_code));
+            let emergencyPhoneWithoutCode = originalEmergencyPhone;
+            if (detectedEmergencyCountry) {
+              emergencyPhoneWithoutCode = originalEmergencyPhone.substring(detectedEmergencyCountry.dial_code.length);
+            } else {
+              detectedEmergencyCountry = allCountries.find(c => c.code === "IN") || allCountries.find(c => c.code === "US") || allCountries[0];
+            }
+
             setFormData(prev => ({
               ...prev,
               salutation: data.salutation || "",
@@ -290,7 +313,7 @@ const [selectedEmergencyPhoneCountry, setSelectedEmergencyPhoneCountry] = useSta
               middle_name: data.middle_name || "",
               last_name: data.last_name || "",
               email: data.email || "",
-              phone: data.phone || "",
+              phone: phoneWithoutCode,
               passport_number: data.passport_number || "",
               dob: data.dob ? new Date(data.dob) : null,
               gender: data.gender || "",
@@ -303,11 +326,13 @@ const [selectedEmergencyPhoneCountry, setSelectedEmergencyPhoneCountry] = useSta
               emergency_c_name: data.emergency_c_name || "",
               emergency_c_relation: data.emergency_c_relation || "",
               emergency_c_email: data.emergency_c_email || "",
-              emergency_c_phone: data.emergency_c_phone || "",
+              emergency_c_phone: emergencyPhoneWithoutCode,
             }));
 
             setSelectedCountry(data.country_code);
             setSelectedState(data.state_code);
+            setSelectedPhoneCountry(detectedPhoneCountry);
+            setSelectedEmergencyPhoneCountry(detectedEmergencyCountry);
           }
         } else {
           setError('Failed to fetch student data');
@@ -323,34 +348,6 @@ const [selectedEmergencyPhoneCountry, setSelectedEmergencyPhoneCountry] = useSta
     fetchStudentData();
   }, []);
 
-  // Add this useEffect after the existing fetch useEffect:
-
-// Initialize phone country codes when data loads
-useEffect(() => {
-  if (formData.phone || formData.emergency_c_phone) {
-    const allCountries = phoneCountries.getAll() as Country[];
-    
-    // Try to extract country code from phone number
-    if (formData.phone) {
-      // Look for matching country code in the phone number
-      const matchedCountry = allCountries.find(country => 
-        formData.phone.startsWith(country.dial_code)
-      );
-      setSelectedPhoneCountry(matchedCountry || allCountries.find(c => c.code === "US") || allCountries[0]);
-    } else {
-      setSelectedPhoneCountry(allCountries.find(c => c.code === "US") || allCountries[0]);
-    }
-    
-    if (formData.emergency_c_phone) {
-      const matchedCountry = allCountries.find(country => 
-        formData.emergency_c_phone.startsWith(country.dial_code)
-      );
-      setSelectedEmergencyPhoneCountry(matchedCountry || allCountries.find(c => c.code === "US") || allCountries[0]);
-    } else {
-      setSelectedEmergencyPhoneCountry(allCountries.find(c => c.code === "US") || allCountries[0]);
-    }
-  }
-}, [formData.phone, formData.emergency_c_phone]);
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections(prev => ({
@@ -427,11 +424,128 @@ useEffect(() => {
     setFieldErrors(prev => ({ ...prev, ...errors }));
     return Object.keys(errors).length === 0;
   };
-// Update the handleInputChange function - modify the phone number handling part:
+  const getSectionIdFromFieldName = (fieldName: string): string | null => {
+    const personalFields = ['salutation', 'first_name', 'middle_name', 'last_name', 'email', 'phone', 'passport_number', 'dob', 'gender'];
+    const addressFields = ['country_code', 'state_code', 'city_code', 'address', 'postal_code', 'citizenship'];
+    const emergencyFields = ['emergency_c_name', 'emergency_c_relation', 'emergency_c_email', 'emergency_c_phone'];
+    if (personalFields.includes(fieldName)) return 'personal';
+    if (addressFields.includes(fieldName)) return 'address';
+    if (emergencyFields.includes(fieldName)) return 'emergency';
+    return null;
+  };
+
+  const saveSection = async (sectionId: string, nextSectionId?: string) => {
+    const isValid = validateSection(sectionId);
+    if (!isValid) {
+      setSectionStatus(prev => ({
+        ...prev,
+        [sectionId]: { isSaving: false, message: 'Please fill all required fields', messageType: 'error' }
+      }));
+      return;
+    }
+
+    setSectionStatus(prev => ({
+      ...prev,
+      [sectionId]: { ...prev[sectionId], isSaving: true, message: '', messageType: '' }
+    }));
+
+    try {
+      let formattedPhone = formData.phone;
+      if (formData.phone && selectedPhoneCountry) {
+        let clean = formData.phone;
+        if (clean.startsWith(selectedPhoneCountry.dial_code)) clean = clean.substring(selectedPhoneCountry.dial_code.length);
+        formattedPhone = selectedPhoneCountry.dial_code + clean;
+      }
+
+      let formattedEmergencyPhone = formData.emergency_c_phone;
+      if (formData.emergency_c_phone && selectedEmergencyPhoneCountry) {
+        let clean = formData.emergency_c_phone;
+        if (clean.startsWith(selectedEmergencyPhoneCountry.dial_code)) clean = clean.substring(selectedEmergencyPhoneCountry.dial_code.length);
+        formattedEmergencyPhone = selectedEmergencyPhoneCountry.dial_code + clean;
+      }
+
+      let apiData: any = {};
+      let endpoint = '';
+
+      switch (sectionId) {
+        case 'personal':
+          endpoint = '/student/personal-info';
+          apiData = {
+            salutation: formData.salutation,
+            first_name: formData.first_name,
+            middle_name: formData.middle_name,
+            last_name: formData.last_name,
+            phone: formattedPhone,
+            passport_number: formData.passport_number,
+            dob: formData.dob ? formData.dob.toISOString().split('T')[0] : null,
+            gender: formData.gender,
+          };
+          break;
+        case 'address':
+          endpoint = '/student/address';
+          apiData = {
+            country_code: formData.country_code,
+            state_code: formData.state_code,
+            city_code: formData.city_code,
+            address: formData.address,
+            postal_code: formData.postal_code,
+            citizenship: formData.citizenship,
+          };
+          break;
+        case 'emergency':
+          endpoint = '/student/emergency-contact';
+          apiData = {
+            emergency_c_name: formData.emergency_c_name,
+            emergency_c_relation: formData.emergency_c_relation,
+            emergency_c_email: formData.emergency_c_email,
+            emergency_c_phone: formattedEmergencyPhone,
+          };
+          break;
+      }
+
+      const response = await fetch(`${BASE_URL}${endpoint}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(apiData),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        setSectionStatus(prev => ({
+          ...prev,
+          [sectionId]: { isSaving: false, message: result.message || 'Failed to save', messageType: 'error' }
+        }));
+      } else {
+        setSectionStatus(prev => ({
+          ...prev,
+          [sectionId]: { isSaving: false, message: 'Saved successfully!', messageType: 'success' }
+        }));
+
+        if (nextSectionId) {
+          setTimeout(() => {
+            setExpandedSections(prev => ({ ...prev, [sectionId]: false, [nextSectionId]: true }));
+          }, 1000);
+        }
+
+        if (sectionId === 'emergency') {
+          setTimeout(() => {
+            router.push('/student/editProfile?profileTab=academics');
+          }, 3000);
+        }
+      }
+    } catch (err) {
+      console.error('Error saving section:', err);
+      setSectionStatus(prev => ({
+        ...prev,
+        [sectionId]: { isSaving: false, message: 'An error occurred. Please try again.', messageType: 'error' }
+      }));
+    }
+  };
 
 const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
   const { name, value, type } = e.target;
-  
+
   // Clear field error when user starts typing
   if (fieldErrors[name]) {
     setFieldErrors(prev => {
@@ -439,6 +553,12 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaE
       delete newErrors[name];
       return newErrors;
     });
+  }
+
+  // Clear section status message when user starts typing
+  const sectionId = getSectionIdFromFieldName(name);
+  if (sectionId && sectionStatus[sectionId].message) {
+    setSectionStatus(prev => ({ ...prev, [sectionId]: { ...prev[sectionId], message: '', messageType: '' } }));
   }
 
   if (type === 'checkbox') {
@@ -482,90 +602,15 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaE
 };
 
   const handleDateChange = (date: Date | null) => {
-    setFormData(prev => ({
-      ...prev,
-      dob: date
-    }));
-    
-    // Clear date error when user selects a date
+    setFormData(prev => ({ ...prev, dob: date }));
     if (fieldErrors.dob) {
-      setFieldErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors.dob;
-        return newErrors;
-      });
+      setFieldErrors(prev => { const n = { ...prev }; delete n.dob; return n; });
+    }
+    if (sectionStatus.personal.message) {
+      setSectionStatus(prev => ({ ...prev, personal: { ...prev.personal, message: '', messageType: '' } }));
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate all sections before submission
-    const isPersonalValid = validateSection("personal");
-    const isAddressValid = validateSection("address");
-    const isEmergencyValid = validateSection("emergency");
-    
-    if (!isPersonalValid || !isAddressValid || !isEmergencyValid) {
-      setValidationMessage("Please fix all validation errors before submitting.");
-      // Expand sections with errors
-      setExpandedSections({
-        personal: isPersonalValid ? expandedSections.personal : true,
-        address: isAddressValid ? expandedSections.address : true,
-        emergency: isEmergencyValid ? expandedSections.emergency : true,
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setValidationMessage("");
-
-    try {
-      // Transform data for API
-      const apiData = {
-        salutation: formData.salutation,
-        first_name: formData.first_name,
-        middle_name: formData.middle_name,
-        last_name: formData.last_name,
-        email: formData.email,
-        phone: selectedPhoneCountry ? `${selectedPhoneCountry.dial_code}${formData.phone}` : formData.phone,
-        passport_number: formData.passport_number,
-        country_code: formData.country_code,
-        state_code: formData.state_code,
-        city_code: formData.city_code,
-        dob: formData.dob ? formData.dob.toISOString().split('T')[0] : null,
-        gender: formData.gender,
-        citizenship: formData.citizenship,
-        address: formData.address,
-        postal_code: formData.postal_code,
-        emergency_c_name: formData.emergency_c_name,
-        emergency_c_relation: formData.emergency_c_relation,
-        emergency_c_email: formData.emergency_c_email,
-        emergency_c_phone: selectedEmergencyPhoneCountry ? `${selectedEmergencyPhoneCountry.dial_code}${formData.emergency_c_phone}` : formData.emergency_c_phone,
-      };
-
-      const response = await fetch(`${BASE_URL}/student`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(apiData),
-      });
-
-      const result = await response.json();
-      if (!result.success) {
-        setValidationMessage(result.message);
-      } else {
-        setValidationMessage("Student data saved successfully!");
-      }
-      
-    } catch (error) {
-      console.error('Error saving student data:', error);
-      setValidationMessage("An error occurred while saving. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handlePhoneCountryChange = (country: Country) => {
   setSelectedPhoneCountry(country);
@@ -1094,17 +1139,6 @@ const handleEmergencyPhoneCountryChange = (country: Country) => {
 
       
 
-        {validationMessage && (
-          <div className="px-5 py-4 sm:px-6 sm:py-5">
-          <p className={`mt-1 text-sm ${
-            validationMessage.includes("successfully") 
-              ? "text-green-500 dark:text-green-400" 
-              : "text-red-500 dark:text-red-400"
-          }`}>
-            {validationMessage}
-          </p>
-          </div>
-        )}
       
       
       {/* Main Tab Navigation */}
@@ -1157,19 +1191,20 @@ const handleEmergencyPhoneCountryChange = (country: Country) => {
 </button>
             </div>
          
-          <form onSubmit={handleSubmit}>
+          <div>
             {/* Form Sections */}
             <div className="space-y-6">
-              {formSections.map((section) => {
+              {formSections.map((section, index) => {
                 const IconComponent = section.icon;
                 const isExpanded = expandedSections[section.id];
-                
+                const nextSection = formSections[index + 1];
+
                 return (
-                  <div 
-                    key={section.id} 
+                  <div
+                    key={section.id}
                     className={`rounded-xl border ${
-                      isExpanded 
-                        ? 'border-brand-200 bg-brand-50/50 dark:border-brand-800 dark:bg-brand-900/10' 
+                      isExpanded
+                        ? 'border-brand-200 bg-brand-50/50 dark:border-brand-800 dark:bg-brand-900/10'
                         : 'border-gray-200 dark:border-gray-800'
                     }`}
                   >
@@ -1181,8 +1216,8 @@ const handleEmergencyPhoneCountryChange = (country: Country) => {
                     >
                       <div className="flex items-center gap-3">
                         <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                          section.completed 
-                            ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' 
+                          section.completed
+                            ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
                             : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
                         }`}>
                           <IconComponent size={20} />
@@ -1219,49 +1254,53 @@ const handleEmergencyPhoneCountryChange = (country: Country) => {
                         {section.id === "personal" && renderPersonalInfoSection()}
                         {section.id === "address" && renderAddressSection()}
                         {section.id === "emergency" && renderEmergencyContactSection()}
+
+                        {/* Per-section Save Button */}
+                        <div className="mt-6 flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => saveSection(section.id, nextSection?.id)}
+                            disabled={sectionStatus[section.id].isSaving}
+                            className="bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 flex items-center gap-2 rounded-lg px-6 py-2 text-sm font-medium text-white disabled:cursor-not-allowed"
+                          >
+                            {sectionStatus[section.id].isSaving ? (
+                              <>
+                                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                Save {section.title}
+                                {nextSection && <span className="text-xs"> & Continue</span>}
+                              </>
+                            )}
+                          </button>
+
+                          {sectionStatus[section.id].message && (
+                            <div className={`flex items-center gap-2 text-sm ${
+                              sectionStatus[section.id].messageType === 'success'
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            }`}>
+                              {sectionStatus[section.id].messageType === 'success' ? (
+                                <CheckCircle size={16} />
+                              ) : (
+                                <XCircle size={16} />
+                              )}
+                              <span>{sectionStatus[section.id].message}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
-
-            {/* Submit Buttons */}
-            <div className="mt-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => router.back()}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 sm:w-auto"
-                >
-                  Cancel
-                </button>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !formSections.every(section => section.completed)}
-                  className="bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed sm:w-auto"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      Save All Sections
-                      <Plus size={18} />
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </form>
+          </div>
            </>
         )}
 

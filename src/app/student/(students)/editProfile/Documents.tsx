@@ -113,6 +113,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
   const [uploadErrors, setUploadErrors] = useState<UploadError>({});
   const [uploadSuccess, setUploadSuccess] = useState<UploadSuccess>({});
   const [selectedFile, setSelectedFile] = useState<{ [key: number]: File | null }>({});
+  const [verifierEmail, setVerifierEmail] = useState<{ [key: number]: string }>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const BASE_URL = 'https://api.applystore.org/api';
@@ -237,6 +238,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
     const formData = new FormData();
     formData.append('document_id', documentId.toString());
     formData.append('file', file);
+    if (verifierEmail[documentId]) formData.append('verifier_email', verifierEmail[documentId]);
 
     setUploading(prev => ({ ...prev, [documentId]: true }));
     setUploadProgress(prev => ({ ...prev, [documentId]: 0 }));
@@ -333,6 +335,18 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
             {fileError}
           </div>
         )}
+
+        <div className="flex flex-col gap-1.5">
+          <input
+            type="email"
+            placeholder="Verifier email (e.g. bank@example.com)"
+            value={verifierEmail[documentId] || ''}
+            onChange={(e) => setVerifierEmail(prev => ({ ...prev, [documentId]: e.target.value }))}
+            disabled={isUploading}
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-400 dark:text-gray-500">Email of the authority who can verify this document</p>
+        </div>
 
         <div className="flex gap-2">
           <label className="flex items-center gap-1.5 cursor-pointer border dark:text-white border-gray-300 dark:border-gray-600 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50 dark:hover:bg-gray-700 shrink-0">

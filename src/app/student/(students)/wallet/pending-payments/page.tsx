@@ -287,7 +287,7 @@ export default function PendingPaymentsPage() {
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">Total Pending Amount</div>
           <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-            ₹{pendingPayments.reduce((sum, p) => sum + (p.fee_in_inr ?? parseFloat(p.application_fee || '0')), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            ₹{pendingPayments.reduce((sum, p) => sum + (p.fee_in_inr ?? 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </div>
         </div>
 

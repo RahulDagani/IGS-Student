@@ -29,10 +29,12 @@ interface BaseDocument {
   file_url: string | null;
   uploaded_at: string | null;
   uploaded_by: number | null;
-  status: 'uploaded' | 'pending' | string;
+  status: 'uploaded' | 'pending' | 'verified' | string;
   remarks: string | null;
   is_deleted: number;
   created_at: string;
+  verifier_email: string | null;
+  verification_email_sent_at: string | null;
 }
 
 interface CommonDocument extends BaseDocument {
@@ -314,11 +316,12 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
     }
   };
 
-  const FileInput = ({ documentId, isCommon, applicationId = null, doc_category }: {
+  const FileInput = ({ documentId, isCommon, applicationId = null, doc_category, docStatus }: {
     documentId: number;
     isCommon: boolean;
     applicationId?: number | null;
     doc_category?: string;
+    docStatus?: string;
   }) => {
     const isUploading = uploading[documentId];
     const progress = uploadProgress[documentId] ?? 0;
@@ -342,17 +345,19 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
           </div>
         )}
 
-        <div className="flex flex-col gap-1.5">
-          <input
-            type="email"
-            placeholder="Verifier email (e.g. bank@example.com)"
-            value={verifierEmail[documentId] || ''}
-            onChange={(e) => setVerifierEmail(prev => ({ ...prev, [documentId]: e.target.value }))}
-            disabled={isUploading}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-          <p className="text-xs text-gray-400 dark:text-gray-500">Email of the authority who can verify this document</p>
-        </div>
+        {docStatus !== 'verified' && (
+          <div className="flex flex-col gap-1.5">
+            <input
+              type="email"
+              placeholder="Verifier email (e.g. bank@example.com)"
+              value={verifierEmail[documentId] || ''}
+              onChange={(e) => setVerifierEmail(prev => ({ ...prev, [documentId]: e.target.value }))}
+              disabled={isUploading}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-400 dark:text-gray-500">Email of the authority who can verify this document</p>
+          </div>
+        )}
 
         <div className="flex gap-2">
           <label className="flex items-center gap-1.5 cursor-pointer border dark:text-white border-gray-300 dark:border-gray-600 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50 dark:hover:bg-gray-700 shrink-0">
@@ -450,7 +455,11 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
             <div className="mt-2 text-sm text-gray-700 dark:text-gray-300 space-y-1">
               <p>
                 <strong className="dark:text-gray-200">Status:</strong>{' '}
-                <span className={`capitalize ${doc.status === 'uploaded' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                <span className={`capitalize font-medium ${
+                  doc.status === 'verified' ? 'text-blue-600 dark:text-blue-400' :
+                  doc.status === 'uploaded' ? 'text-green-600 dark:text-green-400' :
+                  'text-red-600 dark:text-red-400'
+                }`}>
                   {doc.status}
                 </span>
               </p>
@@ -460,10 +469,15 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
                   {formatDate(doc.uploaded_at)}
                 </p>
               )}
-              {doc.uploaded_by && (
+              {doc.verifier_email && (
                 <p>
-                  <strong className="dark:text-gray-200">Uploaded By:</strong>{' '}
-                  User ID: {doc.uploaded_by}
+                  <strong className="dark:text-gray-200">Verifier:</strong>{' '}
+                  {doc.verifier_email}
+                </p>
+              )}
+              {doc.verification_email_sent_at && (
+                <p className="text-blue-600 dark:text-blue-400 text-xs">
+                  Verification email sent on {formatDate(doc.verification_email_sent_at)}
                 </p>
               )}
               {isCommon && doc.study_level_name && (
@@ -482,6 +496,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
                 isCommon={isCommon}
                 applicationId={!isCommon ? doc.application_id : null}
                 doc_category={doc.doc_category}
+                docStatus={doc.status}
               />
             </div>
           )}

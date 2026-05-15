@@ -16,7 +16,11 @@ interface PendingPayment {
   user_id: number;
   application_id: string;
   application_fee: string;
+  currency_code: string;
+  fee_in_inr: number | null;
+  conversion_rate: number | null;
   fee_status: string;
+  payment_status: string;
   created_at: string;
   updated_at: string;
   student_email: string;
@@ -24,7 +28,6 @@ interface PendingPayment {
   university_name: string;
   country_code: string;
   tuition_fee: string;
-  currency_code: string;
   duration_min: number;
   duration_max: number;
   duration_unit: string;
@@ -284,7 +287,7 @@ export default function PendingPaymentsPage() {
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">Total Pending Amount</div>
           <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-            {formatAmount(pendingPayments.reduce((sum, payment) => sum + parseFloat(payment.application_fee), 0).toString())}
+            ₹{pendingPayments.reduce((sum, p) => sum + (p.fee_in_inr ?? parseFloat(p.application_fee || '0')), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </div>
         </div>
 
@@ -384,6 +387,7 @@ export default function PendingPaymentsPage() {
                     { key: "university_name", label: "University" },
                     { key: "course_name", label: "Course" },
                     { key: "application_fee", label: "Application Fee" },
+                    { key: "fee_in_inr", label: "Fee in INR" },
                     { key: "tuition_fee", label: "Tuition Fee" },
                     { key: "duration", label: "Duration" },
                     { key: "created_at", label: "Applied Date" },
@@ -428,7 +432,18 @@ export default function PendingPaymentsPage() {
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
                         <div className="text-red-600 dark:text-red-400 font-medium text-theme-sm">
-                          {formatAmount(payment.application_fee)}
+                          {payment.currency_code} {parseFloat(payment.application_fee).toFixed(2)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-5 py-4 text-start">
+                        <div className="text-theme-sm">
+                          {payment.fee_in_inr != null ? (
+                            <span className="font-medium text-gray-800 dark:text-white/90">
+                              ₹{payment.fee_in_inr.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">Rate unavailable</span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">

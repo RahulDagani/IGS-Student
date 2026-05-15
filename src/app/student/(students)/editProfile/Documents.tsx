@@ -194,7 +194,13 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
 
   // Get status icon and color
   const getStatusIcon = (status: string, isMandatory: number) => {
-    if (status === 'uploaded') {
+    if (status === 'verified') {
+      return {
+        icon: <CheckCircle className="text-blue-600 dark:text-blue-400" />,
+        borderColor: 'border-blue-500 dark:border-blue-400',
+        bgColor: 'bg-blue-50 dark:bg-blue-900/20'
+      };
+    } else if (status === 'uploaded') {
       return {
         icon: <CheckCircle className="text-green-600 dark:text-green-400" />,
         borderColor: 'border-green-500 dark:border-green-400',

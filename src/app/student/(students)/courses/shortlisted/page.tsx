@@ -640,7 +640,7 @@ export default function ShortlistedCoursesPage() {
         setAlertMessage(`Your application for ${selectedCourse.course_name} at ${selectedCourse.university} has been submitted successfully!`);
 
         setTimeout(() => {
-          router.push(`/student/editProfile/${studentId}?tab=applications&app=${app_id}`);
+          router.push(`/student/editProfile?tab=applications&app=${app_id}`);
         }, 2000);
       } else {
         throw new Error(result.message || 'Application failed');

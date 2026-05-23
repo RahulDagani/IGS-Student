@@ -653,7 +653,7 @@ const CourseDetailsPage: React.FC = () => {
         showAlert('success', 'Application submitted successfully!');
         setShowConfirmModal(false);
         setTimeout(()=>{
-          router.push(`/student/editProfile/${studentId}?tab=applications&app=${app_id}`);
+          router.push(`/student/editProfile?tab=applications&app=${app_id}`);
         },2000)
       } else {
         // Check if it's a duplicate application error

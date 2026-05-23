@@ -993,7 +993,7 @@ export default function ApplicationsTable() {
                     applications.map((application) => (
                       <TableRow key={application.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <TableCell className="px-5 py-4 text-gray-700 text-theme-sm dark:text-gray-300 font-medium">
-                          <Link href={`/student/editProfile/${application.student_user_id}?tab=applications&app=${application.id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                          <Link href={`/student/editProfile?tab=applications&app=${application.id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
                             {application.acknowledgement_no}
                           </Link>
                         </TableCell>
@@ -1006,7 +1006,7 @@ export default function ApplicationsTable() {
                           {formatDate(application.date_created)}
                         </TableCell>
                         <TableCell className="px-5 py-4 text-gray-700 text-theme-sm dark:text-gray-300 font-medium">
-                          <Link href={`/student/editProfile/${application.student_user_id}`}>
+                          <Link href={`/student/editProfile`}>
                             {application.student_full_name || 'N/A'}
                           </Link>
                         </TableCell>

@@ -1576,7 +1576,7 @@ const buildCoursesQueryString = useCallback((page: number = 1, filtersToBuild: F
         setAlertMessage(`Your application for ${selectedCourse.course_name} at ${selectedCourse.university_name} has been submitted successfully!`);
 
         setTimeout(()=>{
-          router.push(`/student/editProfile/${studentId}?tab=applications&app=${app_id}`);
+          router.push(`/student/editProfile?tab=applications&app=${app_id}`);
         },2000)
       } else {
         throw new Error(result.message || 'Application failed');

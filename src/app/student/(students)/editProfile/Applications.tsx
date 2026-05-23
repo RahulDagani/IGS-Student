@@ -94,6 +94,7 @@ interface ApplicationDetail {
 
   application_login: string;
   application_password: string;
+  application_link: string | null;
 }
 
 interface SpecificDocument {
@@ -196,9 +197,11 @@ export default function Applications() {
   const [editingCredentials, setEditingCredentials] = useState<{
     application_login: string;
     application_password: string;
+    application_link: string;
   }>({
     application_login: '',
-    application_password: ''
+    application_password: '',
+    application_link: ''
   });
   const [isUpdatingCredentials, setIsUpdatingCredentials] = useState<boolean>(false);
 
@@ -250,7 +253,8 @@ export default function Applications() {
     if (applicationDetail) {
       setEditingCredentials({
         application_login: applicationDetail.application_login || '',
-        application_password: applicationDetail.application_password || ''
+        application_password: applicationDetail.application_password || '',
+        application_link: applicationDetail.application_link || ''
       });
       setShowCredentialsModal(true);
     }
@@ -265,7 +269,7 @@ const updateCredentials = async () => {
 
   try {
     setIsUpdatingCredentials(true);
-    
+
     const response = await fetch(`${BASE_URL}/student/application/credentials/${activeProgram}`, {
       method: 'PUT',
       headers: {
@@ -274,19 +278,20 @@ const updateCredentials = async () => {
       },
       body: JSON.stringify({
         application_login: editingCredentials.application_login,
-        application_password: editingCredentials.application_password
+        application_password: editingCredentials.application_password,
+        application_link: editingCredentials.application_link
       })
     });
 
     const data = await response.json();
-    
+
     if (data.success) {
-      // Update the local state with new credentials
       if (applicationDetail) {
         setApplicationDetail({
           ...applicationDetail,
           application_login: editingCredentials.application_login,
-          application_password: editingCredentials.application_password
+          application_password: editingCredentials.application_password,
+          application_link: editingCredentials.application_link || null
         });
       }
       setShowCredentialsModal(false);
@@ -789,26 +794,43 @@ const updateCredentials = async () => {
                 </div>
               </div>
 
-              <div className="mt-3 flex gap-3">
+              <div className="mt-3 flex flex-wrap gap-3">
                 <div className="text-gray-500 dark:text-gray-400">
                   Application Login:{' '}
                   <span className="ml-2 rounded text-sm font-medium">
-                    {`${applicationDetail.application_login || "N/A"}`}
+                    {applicationDetail.application_login || "N/A"}
                   </span>
                 </div>
-                <div className="text-gray-500 dark:text-gray-400 ">
+                <div className="text-gray-500 dark:text-gray-400">
                   Application Password:{' '}
                   <span className="ml-2 rounded text-sm font-medium">
-                    {`${applicationDetail.application_password || "N/A"}`}
+                    {applicationDetail.application_password || "N/A"}
                   </span>
                 </div>
-                <div className="text-gray-500 dark:text-gray-400 " >
-                  {activeProgram ? <span 
-  onClick={handleLoginDetails(activeProgram)} 
-  className="ml-2 rounded text-sm font-medium text-blue-500 cursor-pointer underline hover:text-blue-600 dark:hover:text-blue-400"
->
-  Edit
-</span> : null}
+                <div className="text-gray-500 dark:text-gray-400">
+                  Online Application Link:{' '}
+                  {applicationDetail.application_link ? (
+                    <a
+                      href={applicationDetail.application_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-2 text-sm font-medium text-blue-500 underline hover:text-blue-600 dark:hover:text-blue-400"
+                    >
+                      Open Link
+                    </a>
+                  ) : (
+                    <span className="ml-2 rounded text-sm font-medium">N/A</span>
+                  )}
+                </div>
+                <div className="text-gray-500 dark:text-gray-400">
+                  {activeProgram ? (
+                    <span
+                      onClick={handleLoginDetails(activeProgram)}
+                      className="ml-2 rounded text-sm font-medium text-blue-500 cursor-pointer underline hover:text-blue-600 dark:hover:text-blue-400"
+                    >
+                      Edit
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
@@ -1205,8 +1227,23 @@ const updateCredentials = async () => {
             disabled={isUpdatingCredentials}
           />
         </div>
-        
-       
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Online Application Link
+          </label>
+          <input
+            type="url"
+            value={editingCredentials.application_link}
+            onChange={(e) => setEditingCredentials(prev => ({
+              ...prev,
+              application_link: e.target.value
+            }))}
+            className="w-full px-4 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+            placeholder="https://..."
+            disabled={isUpdatingCredentials}
+          />
+        </div>
       </div>
       
       <div className="flex justify-end gap-3 p-6 border-t dark:border-gray-700">

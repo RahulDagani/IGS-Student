@@ -125,22 +125,24 @@ const AppSidebar: React.FC = () => {
   
   // Fetch menu data from API
   useEffect(() => {
+    if (!token) return;
+
     const fetchMenuData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(`${BASE_URL}/modules`,{
-          headers:{
+        const response = await fetch(`${BASE_URL}/modules`, {
+          headers: {
             "Authorization": `Bearer ${token}`
           }
         });
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const data: ApiMainModule[] = await response.json();
         const convertedItems = convertApiToNavItems(data);
-        
+
         if (convertedItems.length > 0) {
           setNavItems(convertedItems);
         }
@@ -153,7 +155,7 @@ const AppSidebar: React.FC = () => {
     };
 
     fetchMenuData();
-  }, []);
+  }, [token]);
 
   const isActive = useCallback((path: string | undefined): boolean => {
     if (!path) return false;

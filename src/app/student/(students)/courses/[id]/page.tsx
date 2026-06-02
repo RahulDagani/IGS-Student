@@ -847,7 +847,7 @@ const CourseDetailsPage: React.FC = () => {
 
                 {/* Action Buttons and Links */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {courseData.intakes[0]?.deadlines[0] && (
+                  {courseData.intakes.length > 0 && (
                     <a
                       href={course.university_website || "#"}
                       target="_blank"

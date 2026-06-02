@@ -157,16 +157,16 @@ const AppSidebar: React.FC = () => {
     fetchMenuData();
   }, [token]);
 
-  const isActive = useCallback((path: string | undefined): boolean => {
+  const isActive = useCallback((path: string | undefined, name?: string): boolean => {
     if (!path) return false;
     const fullPath = path === "/dashboard" ? "/student" : "/student" + path;
-    // Dashboard: exact match only — avoid matching every /student/* page
+    // Dashboard: exact match only
     if (fullPath === "/student") return pathname === "/student";
-    // Applications: also highlight on editProfile page
-    if (fullPath === "/student/applications") {
-      return pathname === "/student/applications"
-        || pathname.startsWith("/student/applications/")
-        || pathname === "/student/editProfile";
+    // Applications: also match editProfile (applications tab lives there)
+    if (name?.toLowerCase().includes("application")) {
+      return pathname === fullPath
+        || pathname.startsWith(fullPath + "/")
+        || pathname.startsWith("/student/editProfile");
     }
     return pathname === fullPath || pathname.startsWith(fullPath + "/");
   }, [pathname]);
@@ -237,11 +237,11 @@ const AppSidebar: React.FC = () => {
             <Link
               href={item.path != "/dashboard" ? "/student" + item.path : "/student"}
               className={`menu-item group ${
-                isActive(item.path) ? "menu-item-active" : "menu-item-inactive"
+                isActive(item.path, item.name) ? "menu-item-active" : "menu-item-inactive"
               }`}
               style={{ paddingLeft: `${level * 20 + 16}px` }}
             >
-              <span className={isActive(item.path) ? "menu-item-icon-active" : "menu-item-icon-inactive"}>
+              <span className={isActive(item.path, item.name) ? "menu-item-icon-active" : "menu-item-icon-inactive"}>
                 {item.icon}
               </span>
               {(isExpanded || isHovered || isMobileOpen) && (

@@ -114,11 +114,14 @@ const FilterModal: React.FC<FilterModalProps> = ({
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     disciplines: true, locations: true, universities: true, studyLevels: true, intakes: true, intakeYears: true,
   });
+  const [disciplineSearch, setDisciplineSearch] = useState('');
+  const [universitySearch, setUniversitySearch] = useState('');
 
-  const getFilteredStates = useMemo(() => {
-    if (!filterOptions?.locations.states || localFilters.countries.length === 0) return [];
-    return filterOptions.locations.states;
-  }, [filterOptions?.locations.states, localFilters.countries]);
+  const matchesSearch = (name: string, query: string) => {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    return name.toLowerCase().split(/\s+/).some(word => word.startsWith(q));
+  };
 
   useEffect(() => {
     if (isOpen) setLocalFilters(appliedFilters);
@@ -207,46 +210,13 @@ const FilterModal: React.FC<FilterModalProps> = ({
         <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
 
           {/* Destination */}
-          <Section title="Study Destination" sectionKey="locations" count={localFilters.countries.length + localFilters.states.length + localFilters.cities.length || undefined}>
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Countries</p>
-                <CheckboxList
-                  items={filterOptions.locations.countries}
-                  filterKey="countries"
-                  getLabel={(c) => getCountryName(c.country_code)}
-                  getId={(c) => c.country_code}
-                />
-              </div>
-
-              {localFilters.countries.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">States / Provinces</p>
-                  {getFilteredStates.length === 0 ? (
-                    <p className="text-sm text-gray-400 dark:text-gray-500 italic">No states available for selected countries.</p>
-                  ) : (
-                    <CheckboxList
-                      items={getFilteredStates}
-                      filterKey="states"
-                      getLabel={(s) => s.state_code}
-                      getId={(s) => s.state_code}
-                    />
-                  )}
-                </div>
-              )}
-
-              {localFilters.states.length > 0 && filterOptions.locations.cities.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Cities</p>
-                  <CheckboxList
-                    items={filterOptions.locations.cities}
-                    filterKey="cities"
-                    getLabel={(c) => c.city_code}
-                    getId={(c) => c.city_code}
-                  />
-                </div>
-              )}
-            </div>
+          <Section title="Study Destination" sectionKey="locations" count={localFilters.countries.length || undefined}>
+            <CheckboxList
+              items={filterOptions.locations.countries}
+              filterKey="countries"
+              getLabel={(c) => getCountryName(c.country_code)}
+              getId={(c) => c.country_code}
+            />
           </Section>
 
           {/* Study Levels */}
@@ -261,22 +231,44 @@ const FilterModal: React.FC<FilterModalProps> = ({
 
           {/* Disciplines */}
           <Section title="Discipline" sectionKey="disciplines" count={localFilters.disciplines.length || undefined}>
-            <CheckboxList
-              items={filterOptions.disciplines}
-              filterKey="disciplines"
-              getLabel={(d) => d.name}
-              getId={(d) => d.id}
-            />
+            <div className="space-y-2">
+              <input
+                type="text"
+                placeholder="Search disciplines..."
+                value={disciplineSearch}
+                onChange={e => setDisciplineSearch(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300"
+              />
+              <CheckboxList
+                items={filterOptions.disciplines
+                  .filter((d, i, arr) => arr.findIndex(x => x.name === d.name) === i)
+                  .filter(d => matchesSearch(d.name, disciplineSearch))}
+                filterKey="disciplines"
+                getLabel={(d) => d.name}
+                getId={(d) => d.id}
+              />
+            </div>
           </Section>
 
           {/* Universities */}
           <Section title="University" sectionKey="universities" count={localFilters.universities.length || undefined}>
-            <CheckboxList
-              items={filterOptions.universities}
-              filterKey="universities"
-              getLabel={(u) => u.university}
-              getId={(u) => u.id}
-            />
+            <div className="space-y-2">
+              <input
+                type="text"
+                placeholder="Search universities..."
+                value={universitySearch}
+                onChange={e => setUniversitySearch(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300"
+              />
+              <CheckboxList
+                items={filterOptions.universities
+                  .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
+                  .filter(u => matchesSearch(u.university, universitySearch))}
+                filterKey="universities"
+                getLabel={(u) => u.university}
+                getId={(u) => u.id}
+              />
+            </div>
           </Section>
 
           {/* Intake */}

@@ -605,6 +605,7 @@ export default function StudentProgramsPage() {
 
   const [filters, setFilters] = useState<FilterOptions>(emptyFilters());
   const [modalFilters, setModalFilters] = useState<FilterOptions>(emptyFilters());
+  const [filterLabels, setFilterLabels] = useState<Record<string, Record<number, string>>>({});
 
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -711,6 +712,15 @@ export default function StudentProgramsPage() {
   }, [fetchFilters]);
 
   const handleFilterApply = (newFilters: FilterOptions) => {
+    // Snapshot labels from current filtersData while they're still available
+    if (filtersData) {
+      const labels: Record<string, Record<number, string>> = {};
+      newFilters.studyLevels.forEach(id => { labels.studyLevels = { ...labels.studyLevels, [id]: filtersData.studyLevels.find(l => l.id === id)?.name ?? String(id) }; });
+      newFilters.disciplines.forEach(id => { labels.disciplines = { ...labels.disciplines, [id]: filtersData.disciplines.find(d => d.id === id)?.name ?? String(id) }; });
+      newFilters.universities.forEach(id => { labels.universities = { ...labels.universities, [id]: filtersData.universities.find(u => u.id === id)?.university ?? String(id) }; });
+      newFilters.countries.forEach(id => { labels.countries = { ...labels.countries, [id]: filtersData.locations.countries.find(c => c.country_id === id)?.country_name ?? String(id) }; });
+      setFilterLabels(prev => ({ ...prev, ...labels }));
+    }
     setFilters(newFilters);
     setModalFilters(newFilters);
     setCurrentPage(1);
@@ -786,13 +796,15 @@ export default function StudentProgramsPage() {
   const filterCount = Object.values(filters).reduce((s, v) => s + (Array.isArray(v) ? v.length : 0), 0);
 
   const getFilterDisplayName = (key: keyof FilterOptions, value: number): string => {
+    // Use cached label first (survives after filtersData narrows)
+    const cached = filterLabels[key]?.[value];
+    if (cached) return cached;
     if (!filtersData) return String(value);
     switch (key) {
       case 'studyLevels': return filtersData.studyLevels.find(l => l.id === value)?.name ?? String(value);
       case 'disciplines': return filtersData.disciplines.find(d => d.id === value)?.name ?? String(value);
       case 'universities': return filtersData.universities.find(u => u.id === value)?.university ?? String(value);
       case 'countries': return filtersData.locations.countries.find(c => c.country_id === value)?.country_name ?? String(value);
-      case 'intakes': return filtersData.intakes.find(i => i.id === value)?.intake ?? String(value);
       case 'intakeYears': return String(value);
       default: return String(value);
     }

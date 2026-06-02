@@ -252,27 +252,6 @@ const FilterModal: React.FC<FilterModalProps> = ({
             />
           </Section>
 
-          {filterOptions.intakes.length > 0 && (
-            <Section title="Intake" sectionKey="intakes" count={localFilters.intakes.length || undefined}>
-              <CheckboxList
-                items={filterOptions.intakes}
-                filterKey="intakes"
-                getLabel={i => i.intake}
-                getId={i => i.id}
-              />
-            </Section>
-          )}
-
-          {filterOptions.intakeYears.length > 0 && (
-            <Section title="Intake Year" sectionKey="intakeYears" count={localFilters.intakeYears.length || undefined}>
-              <CheckboxList
-                items={filterOptions.intakeYears}
-                filterKey="intakeYears"
-                getLabel={y => String(y.intake_year)}
-                getId={y => y.intake_year}
-              />
-            </Section>
-          )}
         </div>
 
         {/* Footer */}

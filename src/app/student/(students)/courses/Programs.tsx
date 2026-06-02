@@ -227,29 +227,33 @@ const FilterModal: React.FC<FilterModalProps> = ({
           </Section>
 
           <Section title="Discipline" sectionKey="disciplines" count={localFilters.disciplines.length || undefined}>
-            <input type="text" placeholder="Search disciplines..." value={disciplineSearch}
-              onChange={e => setDisciplineSearch(e.target.value)} className={searchInputCls} />
-            <CheckboxList
-              items={filterOptions.disciplines
-                .filter((d, i, arr) => arr.findIndex(x => x.name === d.name) === i)
-                .filter(d => matchesSearch(d.name, disciplineSearch))}
-              filterKey="disciplines"
-              getLabel={d => d.name}
-              getId={d => d.id}
-            />
+            <div className="min-h-[220px]">
+              <input type="text" placeholder="Search disciplines..." value={disciplineSearch}
+                onChange={e => setDisciplineSearch(e.target.value)} className={searchInputCls} />
+              <CheckboxList
+                items={filterOptions.disciplines
+                  .filter((d, i, arr) => arr.findIndex(x => x.name === d.name) === i)
+                  .filter(d => matchesSearch(d.name, disciplineSearch))}
+                filterKey="disciplines"
+                getLabel={d => d.name}
+                getId={d => d.id}
+              />
+            </div>
           </Section>
 
           <Section title="University" sectionKey="universities" count={localFilters.universities.length || undefined}>
-            <input type="text" placeholder="Search universities..." value={universitySearch}
-              onChange={e => setUniversitySearch(e.target.value)} className={searchInputCls} />
-            <CheckboxList
-              items={filterOptions.universities
-                .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
-                .filter(u => matchesSearch(u.university, universitySearch))}
-              filterKey="universities"
-              getLabel={u => u.university}
-              getId={u => u.id}
-            />
+            <div className="min-h-[220px]">
+              <input type="text" placeholder="Search universities..." value={universitySearch}
+                onChange={e => setUniversitySearch(e.target.value)} className={searchInputCls} />
+              <CheckboxList
+                items={filterOptions.universities
+                  .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
+                  .filter(u => matchesSearch(u.university, universitySearch))}
+                filterKey="universities"
+                getLabel={u => u.university}
+                getId={u => u.id}
+              />
+            </div>
           </Section>
 
         </div>

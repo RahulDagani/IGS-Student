@@ -509,9 +509,9 @@ const CourseCard: React.FC<{ course: Course; onApply: (course: Course) => void }
           <div className="flex items-start gap-3">
             {course.university_logo_url ? (
               <Image src={course.university_logo_url} alt={course.university_name}
-                height={52} width={52} className="rounded-xl object-contain shrink-0 border border-gray-100 dark:border-gray-700" priority />
+                height={80} width={80} className="rounded-xl object-contain shrink-0 border border-gray-100 dark:border-gray-700 bg-white p-1" priority />
             ) : (
-              <div className="w-[52px] h-[52px] bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0">
+              <div className="w-[80px] h-[80px] bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-base shrink-0">
                 {course.university_name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
               </div>
             )}

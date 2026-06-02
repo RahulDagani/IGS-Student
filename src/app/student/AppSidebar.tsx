@@ -159,7 +159,8 @@ const AppSidebar: React.FC = () => {
 
   const isActive = useCallback((path: string | undefined): boolean => {
     if (!path) return false;
-    return pathname === path;
+    const fullPath = path === "/dashboard" ? "/student" : "/student" + path;
+    return pathname === fullPath || pathname.startsWith(fullPath + "/");
   }, [pathname]);
 
   // Recursive component for nested menu items

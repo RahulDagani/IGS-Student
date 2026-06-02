@@ -160,6 +160,14 @@ const AppSidebar: React.FC = () => {
   const isActive = useCallback((path: string | undefined): boolean => {
     if (!path) return false;
     const fullPath = path === "/dashboard" ? "/student" : "/student" + path;
+    // Dashboard: exact match only — avoid matching every /student/* page
+    if (fullPath === "/student") return pathname === "/student";
+    // Applications: also highlight on editProfile page
+    if (fullPath === "/student/applications") {
+      return pathname === "/student/applications"
+        || pathname.startsWith("/student/applications/")
+        || pathname === "/student/editProfile";
+    }
     return pathname === fullPath || pathname.startsWith(fullPath + "/");
   }, [pathname]);
 

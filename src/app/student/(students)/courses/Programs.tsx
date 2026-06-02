@@ -761,7 +761,7 @@ export default function StudentProgramsPage() {
         setAlertType('success');
         setAlertMessage(`Application for ${selectedCourse.course_name} at ${selectedCourse.university_name} submitted successfully!`);
         setTimeout(() => {
-          if (result.application_id) router.push(`/student/editProfile/${studentId}?tab=applications&app=${result.application_id}`);
+          if (result.application_id) router.push(`/student/editProfile?tab=applications&app=${result.application_id}`);
         }, 2000);
       } else {
         throw new Error(result.message || 'Application failed');

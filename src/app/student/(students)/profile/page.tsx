@@ -385,7 +385,7 @@ const StudentProfile: React.FC = () => {
   };
 
   const handleEditProfileClick = () => {
-    router.push(`/student/editProfile/${profile.user_id}`);
+    router.push(`/student/editProfile`);
   };
 
   const handleAcademicInterestsSave = async (interests: StudentProfileData['academicInterests']) => {

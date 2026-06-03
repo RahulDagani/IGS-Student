@@ -5,15 +5,15 @@ import { Mail, User, ChevronLeftIcon, CheckCircle, X, Info, GraduationCap, Chevr
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import countries from "country-list-with-dial-code-and-flag";
 import { GoogleLoginButton } from "@/components/GoogleLoginButton";
 
 
 // Types for country data
 interface Country {
+  id: number;
   name: string;
-  dial_code: string;
-  code: string;
+  dial_code: string;  // mapped from phone_code
+  code: string;       // mapped from iso_code
   flag: string;
 }
 
@@ -25,7 +25,8 @@ const PhoneInput = ({
   error,
   disabled = false,
   selectedCountry,
-  onCountryChange
+  onCountryChange,
+  allCountries = [],
 }: {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -34,15 +35,14 @@ const PhoneInput = ({
   disabled?: boolean;
   selectedCountry: Country;
   onCountryChange: (country: Country) => void;
+  allCountries?: Country[];
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const allCountries = countries.getAll() as Country[];
-
   const filtered = search.trim()
-    ? allCountries.filter(c =>
+    ? (allCountries || []).filter((c: Country) =>
         c.name.toLowerCase().includes(search.toLowerCase()) ||
         c.dial_code.includes(search) ||
         c.code.toLowerCase().startsWith(search.toLowerCase())
@@ -279,10 +279,31 @@ export default function StudentRegistrationPage() {
   const [loading, setLoading] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
-  const allCountries = countries.getAll() as Country[];
-  const defaultCountry = allCountries.find(c => c.code === "US") || allCountries[0];
+  const [allCountries, setAllCountries] = useState<Country[]>([]);
+  const [selectedCountry, setSelectedCountry] = useState<Country>({
+    id: 0, name: "India", dial_code: "+91", code: "IN", flag: "🇮🇳",
+  });
 
-  const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountry);
+  const BASE_URL_PUBLIC = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+  useEffect(() => {
+    fetch(`${BASE_URL_PUBLIC}/countries`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          const list: Country[] = (d.data || []).map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            dial_code: c.phone_code,
+            code: c.iso_code,
+            flag: c.flag || "",
+          }));
+          setAllCountries(list);
+          const india = list.find(c => c.code === "IN") || list[0];
+          if (india) setSelectedCountry(india);
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [formData, setFormData] = useState({
     firstName: "",
     middleName: "",
@@ -596,6 +617,7 @@ export default function StudentRegistrationPage() {
                         error={errors.phoneNumber}
                         selectedCountry={selectedCountry}
                         onCountryChange={handleCountryChange}
+                        allCountries={allCountries}
                       />
                     </div>
 

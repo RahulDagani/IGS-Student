@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from "react";
-import { Check, Clock, File, Heart, Table, PenSquare, FileText, User, GraduationCap, Briefcase, Star, MessageSquare, X } from "lucide-react";
+import { Check, Clock, File, Heart, Table, PenSquare, FileText, User, MessageSquare, X } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import CalendlyEmbed from "@/components/CalendlyEmbed"
@@ -121,7 +121,7 @@ const checkAndRedirectForInterests = async (): Promise<void> => {
   // Calculate document upload percentage
   const calculateDocumentPercentage = () => {
     if (!dashboardData) return 0;
-    if (dashboardData.documents.mandatory === 0) return 100;
+    if (dashboardData.documents.mandatory === 0) return 0;
     return Math.round((dashboardData.documents.uploaded / dashboardData.documents.mandatory) * 100);
   };
 
@@ -420,74 +420,6 @@ const checkAndRedirectForInterests = async (): Promise<void> => {
                       </Link>
                     </div>
 
-                    {/* Academic Qualification */}
-                    <div className="flex items-center justify-between shadow-sm rounded-xl p-4 dark:text-white transition border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] hover:shadow-md">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-10 h-10 bg-indigo-50 rounded-lg dark:bg-indigo-900/20">
-                          <GraduationCap className="text-indigo-600 dark:text-indigo-400" size={20} />
-                        </div>
-                        <div>
-                          <strong className="text-gray-800 dark:text-white text-sm">
-                            Academic Qualification
-                          </strong>
-                          <div className="flex items-center text-sm gap-2 mt-1 text-green-600">
-                            {dashboardData?.academic_qualifications.is_complete ? 'Completed' : 'Incomplete'}
-                          </div>
-                        </div>
-                      </div>
-                      <Link
-                        href={`/student/editProfile?profileTab=academics`}
-                        className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-                      >
-                        {dashboardData?.academic_qualifications.is_complete ? 'Update' : 'Complete'} ›
-                      </Link>
-                    </div>
-
-                    {/* Test Scores */}
-                    <div className="flex items-center justify-between shadow-sm rounded-xl p-4 dark:text-white transition border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] hover:shadow-md">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-10 h-10 bg-indigo-50 rounded-lg dark:bg-indigo-900/20">
-                          <Star className="text-indigo-600 dark:text-indigo-400" size={20} />
-                        </div>
-                        <div>
-                          <strong className="text-gray-800 dark:text-white text-sm">
-                            Test Scores
-                          </strong>
-                          <div className={`flex items-center gap-2 text-sm mt-1 ${dashboardData?.test_scores.is_complete ? 'text-green-600' : 'text-yellow-500'}`}>
-                            {dashboardData?.test_scores.is_complete ? 'Completed' : `Added (${dashboardData?.test_scores.total_added || 0} Test${dashboardData?.test_scores.total_added !== 1 ? 's' : ''})`}
-                          </div>
-                        </div>
-                      </div>
-                      <Link
-                        href={`/student/editProfile?profileTab=testscores`}
-                        className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-                      >
-                        {dashboardData?.test_scores.is_complete ? 'Update' : 'Complete'} ›
-                      </Link>
-                    </div>
-
-                    {/* Work Experience (optional) */}
-                    <div className="flex items-center justify-between shadow-sm rounded-xl p-4 dark:text-white transition border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] hover:shadow-md">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-10 h-10 bg-indigo-50 rounded-lg dark:bg-indigo-900/20">
-                          <Briefcase className="text-indigo-600 dark:text-indigo-400" size={20} />
-                        </div>
-                        <div>
-                          <strong className="text-gray-800 dark:text-white text-sm">
-                            Work Experience (optional)
-                          </strong>
-                          <div className={`flex items-center gap-2 mt-1 text-sm ${dashboardData?.work_experience.is_complete ? 'text-green-600' : 'text-blue-600'}`}>
-                            {dashboardData?.work_experience.is_complete ? 'Completed' : 'Optional / Not Added'}
-                          </div>
-                        </div>
-                      </div>
-                      <Link
-                        href={`/student/editProfile?profileTab=workexperience`}
-                        className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-                      >
-                        {dashboardData?.work_experience.is_complete ? 'Update' : 'Add'} ›
-                      </Link>
-                    </div>
                   </div>
                 </div>
               </div>

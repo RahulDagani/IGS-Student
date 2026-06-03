@@ -64,7 +64,11 @@ export const GoogleLoginButton = ({
                 } else {
                   // Default redirects
                   if (user.role_key === 'student') {
-                    router.push('/student');
+                    if (!user.phone_number) {
+                      router.push('/signin/phone?returnUrl=%2Fstudent');
+                    } else {
+                      router.push('/student');
+                    }
                   } else if (user.role_key === 'agent') {
                     router.push('/agent');
                   } else {

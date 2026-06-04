@@ -74,6 +74,24 @@ const emptyFilters = (): FilterOptions => ({
   disciplines: [], studyLevels: [], universities: [], countries: [], intakes: [], intakeYears: [],
 });
 
+// ─── Session persistence ────────────────────────────────────────────────────────
+
+const COURSES_STATE_KEY = 'igs_student_courses_state';
+
+function loadCoursesState(): { filters: FilterOptions; search: string; labels: Record<string, Record<number, string>> } | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = sessionStorage.getItem(COURSES_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveCoursesState(filters: FilterOptions, search: string, labels: Record<string, Record<number, string>>) {
+  try {
+    sessionStorage.setItem(COURSES_STATE_KEY, JSON.stringify({ filters, search, labels }));
+  } catch {}
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
 const getCountryName = (code: string | undefined | null) => {
@@ -599,7 +617,7 @@ export default function StudentProgramsPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => loadCoursesState()?.search ?? '');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
@@ -607,9 +625,9 @@ export default function StudentProgramsPage() {
   const [alertMessage, setAlertMessage] = useState('');
   const [isApplying, setIsApplying] = useState(false);
 
-  const [filters, setFilters] = useState<FilterOptions>(emptyFilters());
-  const [modalFilters, setModalFilters] = useState<FilterOptions>(emptyFilters());
-  const [filterLabels, setFilterLabels] = useState<Record<string, Record<number, string>>>({});
+  const [filters, setFilters] = useState<FilterOptions>(() => loadCoursesState()?.filters ?? emptyFilters());
+  const [modalFilters, setModalFilters] = useState<FilterOptions>(() => loadCoursesState()?.filters ?? emptyFilters());
+  const [filterLabels, setFilterLabels] = useState<Record<string, Record<number, string>>>(() => loadCoursesState()?.labels ?? {});
 
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -618,6 +636,7 @@ export default function StudentProgramsPage() {
   const observerRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const filterDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const isFirstMountRef = useRef(true);
 
   // ── Query builders ──────────────────────────────────────────────────────────
 
@@ -682,12 +701,19 @@ export default function StudentProgramsPage() {
   // ── Effects ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    fetchFilters();
-    fetchCourses(1, false, filters, '');
+    fetchFilters(filters);
+    fetchCourses(1, false, filters, searchTerm);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Persist filters + search to sessionStorage so back-navigation restores them
   useEffect(() => {
+    saveCoursesState(filters, searchTerm, filterLabels);
+  }, [filters, searchTerm, filterLabels]);
+
+  useEffect(() => {
+    // Skip on first mount — initial effect already fetches with restored state
+    if (isFirstMountRef.current) { isFirstMountRef.current = false; return; }
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
       setCurrentPage(1);

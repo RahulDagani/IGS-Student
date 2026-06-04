@@ -498,18 +498,6 @@ export default function StudentRegistrationPage() {
               </p>
             </div>
 
-            {/* Alert Messages */}
-            {showAlert && alert && (
-              <Alert
-                type={alert.type}
-                message={alert.message}
-                onClose={() => {
-                  setShowAlert(false);
-                  setAlert(null);
-                }}
-              />
-            )}
-
             {registrationComplete ? (
               <div className="text-center py-10">
                 <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -638,7 +626,7 @@ export default function StudentRegistrationPage() {
                     </div>
 
                     {/* Display submit errors from API */}
-                    {errors.submit && !showAlert && (
+                    {errors.submit && (
                       <Alert
                         type="error"
                         message={errors.submit}

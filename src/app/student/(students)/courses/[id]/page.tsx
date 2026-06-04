@@ -785,6 +785,19 @@ const CourseDetailsPage: React.FC = () => {
         />
       )}
 
+      {/* Back Navigation */}
+      <div className="px-4 pt-4">
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back
+        </button>
+      </div>
+
       {/* Hero Section */}
       <section className="course-details-head bg-white dark:bg-gray-800 py-8">
         <div className="container mx-auto px-4">

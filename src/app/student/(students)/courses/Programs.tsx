@@ -58,7 +58,7 @@ interface Course {
   discipline_name: string;
   university_logo_url: string;
   is_shortlisted?: number | null;
-  intakes?: { intake_id: number; intake_year: number; intake_name: string; }[];
+  intakes?: { id: number; intake_id: number; intake_year: number; intake_name: string; }[];
 }
 
 interface FilterOptions {
@@ -313,7 +313,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
   };
 
   useEffect(() => {
-    if (course?.intakes?.length) setSelectedIntakeId(course.intakes[0].intake_id);
+    if (course?.intakes?.length) setSelectedIntakeId(course.intakes[0].id);
     else setSelectedIntakeId(0);
     setAppLogin('');
     setAppPassword('');
@@ -377,14 +377,14 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
             ) : (
               <div className="space-y-2">
                 {course.intakes?.map(intake => {
-                  const sel = selectedIntakeId === intake.intake_id;
+                  const sel = selectedIntakeId === intake.id;
                   return (
-                    <label key={intake.intake_id}
+                    <label key={intake.id}
                       className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                         sel ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}>
-                      <input type="radio" name="intake" value={intake.intake_id} checked={sel}
-                        onChange={() => setSelectedIntakeId(intake.intake_id)}
+                      <input type="radio" name="intake" value={intake.id} checked={sel}
+                        onChange={() => setSelectedIntakeId(intake.id)}
                         className="h-4 w-4 text-brand-500 focus:ring-brand-500 border-gray-300" />
                       <span className={`text-sm font-medium ${sel ? 'text-brand-700 dark:text-brand-300' : 'text-gray-700 dark:text-gray-300'}`}>
                         {intake.intake_name} {intake.intake_year}

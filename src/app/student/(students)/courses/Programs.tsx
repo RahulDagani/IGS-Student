@@ -424,7 +424,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
             Cancel
           </button>
           <button onClick={() => onConfirm(selectedIntakeId, appLogin, appPassword)}
-            disabled={loading || !hasIntakes || selectedIntakeId === 0}
+            disabled={loading || !hasIntakes || !selectedIntakeId}
             className="flex-1 px-4 py-2.5 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             {loading ? (
               <>

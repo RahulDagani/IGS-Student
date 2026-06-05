@@ -216,7 +216,7 @@ export default function PendingPaymentsPage() {
   const getTotalSelectedAmount = () => {
     return selectedPayments.reduce((total, paymentId) => {
       const payment = pendingPayments.find(p => p.id === paymentId);
-      return total + (payment ? parseFloat(payment.application_fee) : 0);
+      return total + (payment ? (payment.fee_in_inr ?? 0) : 0);
     }, 0);
   };
 
@@ -229,7 +229,7 @@ export default function PendingPaymentsPage() {
   // Helper function to check if balance is sufficient for a single payment
   const isInsufficientBalance = (payment: PendingPayment) => {
     if (!walletBalance) return true;
-    return parseFloat(walletBalance.balance) < parseFloat(payment.application_fee);
+    return parseFloat(walletBalance.balance) < (payment.fee_in_inr ?? 0);
   };
 
   if (isLoading) {
@@ -399,7 +399,6 @@ export default function PendingPaymentsPage() {
                     { key: "application_fee", label: "Application Fee" },
                     { key: "fee_in_inr", label: "Fee in INR" },
                     { key: "tuition_fee", label: "Tuition Fee" },
-                    { key: "duration", label: "Duration" },
                     { key: "created_at", label: "Applied Date" },
                     { key: "actions", label: "Actions" },
                   ].map(({ key, label }) => (
@@ -458,12 +457,7 @@ export default function PendingPaymentsPage() {
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
                         <div className="text-gray-600 dark:text-gray-400 text-theme-sm">
-                          {formatAmount(payment.tuition_fee)} {payment.currency_code}
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="text-gray-600 dark:text-gray-400 text-theme-sm">
-                          {payment.duration_min} - {payment.duration_max} {payment.duration_unit}
+                          {payment.currency_code} {parseFloat(payment.tuition_fee).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">

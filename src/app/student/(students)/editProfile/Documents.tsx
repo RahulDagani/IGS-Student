@@ -20,6 +20,108 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { openSecureFile } from "@/utils/fileUrl";
 
+interface FileInputProps {
+  documentId: number;
+  isCommon: boolean;
+  applicationId?: number | null;
+  doc_category?: string;
+  docStatus?: string;
+  isUploading: boolean;
+  progress: number;
+  fileError: string;
+  success: boolean;
+  selectedFileForDoc: File | null;
+  verifierEmailValue: string;
+  onVerifierEmailChange: (value: string) => void;
+  onFileSelect: (file: File | null) => void;
+  onUpload: () => void;
+}
+
+function FileInput({
+  documentId, isCommon, applicationId = null, doc_category, docStatus,
+  isUploading, progress, fileError, success, selectedFileForDoc,
+  verifierEmailValue, onVerifierEmailChange, onFileSelect, onUpload,
+}: FileInputProps) {
+  return (
+    <div className="w-64 flex flex-col gap-2">
+      {success && (
+        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-md">
+          <CheckCircle size={15} />
+          Uploaded successfully
+        </div>
+      )}
+      {fileError && (
+        <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-md">
+          <AlertCircle size={15} />
+          {fileError}
+        </div>
+      )}
+      {docStatus !== 'verified' && (
+        <div className="flex flex-col gap-1.5">
+          <input
+            type="email"
+            placeholder="Verifier email (e.g. bank@example.com)"
+            value={verifierEmailValue}
+            onChange={(e) => onVerifierEmailChange(e.target.value)}
+            disabled={isUploading}
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-400 dark:text-gray-500">Email of the authority who can verify this document</p>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <label className="flex items-center gap-1.5 cursor-pointer border dark:text-white border-gray-300 dark:border-gray-600 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50 dark:hover:bg-gray-700 shrink-0">
+          <UploadCloud size={14} />
+          {selectedFileForDoc
+            ? <span className="max-w-[80px] truncate">{selectedFileForDoc.name}</span>
+            : 'Choose File'}
+          <input
+            type="file"
+            className="hidden"
+            onChange={(e) => onFileSelect(e.target.files?.[0] || null)}
+            disabled={isUploading}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={onUpload}
+          disabled={isUploading || !selectedFileForDoc}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm shrink-0 ${
+            isUploading || !selectedFileForDoc
+              ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed'
+              : 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600'
+          } text-white`}
+        >
+          {isUploading ? (
+            <>
+              <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
+              Uploading...
+            </>
+          ) : (
+            <>
+              <UploadCloud size={14} />
+              Upload
+            </>
+          )}
+        </button>
+      </div>
+      {isUploading && (
+        <div className="w-full">
+          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+            <span>{Math.round(progress)}%</span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+            <div
+              className="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface BaseDocument {
   id: number;
   agent_id: number;
@@ -316,104 +418,6 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
     }
   };
 
-  const FileInput = ({ documentId, isCommon, applicationId = null, doc_category, docStatus }: {
-    documentId: number;
-    isCommon: boolean;
-    applicationId?: number | null;
-    doc_category?: string;
-    docStatus?: string;
-  }) => {
-    const isUploading = uploading[documentId];
-    const progress = uploadProgress[documentId] ?? 0;
-    const fileError = uploadErrors[documentId];
-    const success = uploadSuccess[documentId];
-    const selectedFileForDoc = selectedFile[documentId];
-
-    return (
-      <div className="w-64 flex flex-col gap-2">
-        {success && (
-          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-md">
-            <CheckCircle size={15} />
-            Uploaded successfully
-          </div>
-        )}
-
-        {fileError && (
-          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-md">
-            <AlertCircle size={15} />
-            {fileError}
-          </div>
-        )}
-
-        {docStatus !== 'verified' && (
-          <div className="flex flex-col gap-1.5">
-            <input
-              type="email"
-              placeholder="Verifier email (e.g. bank@example.com)"
-              value={verifierEmail[documentId] || ''}
-              onChange={(e) => setVerifierEmail(prev => ({ ...prev, [documentId]: e.target.value }))}
-              disabled={isUploading}
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-400 dark:text-gray-500">Email of the authority who can verify this document</p>
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          <label className="flex items-center gap-1.5 cursor-pointer border dark:text-white border-gray-300 dark:border-gray-600 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50 dark:hover:bg-gray-700 shrink-0">
-            <UploadCloud size={14} />
-            {selectedFileForDoc
-              ? <span className="max-w-[80px] truncate">{selectedFileForDoc.name}</span>
-              : 'Choose File'}
-            <input
-              type="file"
-              className="hidden"
-              onChange={(e) => handleFileSelect(documentId, e.target.files?.[0] || null)}
-              disabled={isUploading}
-            />
-          </label>
-
-          <button
-            type="button"
-            onClick={() => uploadFile(documentId, isCommon, applicationId, doc_category)}
-            disabled={isUploading || !selectedFileForDoc}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm shrink-0 ${
-              isUploading || !selectedFileForDoc
-                ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed'
-                : 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600'
-            } text-white`}
-          >
-            {isUploading ? (
-              <>
-                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <UploadCloud size={14} />
-                Upload
-              </>
-            )}
-          </button>
-        </div>
-
-        {isUploading && (
-          <div className="w-full">
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-              <span>{Math.round(progress)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-              <div
-                className="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   // Document card component
   const DocumentCard = ({ doc }: { doc: Document }) => {
     const statusConfig = getStatusIcon(doc.status, doc.is_mandatory);
@@ -497,6 +501,15 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
                 applicationId={!isCommon ? doc.application_id : null}
                 doc_category={doc.doc_category}
                 docStatus={doc.status}
+                isUploading={uploading[doc.id] ?? false}
+                progress={uploadProgress[doc.id] ?? 0}
+                fileError={uploadErrors[doc.id] ?? ''}
+                success={uploadSuccess[doc.id] ?? false}
+                selectedFileForDoc={selectedFile[doc.id] ?? null}
+                verifierEmailValue={verifierEmail[doc.id] ?? ''}
+                onVerifierEmailChange={(val) => setVerifierEmail(prev => ({ ...prev, [doc.id]: val }))}
+                onFileSelect={(file) => handleFileSelect(doc.id, file)}
+                onUpload={() => uploadFile(doc.id, isCommon, !isCommon ? doc.application_id : null, doc.doc_category)}
               />
             </div>
           )}

@@ -509,7 +509,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
                 verifierEmailValue={verifierEmail[doc.id] ?? ''}
                 onVerifierEmailChange={(val) => setVerifierEmail(prev => ({ ...prev, [doc.id]: val }))}
                 onFileSelect={(file) => handleFileSelect(doc.id, file)}
-                onUpload={() => uploadFile(doc.id, isCommon, !isCommon ? doc.application_id : null, doc.doc_category)}
+                onUpload={() => uploadFile(doc.id, isCommon, !isCommon ? (doc.application_id ?? null) : null, doc.doc_category)}
               />
             </div>
           )}

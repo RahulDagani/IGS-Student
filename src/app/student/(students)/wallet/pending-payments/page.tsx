@@ -1,5 +1,6 @@
 "use client"
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -297,6 +298,12 @@ export default function PendingPaymentsPage() {
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
             {walletBalance ? formatBalance(walletBalance.balance) : formatBalance(0)}
           </div>
+          <Link
+            href="/student/wallet"
+            className="inline-block mt-2 text-xs text-brand-500 hover:text-brand-600 underline font-medium"
+          >
+            + Add Balance
+          </Link>
         </div>
       </div>
 
@@ -350,8 +357,11 @@ export default function PendingPaymentsPage() {
             {selectedPayments.length > 0 && (
               <div className="flex items-center gap-3">
                 {!hasSufficientBalance() && (
-                  <span className="text-sm text-red-600 dark:text-red-400">
-                    Insufficient balance
+                  <span className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    Insufficient balance —{' '}
+                    <Link href="/student/wallet" className="underline font-medium hover:text-red-800 dark:hover:text-red-300">
+                      Add Balance
+                    </Link>
                   </span>
                 )}
                 <button
@@ -462,13 +472,23 @@ export default function PendingPaymentsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 text-start">
-                        <button
-                          onClick={() => handlePaySingle(payment.id)}
-                          disabled={isPaying || isInsufficientBalance(payment)}
-                          className="px-3 py-1 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isPaying ? "Paying..." : "Pay Now"}
-                        </button>
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => handlePaySingle(payment.id)}
+                            disabled={isPaying || isInsufficientBalance(payment)}
+                            className="px-3 py-1 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isPaying ? "Paying..." : "Pay Now"}
+                          </button>
+                          {isInsufficientBalance(payment) && (
+                            <Link
+                              href="/student/wallet"
+                              className="text-xs text-red-600 dark:text-red-400 underline hover:text-red-800 dark:hover:text-red-300 text-center"
+                            >
+                              Add Balance
+                            </Link>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

@@ -781,8 +781,8 @@ const updateCredentials = async () => {
                         <CheckCircle size={11} /> Paid
                       </span>
                     ) : (
-                      <Link href="/student/wallet/pending-payments" className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors">
-                        <CreditCard size={11} /> Fee Pending
+                      <Link href="/student/wallet/pending-payments" className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors cursor-pointer" title="Click to pay">
+                        <CreditCard size={11} /> Fee Pending · <span className="underline">Click to Pay</span>
                       </Link>
                     )
                   )}

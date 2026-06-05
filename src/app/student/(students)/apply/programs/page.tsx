@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import Badge from "@/components/ui/badge/Badge";
 import { DockIcon, DollarSign, GraduationCap, MapPin } from "lucide-react";
 import {useAuth} from '@/context/AuthContext';
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 
 interface Course {
@@ -607,7 +607,8 @@ const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
 export default function ProgramCards() {
   const {token, logout} = useAuth()
-  const {id: student_user_id} = useParams();   
+  const {id: student_user_id} = useParams();
+  const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -701,18 +702,18 @@ export default function ProgramCards() {
       const result = await response.json();
       
       if (result.success) {
-        setAlertType('success');
-        setAlertMessage(`Your application for ${selectedCourse.course_name} at ${selectedCourse.university_name} has been submitted successfully!`);
+        const appId = result.application_id;
+        router.push(`/student/editProfile?tab=applications${appId ? `&app=${appId}` : ''}`);
       } else {
         throw new Error(result.message || 'Application failed');
       }
     } catch (err) {
       setAlertType('error');
       setAlertMessage(err instanceof Error ? err.message : 'Failed to submit application. Please try again.');
-    } finally {
-      setIsApplying(false);
       setIsConfirmModalOpen(false);
       setIsAlertModalOpen(true);
+    } finally {
+      setIsApplying(false);
     }
   };
 

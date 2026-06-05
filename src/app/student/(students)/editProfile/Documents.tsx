@@ -20,6 +20,21 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { openSecureFile } from "@/utils/fileUrl";
 
+interface DocumentCardHandlers {
+  activeTab: string;
+  uploading: { [key: number]: boolean };
+  uploadProgress: { [key: number]: number };
+  uploadErrors: { [key: number]: string };
+  uploadSuccess: { [key: number]: boolean };
+  selectedFile: { [key: number]: File | null };
+  verifierEmail: { [key: number]: string };
+  setVerifierEmail: React.Dispatch<React.SetStateAction<{ [key: number]: string }>>;
+  handleFileSelect: (documentId: number, file: File | null) => void;
+  uploadFile: (documentId: number, isCommon: boolean, applicationId: number | null, doc_category?: string) => void;
+  formatDate: (dateString: string | null) => string;
+  getStatusIcon: (status: string, isMandatory: number) => { icon: React.ReactNode; borderColor: string; bgColor: string };
+}
+
 interface FileInputProps {
   documentId: number;
   isCommon: boolean;
@@ -201,6 +216,84 @@ interface UploadSuccess {
 
 interface DocumentsPageProps {
   onDocumentUpload: () => void; // Optional if not always provided
+}
+
+function DocumentCard({ doc, handlers }: { doc: Document; handlers: DocumentCardHandlers }) {
+  const { activeTab, uploading, uploadProgress, uploadErrors, uploadSuccess, selectedFile, verifierEmail, setVerifierEmail, handleFileSelect, uploadFile, formatDate, getStatusIcon } = handlers;
+  const statusConfig = getStatusIcon(doc.status, doc.is_mandatory);
+  const fileName = doc.file_url ? doc.file_url.split('/').pop() : 'No file uploaded';
+  const isCommon = doc.is_common === true;
+
+  return (
+    <div className={`border-l-4 ${statusConfig.borderColor} ${statusConfig.bgColor} p-5 rounded-md mb-4`}>
+      <div className="flex justify-between items-start">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            {statusConfig.icon}
+            <span className="font-semibold dark:text-white">
+              {doc.document_name} {doc.is_mandatory === 1 && '*'}
+            </span>
+            {!isCommon && (
+              <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">Specific</span>
+            )}
+          </div>
+          {!isCommon && doc.university_name && (
+            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
+              <Building size={14} />
+              <span className="font-medium">{doc.university_name}</span>
+              {doc.course_name && (<><span className="mx-1">•</span><GraduationCap size={14} /><span>{doc.course_name}</span></>)}
+            </div>
+          )}
+          <div className="mt-2 text-sm text-gray-700 dark:text-gray-300 space-y-1">
+            <p>
+              <strong className="dark:text-gray-200">Status:</strong>{' '}
+              <span className={`capitalize font-medium ${doc.status === 'verified' ? 'text-blue-600 dark:text-blue-400' : doc.status === 'uploaded' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                {doc.status}
+              </span>
+            </p>
+            {doc.uploaded_at && <p><strong className="dark:text-gray-200">Uploaded On:</strong> {formatDate(doc.uploaded_at)}</p>}
+            {doc.verifier_email && <p><strong className="dark:text-gray-200">Verifier:</strong> {doc.verifier_email}</p>}
+            {doc.verification_email_sent_at && <p className="text-blue-600 dark:text-blue-400 text-xs">Verification email sent on {formatDate(doc.verification_email_sent_at)}</p>}
+            {isCommon && doc.study_level_name && <p><strong className="dark:text-gray-200">Study Level:</strong> {doc.study_level_name}</p>}
+          </div>
+        </div>
+        {activeTab !== 'Igs' && (
+          <div className="ml-4">
+            <FileInput
+              documentId={doc.id}
+              isCommon={isCommon}
+              applicationId={!isCommon ? doc.application_id : null}
+              doc_category={doc.doc_category}
+              docStatus={doc.status}
+              isUploading={uploading[doc.id] ?? false}
+              progress={uploadProgress[doc.id] ?? 0}
+              fileError={uploadErrors[doc.id] ?? ''}
+              success={uploadSuccess[doc.id] ?? false}
+              selectedFileForDoc={selectedFile[doc.id] ?? null}
+              verifierEmailValue={verifierEmail[doc.id] ?? ''}
+              onVerifierEmailChange={(val) => setVerifierEmail(prev => ({ ...prev, [doc.id]: val }))}
+              onFileSelect={(file) => handleFileSelect(doc.id, file)}
+              onUpload={() => uploadFile(doc.id, isCommon, !isCommon ? (doc.application_id ?? null) : null, doc.doc_category)}
+            />
+          </div>
+        )}
+      </div>
+      {doc.file_url && (
+        <div className="mt-4 flex items-center gap-3">
+          <a href="#" onClick={(e) => { e.preventDefault(); openSecureFile(doc.file_url); }}
+            className="bg-white dark:bg-gray-800 border flex items-center dark:border-gray-600 px-3 py-1 rounded-md text-sm dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            {fileName}<Eye size={16} className="ml-2" />
+          </a>
+          {activeTab === 'Igs' && (
+            <a href="#" onClick={(e) => { e.preventDefault(); openSecureFile(doc.file_url); }}
+              className="inline-flex items-center justify-center rounded-md border bg-white px-3 py-[2px] text-gray-600 transition hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700" title="Download file">
+              Download<Download size={16} className="ml-2" />
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) {
@@ -418,130 +511,6 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
     }
   };
 
-  // Document card component
-  const DocumentCard = ({ doc }: { doc: Document }) => {
-    const statusConfig = getStatusIcon(doc.status, doc.is_mandatory);
-    const fileName = doc.file_url ? doc.file_url.split('/').pop() : 'No file uploaded';
-    const isCommon = doc.is_common === true;
-
-    return (
-      <div
-        className={`border-l-4 ${statusConfig.borderColor} ${statusConfig.bgColor} p-5 rounded-md mb-4`}
-      >
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              {statusConfig.icon}
-              <span className="font-semibold dark:text-white">
-                {doc.document_name} {doc.is_mandatory === 1 && '*'}
-              </span>
-              {!isCommon && (
-                <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
-                  Specific
-                </span>
-              )}
-            </div>
-
-            {!isCommon && doc.university_name && (
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
-                <Building size={14} />
-                <span className="font-medium">{doc.university_name}</span>
-                {doc.course_name && (
-                  <>
-                    <span className="mx-1">•</span>
-                    <GraduationCap size={14} />
-                    <span>{doc.course_name}</span>
-                  </>
-                )}
-              </div>
-            )}
-
-            <div className="mt-2 text-sm text-gray-700 dark:text-gray-300 space-y-1">
-              <p>
-                <strong className="dark:text-gray-200">Status:</strong>{' '}
-                <span className={`capitalize font-medium ${
-                  doc.status === 'verified' ? 'text-blue-600 dark:text-blue-400' :
-                  doc.status === 'uploaded' ? 'text-green-600 dark:text-green-400' :
-                  'text-red-600 dark:text-red-400'
-                }`}>
-                  {doc.status}
-                </span>
-              </p>
-              {doc.uploaded_at && (
-                <p>
-                  <strong className="dark:text-gray-200">Uploaded On:</strong>{' '}
-                  {formatDate(doc.uploaded_at)}
-                </p>
-              )}
-              {doc.verifier_email && (
-                <p>
-                  <strong className="dark:text-gray-200">Verifier:</strong>{' '}
-                  {doc.verifier_email}
-                </p>
-              )}
-              {doc.verification_email_sent_at && (
-                <p className="text-blue-600 dark:text-blue-400 text-xs">
-                  Verification email sent on {formatDate(doc.verification_email_sent_at)}
-                </p>
-              )}
-              {isCommon && doc.study_level_name && (
-                <p>
-                  <strong className="dark:text-gray-200">Study Level:</strong>{' '}
-                  {doc.study_level_name}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {activeTab !== 'Igs' && (
-            <div className="ml-4">
-              <FileInput
-                documentId={doc.id}
-                isCommon={isCommon}
-                applicationId={!isCommon ? doc.application_id : null}
-                doc_category={doc.doc_category}
-                docStatus={doc.status}
-                isUploading={uploading[doc.id] ?? false}
-                progress={uploadProgress[doc.id] ?? 0}
-                fileError={uploadErrors[doc.id] ?? ''}
-                success={uploadSuccess[doc.id] ?? false}
-                selectedFileForDoc={selectedFile[doc.id] ?? null}
-                verifierEmailValue={verifierEmail[doc.id] ?? ''}
-                onVerifierEmailChange={(val) => setVerifierEmail(prev => ({ ...prev, [doc.id]: val }))}
-                onFileSelect={(file) => handleFileSelect(doc.id, file)}
-                onUpload={() => uploadFile(doc.id, isCommon, !isCommon ? (doc.application_id ?? null) : null, doc.doc_category)}
-              />
-            </div>
-          )}
-        </div>
-
-        {doc.file_url && (
-          <div className="mt-4 flex items-center gap-3">
-            <a
-              href="#"
-              onClick={(e) => { e.preventDefault(); openSecureFile(doc.file_url); }}
-              className="bg-white dark:bg-gray-800 border flex items-center dark:border-gray-600 px-3 py-1 rounded-md text-sm dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              {fileName}
-              <Eye size={16} className="ml-2" />
-            </a>
-
-            {activeTab === 'Igs' && (
-              <a
-                href="#"
-                onClick={(e) => { e.preventDefault(); openSecureFile(doc.file_url); }}
-                className="inline-flex items-center justify-center rounded-md border bg-white px-3 py-[2px] text-gray-600 transition hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                title="Download file"
-              >
-                Download
-                <Download size={16} className="ml-2" />
-              </a>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   if (loading) {
     return (
@@ -570,6 +539,11 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
       </div>
     );
   }
+
+  const cardHandlers: DocumentCardHandlers = {
+    activeTab, uploading, uploadProgress, uploadErrors, uploadSuccess,
+    selectedFile, verifierEmail, setVerifierEmail, handleFileSelect, uploadFile, formatDate, getStatusIcon,
+  };
 
   return (
     <div className="w-full min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
@@ -627,7 +601,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
                   </p>
                 ) : (
                   mandatoryDocuments.map((doc) => (
-                    <DocumentCard key={doc.id} doc={doc} />
+                    <DocumentCard key={doc.id} doc={doc} handlers={cardHandlers} />
                   ))
                 )}
               </div>
@@ -658,7 +632,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
                   </p>
                 ) : (
                   nonMandatoryDocuments.map((doc) => (
-                    <DocumentCard key={doc.id} doc={doc} />
+                    <DocumentCard key={doc.id} doc={doc} handlers={cardHandlers} />
                   ))
                 )}
               </div>
@@ -697,7 +671,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
                   </p>
                 ) : (
                   mandatoryDocuments.map((doc) => (
-                    <DocumentCard key={doc.id} doc={doc} />
+                    <DocumentCard key={doc.id} doc={doc} handlers={cardHandlers} />
                   ))
                 )}
               </div>
@@ -728,7 +702,7 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
                   </p>
                 ) : (
                   nonMandatoryDocuments.map((doc) => (
-                    <DocumentCard key={doc.id} doc={doc} />
+                    <DocumentCard key={doc.id} doc={doc} handlers={cardHandlers} />
                   ))
                 )}
               </div>

@@ -75,12 +75,23 @@ interface FilterModalProps {
 }
 
 // Application Confirmation Modal Component
+interface CourseIntake {
+  id: number;
+  course_id: number;
+  intake_id: number;
+  intake_year: number;
+  intake_name: string;
+  application_deadline: string;
+}
+
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (courseIntakeId: number) => void;
   course: Course | null;
   loading: boolean;
+  token: string | null;
+  baseUrl: string;
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -88,14 +99,42 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onClose,
   onConfirm,
   course,
-  loading
+  loading,
+  token,
+  baseUrl,
 }) => {
+  const [intakes, setIntakes] = useState<CourseIntake[]>([]);
+  const [selectedIntakeId, setSelectedIntakeId] = useState<number | null>(null);
+  const [intakesLoading, setIntakesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !course) return;
+    setSelectedIntakeId(null);
+    setIntakes([]);
+    setIntakesLoading(true);
+    fetch(`${baseUrl}/student/course/intake/${course.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          setIntakes(d.data || []);
+          if (d.data?.length === 1) setSelectedIntakeId(d.data[0].id);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setIntakesLoading(false));
+  }, [isOpen, course?.id]);
+
   if (!isOpen || !course) return null;
 
   const formatFee = (fee: string, currency: string) => {
     if (!fee || fee === "0.00") return "Free";
     return `${currency} ${parseFloat(fee).toLocaleString()}`;
   };
+
+  const formatDeadline = (date: string) =>
+    new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -108,7 +147,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             Please review your application details before submitting:
           </p>
 
-          <div className="space-y-3 mb-6">
+          <div className="space-y-3 mb-4">
             <div className="flex justify-between">
               <span className="text-sm text-gray-600 dark:text-gray-400">Course:</span>
               <span className="text-sm font-medium text-gray-800 dark:text-white">{course.course_name}</span>
@@ -129,6 +168,31 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             </div>
           </div>
 
+          {/* Intake Selection */}
+          <div className="mb-5">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Select Intake <span className="text-red-500">*</span>
+            </label>
+            {intakesLoading ? (
+              <div className="text-sm text-gray-400 py-2">Loading intakes...</div>
+            ) : intakes.length === 0 ? (
+              <div className="text-sm text-red-500 py-2">No available intakes for this course.</div>
+            ) : (
+              <select
+                value={selectedIntakeId ?? ""}
+                onChange={e => setSelectedIntakeId(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-800 dark:text-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">— Select an intake —</option>
+                {intakes.map(intake => (
+                  <option key={intake.id} value={intake.id}>
+                    {intake.intake_name} {intake.intake_year} — Deadline: {formatDeadline(intake.application_deadline)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <div className="flex gap-3">
             <button
               onClick={onClose}
@@ -138,8 +202,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
               Cancel
             </button>
             <button
-              onClick={onConfirm}
-              disabled={loading}
+              onClick={() => selectedIntakeId && onConfirm(selectedIntakeId)}
+              disabled={loading || !selectedIntakeId || intakesLoading || intakes.length === 0}
               className="flex-1 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-green-500/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
@@ -675,15 +739,15 @@ export default function ProgramCards() {
   };
 
   // Handle application submission
-  const handleConfirmApplication = async () => {
+  const handleConfirmApplication = async (courseIntakeId: number) => {
     if (!selectedCourse) return;
 
     setIsApplying(true);
     try {
       const payload = {
         course_id: selectedCourse.id,
+        course_intake_id: courseIntakeId,
         study_level_id: selectedCourse.study_level_id,
-        remarks: "Student wants Jan 2025 intake"
       };
 
       const response = await fetch(`${BASE_URL}/student/application/create`, {
@@ -959,6 +1023,8 @@ export default function ProgramCards() {
         onConfirm={handleConfirmApplication}
         course={selectedCourse}
         loading={isApplying}
+        token={token}
+        baseUrl={BASE_URL || ''}
       />
 
       {/* Alert Modal */}

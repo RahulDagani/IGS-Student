@@ -138,6 +138,8 @@ interface Course {
   university_logo: string;
   university_logo_url: string;
   university_website: string;
+  application_deadlines: string | null;
+  application_procedure: string | null;
   gre_score: string | null;
   gmat_score: string | null;
   ielts_score: string | null;
@@ -814,38 +816,33 @@ const CourseDetailsPage: React.FC = () => {
               </div>
             </AccordionItem>
 
-            {/* University Details Accordion */}
-            <AccordionItem
-              title="University Information"
-              isOpen={openAccordion === 'university'}
-              onToggle={() => toggleAccordion('university')}
-            >
-              <div className="space-y-4">
-                <div>
-                  <h5 className="font-semibold text-gray-800 dark:text-white mb-2">University Details</h5>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    <strong>Name:</strong> {course.university}
-                  </p>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    <strong>Location:</strong> {locationNames.city}, {locationNames.state}, {locationNames.country}
-                  </p>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    <strong>Website:</strong>{' '}
-                    <a 
-                      href={course.university_website} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                    >
-                      {course.university_website}
-                    </a>
-                  </p>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    <strong>Discipline:</strong> {course.discipline_name}
-                  </p>
-                </div>
-              </div>
-            </AccordionItem>
+            {/* Application Deadlines Accordion */}
+            {course.application_deadlines && (
+              <AccordionItem
+                title="Application Deadlines"
+                isOpen={openAccordion === 'application_deadlines'}
+                onToggle={() => toggleAccordion('application_deadlines')}
+              >
+                <div
+                  className="prose prose-gray dark:prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: course.application_deadlines }}
+                />
+              </AccordionItem>
+            )}
+
+            {/* Application Procedure Accordion */}
+            {course.application_procedure && (
+              <AccordionItem
+                title="Application Procedure"
+                isOpen={openAccordion === 'application_procedure'}
+                onToggle={() => toggleAccordion('application_procedure')}
+              >
+                <div
+                  className="prose prose-gray dark:prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: course.application_procedure }}
+                />
+              </AccordionItem>
+            )}
           </div>
         </div>
       </section>

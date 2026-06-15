@@ -747,8 +747,8 @@ const updateCredentials = async () => {
       </div>
 
       {activeTab === 'applied' ? (
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-4 space-y-4">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-4 space-y-4">
             {applications.map(item => (
               <div
                 key={item.id}
@@ -771,18 +771,18 @@ const updateCredentials = async () => {
                 </div>
 
                 {activeProgram === item.id && (
-                  <div className="absolute right-[-10px] top-1/2 -translate-y-1/2 w-0 h-0 border-t-[10px] border-b-[10px] border-l-[10px] border-transparent border-l-blue-500 dark:border-l-blue-400" />
+                  <div className="hidden lg:block absolute right-[-10px] top-1/2 -translate-y-1/2 w-0 h-0 border-t-[10px] border-b-[10px] border-l-[10px] border-transparent border-l-blue-500 dark:border-l-blue-400" />
                 )}
               </div>
             ))}
           </div>
 
           {detailLoading ? (
-            <div className="col-span-8 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-md p-6 flex items-center justify-center">
+            <div className="lg:col-span-8 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-md p-6 flex items-center justify-center">
               <div className="text-gray-600 dark:text-gray-400">Loading details...</div>
             </div>
           ) : applicationDetail ? (
-            <div className="col-span-8 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-md p-6">
+            <div className="lg:col-span-8 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-md p-6">
               <div className="flex justify-between items-start">
                 <div>
                   {/* <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -1028,7 +1028,7 @@ const updateCredentials = async () => {
 
                 {commentTab === 'specific-doc' && (
                   <div className="mt-6">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       {specificDocuments.map(doc => {
                         const uploadState = getDocumentUploadState(doc.id);
                         const isUploading = uploadState?.isUploading || false;
@@ -1276,7 +1276,7 @@ const updateCredentials = async () => {
               </div>
             </div>
           ) : (
-            <div className="col-span-8 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-md p-6 flex items-center justify-center">
+            <div className="lg:col-span-8 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-md p-6 flex items-center justify-center">
              
               <div className="text-center py-12">
         <div className="text-gray-400 dark:text-gray-400 text-lg mb-2">No Application Created</div>

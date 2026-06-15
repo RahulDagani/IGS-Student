@@ -193,7 +193,7 @@ export default function StudentDetailsPage() {
         <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
 
         {/* Welcome User Section */}
-        <div className="d-flex gap-16 col-span-2 rounded-lg border border-gray-300 dark:border-gray-700 p-4" style={{ flex: 2 }}>
+        <div className="col-span-1 md:col-span-2 rounded-lg border border-gray-300 dark:border-gray-700 p-4">
           <div className="welcomeUser">
             <div className="d-flex welcomeUser-items flex-wrap gap-4">
               <div className="studentDetail">
@@ -232,8 +232,8 @@ export default function StudentDetailsPage() {
 
 
         {/* Main Tabs */}
-        <div className="maintabs-flex-responsive  col-span-4 rounded-lg border border-gray-300 dark:border-gray-700 p-4">
-          <ul className="nav maintabs nav-tabs flex flex-wrap justify-between mx-20" role="tablist">
+        <div className="col-span-1 md:col-span-4 rounded-lg border border-gray-300 dark:border-gray-700 p-4">
+          <ul className="nav maintabs nav-tabs flex flex-nowrap justify-around md:justify-between md:mx-20" role="tablist">
             <li id="profileSection" className="mr-2">
               <button
                 className={`nav-link flex flex-col items-center px-4 py-3 font-medium text-sm ${

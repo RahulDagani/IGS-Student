@@ -106,6 +106,47 @@ const getStateName = (code: string | undefined | null) => {
   return s ? s.name : code;
 };
 
+// ─── Filter Modal sub-components (defined outside to prevent remount on rerender) ─
+
+const filterSearchInputCls = "w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 mb-2";
+
+const FilterSection = ({ title, sectionKey, count, expanded, onToggle, children }: {
+  title: string; sectionKey: string; count?: number; expanded: boolean;
+  onToggle: (s: string) => void; children: React.ReactNode;
+}) => (
+  <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
+    <button type="button" onClick={() => onToggle(sectionKey)}
+      className="flex items-center justify-between w-full py-2 text-left">
+      <span className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-white">
+        {title}
+        {count ? <span className="bg-brand-500 text-white text-xs rounded-full px-1.5 py-0.5">{count}</span> : null}
+      </span>
+      {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+    </button>
+    {expanded && <div className="mt-2">{children}</div>}
+  </div>
+);
+
+const FilterCheckboxList = ({ items, filterKey, getLabel, getId, selectedIds, onToggle }: {
+  items: any[]; filterKey: keyof FilterOptions;
+  getLabel: (item: any) => string; getId: (item: any) => number;
+  selectedIds: number[]; onToggle: (key: keyof FilterOptions, id: number, checked: boolean) => void;
+}) => (
+  <div className="grid grid-cols-2 gap-1 max-h-48 overflow-y-auto pr-1">
+    {items.map(item => (
+      <label key={getId(item)}
+        className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+        <input type="checkbox"
+          checked={selectedIds.includes(getId(item))}
+          onChange={e => onToggle(filterKey, getId(item), e.target.checked)}
+          className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 shrink-0"
+        />
+        <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{getLabel(item)}</span>
+      </label>
+    ))}
+  </div>
+);
+
 // ─── Filter Modal ───────────────────────────────────────────────────────────────
 
 interface FilterModalProps {
@@ -158,9 +199,6 @@ const FilterModal: React.FC<FilterModalProps> = ({
     });
   };
 
-  const isSelected = (key: keyof FilterOptions, value: number) =>
-    (localFilters[key] as number[]).includes(value);
-
   const totalSelected = Object.values(localFilters).reduce((s, v) => s + (Array.isArray(v) ? v.length : 0), 0);
 
   const handleReset = () => {
@@ -172,45 +210,6 @@ const FilterModal: React.FC<FilterModalProps> = ({
   const handleApply = () => { onFilterApply(localFilters); onClose(); };
 
   if (!isOpen || !filterOptions) return null;
-
-  const Section = ({ title, sectionKey, count, children }: {
-    title: string; sectionKey: string; count?: number; children: React.ReactNode;
-  }) => (
-    <div className="border-b border-gray-100 dark:border-gray-800 pb-4">
-      <button type="button" onClick={() => toggleSection(sectionKey)}
-        className="flex items-center justify-between w-full py-2 text-left">
-        <span className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-white">
-          {title}
-          {count ? <span className="bg-brand-500 text-white text-xs rounded-full px-1.5 py-0.5">{count}</span> : null}
-        </span>
-        {expandedSections[sectionKey]
-          ? <ChevronUp className="w-4 h-4 text-gray-400" />
-          : <ChevronDown className="w-4 h-4 text-gray-400" />}
-      </button>
-      {expandedSections[sectionKey] && <div className="mt-2">{children}</div>}
-    </div>
-  );
-
-  const CheckboxList = ({ items, filterKey, getLabel, getId }: {
-    items: any[]; filterKey: keyof FilterOptions;
-    getLabel: (item: any) => string; getId: (item: any) => number;
-  }) => (
-    <div className="grid grid-cols-2 gap-1 max-h-48 overflow-y-auto pr-1">
-      {items.map(item => (
-        <label key={getId(item)}
-          className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-          <input type="checkbox"
-            checked={isSelected(filterKey, getId(item))}
-            onChange={e => handleCheckboxChange(filterKey, getId(item), e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 shrink-0"
-          />
-          <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{getLabel(item)}</span>
-        </label>
-      ))}
-    </div>
-  );
-
-  const searchInputCls = "w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300 mb-2";
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-99999 p-4">
@@ -233,53 +232,61 @@ const FilterModal: React.FC<FilterModalProps> = ({
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
 
-          <Section title="Study Destination" sectionKey="locations" count={localFilters.countries.length || undefined}>
-            <CheckboxList
+          <FilterSection title="Study Destination" sectionKey="locations" count={localFilters.countries.length || undefined} expanded={expandedSections.locations} onToggle={toggleSection}>
+            <FilterCheckboxList
               items={filterOptions.locations.countries}
               filterKey="countries"
               getLabel={c => c.country_name}
               getId={c => c.country_id}
+              selectedIds={localFilters.countries}
+              onToggle={handleCheckboxChange}
             />
-          </Section>
+          </FilterSection>
 
-          <Section title="Study Level" sectionKey="studyLevels" count={localFilters.studyLevels.length || undefined}>
-            <CheckboxList
+          <FilterSection title="Study Level" sectionKey="studyLevels" count={localFilters.studyLevels.length || undefined} expanded={expandedSections.studyLevels} onToggle={toggleSection}>
+            <FilterCheckboxList
               items={filterOptions.studyLevels}
               filterKey="studyLevels"
               getLabel={l => l.name}
               getId={l => l.id}
+              selectedIds={localFilters.studyLevels}
+              onToggle={handleCheckboxChange}
             />
-          </Section>
+          </FilterSection>
 
-          <Section title="Discipline" sectionKey="disciplines" count={localFilters.disciplines.length || undefined}>
+          <FilterSection title="Discipline" sectionKey="disciplines" count={localFilters.disciplines.length || undefined} expanded={expandedSections.disciplines} onToggle={toggleSection}>
             <div className="min-h-[220px]">
               <input type="text" placeholder="Search disciplines..." value={disciplineSearch}
-                onChange={e => setDisciplineSearch(e.target.value)} className={searchInputCls} />
-              <CheckboxList
+                onChange={e => setDisciplineSearch(e.target.value)} className={filterSearchInputCls} />
+              <FilterCheckboxList
                 items={filterOptions.disciplines
                   .filter((d, i, arr) => arr.findIndex(x => x.name === d.name) === i)
                   .filter(d => matchesSearch(d.name, disciplineSearch))}
                 filterKey="disciplines"
                 getLabel={d => d.name}
                 getId={d => d.id}
+                selectedIds={localFilters.disciplines}
+                onToggle={handleCheckboxChange}
               />
             </div>
-          </Section>
+          </FilterSection>
 
-          <Section title="University" sectionKey="universities" count={localFilters.universities.length || undefined}>
+          <FilterSection title="University" sectionKey="universities" count={localFilters.universities.length || undefined} expanded={expandedSections.universities} onToggle={toggleSection}>
             <div className="min-h-[220px]">
               <input type="text" placeholder="Search universities..." value={universitySearch}
-                onChange={e => setUniversitySearch(e.target.value)} className={searchInputCls} />
-              <CheckboxList
+                onChange={e => setUniversitySearch(e.target.value)} className={filterSearchInputCls} />
+              <FilterCheckboxList
                 items={filterOptions.universities
                   .filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i)
                   .filter(u => matchesSearch(u.university, universitySearch))}
                 filterKey="universities"
                 getLabel={u => u.university}
                 getId={u => u.id}
+                selectedIds={localFilters.universities}
+                onToggle={handleCheckboxChange}
               />
             </div>
-          </Section>
+          </FilterSection>
 
         </div>
 

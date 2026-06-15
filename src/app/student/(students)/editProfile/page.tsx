@@ -234,9 +234,9 @@ export default function StudentDetailsPage() {
         {/* Main Tabs */}
         <div className="col-span-1 md:col-span-4 rounded-lg border border-gray-300 dark:border-gray-700 p-4">
           <ul className="nav maintabs nav-tabs flex flex-nowrap justify-around md:justify-between md:mx-20" role="tablist">
-            <li id="profileSection" className="mr-2">
+            <li id="profileSection">
               <button
-                className={`nav-link flex flex-col items-center px-4 py-3 font-medium text-sm ${
+                className={`nav-link flex flex-col items-center px-2 py-3 md:px-4 font-medium text-sm ${
                   activeTab === "profile"
                     ? "border-blue-600 text-blue-600 dark:text-blue-400 "
                     : "border-transparent text-gray-500 hover:text-gray-700  dark:text-gray-400 dark:hover:text-gray-300"
@@ -258,9 +258,9 @@ export default function StudentDetailsPage() {
               
             </li>
             
-            <li id="application" className="mr-2">
+            <li id="application">
               <button
-                className={`nav-link flex flex-col items-center px-4 py-3 font-medium text-sm ${
+                className={`nav-link flex flex-col items-center px-2 py-3 md:px-4 font-medium text-sm ${
                   activeTab === "applications"
                     ? "border-blue-600 text-blue-600 dark:text-blue-400 "
                     : "border-transparent text-gray-500 hover:text-gray-700  dark:text-gray-400 dark:hover:text-gray-300"
@@ -281,7 +281,7 @@ export default function StudentDetailsPage() {
             
             <li id="docsView">
               <button
-                className={`nav-link flex flex-col items-center px-4 py-3 font-medium text-sm ${
+                className={`nav-link flex flex-col items-center px-2 py-3 md:px-4 font-medium text-sm ${
                   activeTab === "documents"
                     ? "border-blue-600 text-blue-600 dark:text-blue-400 "
                     : "border-transparent text-gray-500 hover:text-gray-700  dark:text-gray-400 dark:hover:text-gray-300"

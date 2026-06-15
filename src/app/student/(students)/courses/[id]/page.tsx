@@ -171,338 +171,160 @@ interface CourseDetailsResponse {
   intakes: Intake[];
 }
 
-interface Student {
-  user_id: number;
-  email: string;
-  phone: string;
-  status: string;
-  first_name: string;
-  last_name: string;
-  passport_number: string;
-  dob: string;
-  created_at: string;
+interface CourseForModal {
+  course_name: string;
+  university: string;
+  university_logo_url: string;
+  study_level_name: string;
+  application_fee: string;
+  currency_code: string;
+  intakes: { id: number; intake_id: number; intake_name: string; intake_year: number; }[];
 }
 
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (intakeId: number, studyLevelId: number, appLogin: string, appPassword: string) => void;
-  course: Course | null;
+  onConfirm: (intakeId: number, appLogin: string, appPassword: string) => void;
+  course: CourseForModal | null;
   loading: boolean;
-  students: Student[];
-  isFetchingStudents: boolean;
-  studentError: string | null;
-  courseId: string | string[];
-  token: string | null;
 }
 
-const ConfirmModal: React.FC<ConfirmModalProps> = ({
-  isOpen,
-  onClose,
-  onConfirm,
-  course,
-  loading,
-  students,
-  isFetchingStudents,
-  studentError,
-  courseId,
-  token
-}) => {
+const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm, course, loading }) => {
   const [selectedIntakeId, setSelectedIntakeId] = useState<number>(0);
-  const [intakes, setIntakes] = useState<Intake[]>([]);
-  const [isFetchingIntakes, setIsFetchingIntakes] = useState(false);
-  const [intakesError, setIntakesError] = useState<string | null>(null);
-  const [openIntakeDetails, setOpenIntakeDetails] = useState<number | null>(null);
-
-  const [appLogin,setAppLogin] = useState<string>("");
-  const [appPassword,setAppPassword] = useState<string>("");
-
-  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+  const [appLogin, setAppLogin] = useState('');
+  const [appPassword, setAppPassword] = useState('');
 
   const formatFee = (fee: string, currency: string) => {
-    if (!fee || fee === "0.00") return "Free";
+    if (!fee || fee === '0.00') return 'Free';
     return `${currency} ${parseFloat(fee).toLocaleString()}`;
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  // Fetch intakes when modal opens
   useEffect(() => {
-    if (isOpen && courseId && token) {
-      fetchIntakes();
-    }
-  }, [isOpen, courseId, token]);
-
-  const fetchIntakes = async () => {
-    try {
-      setIsFetchingIntakes(true);
-      setIntakesError(null);
-      
-      const response = await fetch(`${BASE_URL}/student/course/intake/${courseId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch intakes: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setIntakes(data.data || []);
-        
-        // Select first open intake by default
-        const firstOpenIntake = data.data.find((intake: Intake) => 
-          intake.deadlines.some(deadline => deadline.is_closed === 0)
-        );
-        
-        if (firstOpenIntake) {
-          setSelectedIntakeId(firstOpenIntake.intake_id);
-        }
-      } else {
-        throw new Error(data.message || 'Failed to load intakes');
-      }
-    } catch (err) {
-      setIntakesError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Error fetching intakes:', err);
-    } finally {
-      setIsFetchingIntakes(false);
-    }
-  };
-  
-  if (!course) return null;
-  
-  let studyLevelId = course.study_level_id;
-  
-  const handleSubmit = () => {
-    
-    if (selectedIntakeId === 0) {
-      // Show error alert for missing intake selection
-      alert("Please select an intake");
-      return;
-    }
-    onConfirm(selectedIntakeId, studyLevelId, appLogin, appPassword);
-  };
-
-  const toggleIntakeDetails = (intakeId: number) => {
-    setOpenIntakeDetails(openIntakeDetails === intakeId ? null : intakeId);
-  };
+    if (course?.intakes?.length) setSelectedIntakeId(course.intakes[0].id);
+    else setSelectedIntakeId(0);
+    setAppLogin('');
+    setAppPassword('');
+  }, [course]);
 
   if (!isOpen || !course) return null;
+  const hasIntakes = !!course.intakes?.length;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-99999 p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-2xl my-4">
-        <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
-            Confirm Application
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            Please review your application details before submitting:
-          </p>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-99999 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
 
-          <div className="space-y-6">
-            {/* Course Details */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Course Details</h4>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Course:</span>
-                  <span className="text-sm font-medium text-gray-800 dark:text-white text-right">{course.course_name}</span>
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Confirm Application</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Review your details before submitting</p>
+            </div>
+            <button onClick={onClose} disabled={loading}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+          {/* Course summary */}
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
+            <div className="flex items-start gap-3 mb-3">
+              {course.university_logo_url ? (
+                <Image src={course.university_logo_url} alt={course.university} width={48} height={48} className="rounded-lg object-contain shrink-0" />
+              ) : (
+                <div className="w-12 h-12 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0">
+                  {course.university.slice(0, 2).toUpperCase()}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">University:</span>
-                  <span className="text-sm font-medium text-gray-800 dark:text-white text-right">{course.university}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Study Level:</span>
-                  <span className="text-sm font-medium text-gray-800 dark:text-white text-right">{course.study_level_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Application Fee:</span>
-                  <span className="text-sm font-medium text-gray-800 dark:text-white text-right">
-                    {formatFee(course.application_fee, course.currency_code)}
-                  </span>
-                </div>
+              )}
+              <div>
+                <p className="font-semibold text-gray-900 dark:text-white text-sm">{course.course_name}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{course.university}</p>
               </div>
             </div>
-
-            {/* Intake Selection */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Select Intake</h4>
-              {isFetchingIntakes ? (
-                <div className="flex items-center justify-center p-4">
-                  <svg className="animate-spin h-5 w-5 text-blue-500 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Loading intakes...</span>
-                </div>
-              ) : intakesError ? (
-                <div className="text-sm text-red-600 dark:text-red-400 p-3 bg-red-50 dark:bg-red-900/20 rounded">
-                  Error loading intakes: {intakesError}
-                </div>
-              ) : intakes.length === 0 ? (
-                <div className="text-sm text-yellow-600 dark:text-yellow-400 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded">
-                  No intakes available for this course.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {intakes.map((intake) => {
-                    const isSelected = selectedIntakeId === intake.intake_id;
-                    
-                    return (
-                      <div key={intake.id} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                        <div className={`p-3 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' : ''}`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <input
-                                type="radio"
-                                id={`intake-${intake.id}`}
-                                name="intake"
-                                value={intake.intake_id}
-                                checked={isSelected}
-                                onChange={(e) => setSelectedIntakeId(Number(e.target.value))}
-                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                              />
-                              <div>
-                                <label 
-                                  htmlFor={`intake-${intake.id}`}
-                                  className={`font-medium text-gray-800 dark:text-white`}
-                                >
-                                  {intake.intake_name} {intake.intake_year}
-                                </label>
-                                
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => toggleIntakeDetails(intake.id)}
-                              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                            >
-                              <svg
-                                className={`w-5 h-5 transition-transform ${openIntakeDetails === intake.id ? 'rotate-180' : ''}`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                        
-                        {openIntakeDetails === intake.id && (
-                          <div className="border-t border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-900">
-                            <h5 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Deadlines:</h5>
-                            <div className="space-y-2">
-                              {intake.deadlines.map((deadline) => (
-                                <div key={deadline.id} className="text-sm">
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600 dark:text-gray-400">{deadline.deadline_type}:</span>
-                                    <span className="font-medium text-gray-800 dark:text-white">
-                                      {formatDate(deadline.deadline_date)}
-                                    </span>
-                                  </div>
-                                  {deadline.extended_date && (
-                                    <div className="flex justify-between mt-1">
-                                      <span className="text-gray-600 dark:text-gray-400">Extended Date:</span>
-                                      <span className="text-yellow-600 dark:text-yellow-400">
-                                        {formatDate(deadline.extended_date)}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {deadline.notes && (
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
-                                      Note: {deadline.notes}
-                                    </p>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="flex justify-between gap-2">
+                <span className="text-gray-500 dark:text-gray-400">Level:</span>
+                <span className="font-medium text-gray-800 dark:text-white">{course.study_level_name}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-gray-500 dark:text-gray-400">App. Fee:</span>
+                <span className="font-medium text-gray-800 dark:text-white">{formatFee(course.application_fee, course.currency_code)}</span>
+              </div>
             </div>
+          </div>
 
-            <div className="grid grid-cols-2  gap-4">
+          {/* Intake selection */}
+          <div>
+            <p className="text-sm font-semibold text-gray-800 dark:text-white mb-2">Select Intake</p>
+            {!hasIntakes ? (
+              <div className="text-sm text-amber-700 dark:text-amber-400 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                No intakes are currently available for this program.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {course.intakes.map(intake => {
+                  const sel = selectedIntakeId === intake.id;
+                  return (
+                    <label key={intake.id}
+                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                        sel ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}>
+                      <input type="radio" name="intake" value={intake.id} checked={sel}
+                        onChange={() => setSelectedIntakeId(intake.id)}
+                        className="h-4 w-4 text-brand-500 focus:ring-brand-500 border-gray-300" />
+                      <span className={`text-sm font-medium ${sel ? 'text-brand-700 dark:text-brand-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                        {intake.intake_name} {intake.intake_year}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Portal credentials */}
+          <div>
+            <p className="text-sm font-semibold text-gray-800 dark:text-white mb-2">
+              Portal Credentials <span className="text-xs font-normal text-gray-400">(optional)</span>
+            </p>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Application Login
-          </label>
-          <input
-            type="text"
-            value={appLogin}
-            onChange={(e)=>setAppLogin(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            placeholder="Enter application login"
-           
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Application Password
-          </label>
-          <input
-            type="text"
-            value={appPassword}
-            onChange={(e)=>setAppPassword(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            placeholder="Enter application password"
-            
-          />
-        </div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Login / Username</label>
+                <input type="text" value={appLogin} onChange={e => setAppLogin(e.target.value)}
+                  placeholder="Enter login"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Password</label>
+                <input type="text" value={appPassword} onChange={e => setAppPassword(e.target.value)}
+                  placeholder="Enter password"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
+              </div>
             </div>
-
-
           </div>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 mt-6">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={
-                loading || 
-                isFetchingIntakes || 
-                selectedIntakeId === 0 ||
-                intakes.length === 0 ||
-                intakesError !== null
-              }
-              className="flex-1 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-green-500/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Applying...
-                </>
-              ) : (
-                'Confirm Application'
-              )}
-            </button>
-          </div>
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0 rounded-b-2xl bg-white dark:bg-gray-900">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 px-4 py-2.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50">
+            Cancel
+          </button>
+          <button onClick={() => onConfirm(selectedIntakeId, appLogin, appPassword)}
+            disabled={loading || !hasIntakes || !selectedIntakeId}
+            className="flex-1 px-4 py-2.5 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {loading ? (
+              <>
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Submitting...
+              </>
+            ) : 'Confirm Application'}
+          </button>
         </div>
       </div>
     </div>
@@ -555,9 +377,6 @@ const CourseDetailsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [openAccordion, setOpenAccordion] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [isFetchingStudents, setIsFetchingStudents] = useState(false);
-  const [studentError, setStudentError] = useState<string | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   
   // Add state for alerts
@@ -624,10 +443,10 @@ const CourseDetailsPage: React.FC = () => {
     setShowConfirmModal(true);
   };
 
-  const handleConfirmApplication = async (intakeId: number, studyLevelId: number,  appLogin: string, appPassword: string) => {
+  const handleConfirmApplication = async (intakeId: number, appLogin: string, appPassword: string) => {
     try {
       setIsApplying(true);
-      
+
       const response = await fetch(`${BASE_URL}/student/application`, {
         method: 'POST',
         headers: {
@@ -638,7 +457,7 @@ const CourseDetailsPage: React.FC = () => {
           student_user_id: studentId,
           course_id: courseId,
           course_intake_id: intakeId,
-          study_level_id: studyLevelId,
+          study_level_id: courseData?.course.study_level_id,
           remarks: "Student wants to apply for this course",
           application_login: appLogin,  
           application_password: appPassword
@@ -1024,16 +843,24 @@ const CourseDetailsPage: React.FC = () => {
 
       {/* Confirm Modal */}
       <ConfirmModal
-         isOpen={showConfirmModal}
+        isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
         onConfirm={handleConfirmApplication}
-        course={courseData?.course || null}
+        course={courseData ? {
+          course_name: courseData.course.course_name,
+          university: courseData.course.university,
+          university_logo_url: courseData.course.university_logo_url,
+          study_level_name: courseData.course.study_level_name,
+          application_fee: courseData.course.application_fee,
+          currency_code: courseData.course.currency_code,
+          intakes: courseData.intakes.map(i => ({
+            id: i.id,
+            intake_id: i.intake_id,
+            intake_name: i.intake_name,
+            intake_year: i.intake_year,
+          })),
+        } : null}
         loading={isApplying}
-        students={students}
-        isFetchingStudents={isFetchingStudents}
-        studentError={studentError}
-        courseId={String(courseId)}
-        token={token}
       />
     </div>
   );

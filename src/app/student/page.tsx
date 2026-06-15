@@ -231,7 +231,7 @@ const checkAndRedirectForInterests = async (): Promise<void> => {
               <div className="flex items-end justify-between">
                 <div>
                   <span className="text-xl text-gray-800 dark:text-white/90">
-                    Shortlisted Courses
+                    Wishlist
                   </span>
                   <div className="flex align-middle">
                     <h4 className="font-bold text-gray-800 text-title-sm dark:text-white/90">

@@ -688,7 +688,7 @@ export default function ShortlistedCoursesPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
-            My Shortlisted Courses
+            My Wishlist
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Your saved courses ready for application
@@ -701,7 +701,7 @@ export default function ShortlistedCoursesPage() {
             <div className="text-lg font-semibold text-gray-800 dark:text-white">
               {shortlistedCourses.length || 0}
             </div>
-            <div className="text-gray-500 dark:text-gray-400">Total Shortlisted</div>
+            <div className="text-gray-500 dark:text-gray-400">Total Wishlisted</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-semibold text-green-600 dark:text-green-400">
@@ -717,10 +717,10 @@ export default function ShortlistedCoursesPage() {
         <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
           <Heart className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
-            No shortlisted courses yet
+            No wishlist courses yet
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Start browsing programs and click the heart icon to add them to your shortlist
+            Start browsing programs and click the heart icon to add them to your wishlist
           </p>
           <Link
             href="/student/courses"
@@ -748,7 +748,7 @@ export default function ShortlistedCoursesPage() {
 
           {/* Results Count */}
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            Showing {shortlistedCourses.length} shortlisted course(s)
+            Showing {shortlistedCourses.length} wishlisted course(s)
           </div>
         </>
       )}

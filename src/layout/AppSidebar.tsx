@@ -256,7 +256,7 @@ const othersItems: NavItemOther[] = [
 ];
 
 const AppSidebar: React.FC = () => {
-  const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { isExpanded, isMobileOpen, isHovered, setIsHovered, toggleMobileSidebar } = useSidebar();
   const pathname = usePathname();
 
   const [openSubmenus, setOpenSubmenus] = useState<Set<string>>(new Set());
@@ -336,6 +336,7 @@ const AppSidebar: React.FC = () => {
                 isActive(item.path) ? "menu-item-active" : "menu-item-inactive"
               }`}
               style={{ paddingLeft: `${level * 20 + 16}px` }}
+              onClick={() => { if (isMobileOpen) toggleMobileSidebar(); }}
             >
               <span className={isActive(item.path) ? "menu-item-icon-active" : "menu-item-icon-inactive"}>
                 {item.icon}

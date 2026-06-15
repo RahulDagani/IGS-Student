@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import {
   CheckCircle,
@@ -15,7 +15,8 @@ import {
   Building,
   GraduationCap,
   Eye,
-  Download
+  Download,
+  Mail,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { openSecureFile } from "@/utils/fileUrl";
@@ -29,8 +30,13 @@ interface DocumentCardHandlers {
   selectedFile: { [key: number]: File | null };
   verifierEmail: { [key: number]: string };
   setVerifierEmail: React.Dispatch<React.SetStateAction<{ [key: number]: string }>>;
+  updatingEmail: { [key: number]: boolean };
+  updateEmailSuccess: { [key: number]: boolean };
+  updateEmailError: { [key: number]: string };
   handleFileSelect: (documentId: number, file: File | null) => void;
   uploadFile: (documentId: number, isCommon: boolean, applicationId: number | null, doc_category?: string) => void;
+  updateVerifierEmail: (documentId: number, doc_category: string) => void;
+  emailSuggestions: string[];
   formatDate: (dateString: string | null) => string;
   getStatusIcon: (status: string, isMandatory: number) => { icon: React.ReactNode; borderColor: string; bgColor: string };
 }
@@ -41,22 +47,48 @@ interface FileInputProps {
   applicationId?: number | null;
   doc_category?: string;
   docStatus?: string;
+  hasFile?: boolean;
+  currentVerifierEmail?: string | null;
   isUploading: boolean;
   progress: number;
   fileError: string;
   success: boolean;
   selectedFileForDoc: File | null;
   verifierEmailValue: string;
+  emailSuggestions: string[];
   onVerifierEmailChange: (value: string) => void;
   onFileSelect: (file: File | null) => void;
   onUpload: () => void;
+  onUpdateVerifierEmail: () => void;
+  isUpdatingEmail: boolean;
+  updateEmailSuccess: boolean;
+  updateEmailError: string;
 }
 
 function FileInput({
   documentId, isCommon, applicationId = null, doc_category, docStatus,
+  hasFile, currentVerifierEmail,
   isUploading, progress, fileError, success, selectedFileForDoc,
-  verifierEmailValue, onVerifierEmailChange, onFileSelect, onUpload,
+  verifierEmailValue, emailSuggestions, onVerifierEmailChange, onFileSelect, onUpload,
+  onUpdateVerifierEmail, isUpdatingEmail, updateEmailSuccess, updateEmailError,
 }: FileInputProps) {
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestRef = useRef<HTMLDivElement>(null);
+
+  const filtered = emailSuggestions.filter(e =>
+    e.toLowerCase().includes(verifierEmailValue.toLowerCase()) && e !== verifierEmailValue
+  );
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (suggestRef.current && !suggestRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   return (
     <div className="w-64 flex flex-col gap-2">
       {success && (
@@ -65,23 +97,81 @@ function FileInput({
           Uploaded successfully
         </div>
       )}
+      {updateEmailSuccess && (
+        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-md">
+          <CheckCircle size={15} />
+          Verifier email updated
+        </div>
+      )}
       {fileError && (
         <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-md">
           <AlertCircle size={15} />
           {fileError}
         </div>
       )}
+      {updateEmailError && (
+        <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-md">
+          <AlertCircle size={15} />
+          {updateEmailError}
+        </div>
+      )}
       {docStatus !== 'verified' && (
         <div className="flex flex-col gap-1.5">
-          <input
-            type="email"
-            placeholder="Verifier email (e.g. bank@example.com)"
-            value={verifierEmailValue}
-            onChange={(e) => onVerifierEmailChange(e.target.value)}
-            disabled={isUploading}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
+          <div className="relative" ref={suggestRef}>
+            <input
+              type="email"
+              placeholder="Verifier email (e.g. bank@example.com)"
+              value={verifierEmailValue}
+              onChange={(e) => { onVerifierEmailChange(e.target.value); setShowSuggestions(true); }}
+              onFocus={() => setShowSuggestions(true)}
+              disabled={isUploading || isUpdatingEmail}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            {showSuggestions && filtered.length > 0 && (
+              <div className="absolute z-10 top-full left-0 right-0 mt-0.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-md overflow-hidden">
+                {filtered.map((email) => (
+                  <button
+                    key={email}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onVerifierEmailChange(email);
+                      setShowSuggestions(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 flex items-center gap-2"
+                  >
+                    <Mail size={12} className="text-gray-400 shrink-0" />
+                    {email}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <p className="text-xs text-gray-400 dark:text-gray-500">Email of the authority who can verify this document</p>
+          {hasFile && (
+            <button
+              type="button"
+              onClick={onUpdateVerifierEmail}
+              disabled={isUpdatingEmail || !verifierEmailValue}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm ${
+                isUpdatingEmail || !verifierEmailValue
+                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                  : 'bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-white'
+              }`}
+            >
+              {isUpdatingEmail ? (
+                <>
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-current" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Mail size={14} />
+                  Update Verifier Email
+                </>
+              )}
+            </button>
+          )}
         </div>
       )}
       <div className="flex gap-2">
@@ -219,7 +309,7 @@ interface DocumentsPageProps {
 }
 
 function DocumentCard({ doc, handlers }: { doc: Document; handlers: DocumentCardHandlers }) {
-  const { activeTab, uploading, uploadProgress, uploadErrors, uploadSuccess, selectedFile, verifierEmail, setVerifierEmail, handleFileSelect, uploadFile, formatDate, getStatusIcon } = handlers;
+  const { activeTab, uploading, uploadProgress, uploadErrors, uploadSuccess, selectedFile, verifierEmail, setVerifierEmail, updatingEmail, updateEmailSuccess, updateEmailError, handleFileSelect, uploadFile, updateVerifierEmail, emailSuggestions, formatDate, getStatusIcon } = handlers;
   const statusConfig = getStatusIcon(doc.status, doc.is_mandatory);
   const fileName = doc.file_url ? doc.file_url.split('/').pop() : 'No file uploaded';
   const isCommon = doc.is_common === true;
@@ -265,15 +355,22 @@ function DocumentCard({ doc, handlers }: { doc: Document; handlers: DocumentCard
               applicationId={!isCommon ? doc.application_id : null}
               doc_category={doc.doc_category}
               docStatus={doc.status}
+              hasFile={!!doc.file_url}
+              currentVerifierEmail={doc.verifier_email}
               isUploading={uploading[doc.id] ?? false}
               progress={uploadProgress[doc.id] ?? 0}
               fileError={uploadErrors[doc.id] ?? ''}
               success={uploadSuccess[doc.id] ?? false}
               selectedFileForDoc={selectedFile[doc.id] ?? null}
               verifierEmailValue={verifierEmail[doc.id] ?? ''}
+              emailSuggestions={emailSuggestions}
               onVerifierEmailChange={(val) => setVerifierEmail(prev => ({ ...prev, [doc.id]: val }))}
               onFileSelect={(file) => handleFileSelect(doc.id, file)}
               onUpload={() => uploadFile(doc.id, isCommon, !isCommon ? (doc.application_id ?? null) : null, doc.doc_category)}
+              onUpdateVerifierEmail={() => updateVerifierEmail(doc.id, doc.doc_category ?? 'specific')}
+              isUpdatingEmail={updatingEmail[doc.id] ?? false}
+              updateEmailSuccess={updateEmailSuccess[doc.id] ?? false}
+              updateEmailError={updateEmailError[doc.id] ?? ''}
             />
           </div>
         )}
@@ -311,6 +408,9 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
   const [uploadSuccess, setUploadSuccess] = useState<UploadSuccess>({});
   const [selectedFile, setSelectedFile] = useState<{ [key: number]: File | null }>({});
   const [verifierEmail, setVerifierEmail] = useState<{ [key: number]: string }>({});
+  const [updatingEmail, setUpdatingEmail] = useState<{ [key: number]: boolean }>({});
+  const [updateEmailSuccess, setUpdateEmailSuccess] = useState<{ [key: number]: boolean }>({});
+  const [updateEmailError, setUpdateEmailError] = useState<{ [key: number]: string }>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const BASE_URL = 'https://api.applystore.org/api';
@@ -354,7 +454,15 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
             doc_category: 'specific' as const,
           }));
 
-          setDocuments([...studyLevelDocs, ...countryDocs, ...specificDocs]);
+          const allDocs = [...studyLevelDocs, ...countryDocs, ...specificDocs];
+          setDocuments(allDocs);
+          setVerifierEmail(prev => {
+            const init: { [key: number]: string } = { ...prev };
+            allDocs.forEach(d => {
+              if (d.verifier_email && !init[d.id]) init[d.id] = d.verifier_email;
+            });
+            return init;
+          });
         } else {
           throw new Error('Failed to fetch documents');
         }
@@ -511,6 +619,42 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
     }
   };
 
+  const updateVerifierEmail = async (documentId: number, doc_category: string) => {
+    const email = verifierEmail[documentId];
+    if (!email) return;
+
+    setUpdatingEmail(prev => ({ ...prev, [documentId]: true }));
+    setUpdateEmailError(prev => ({ ...prev, [documentId]: '' }));
+    setUpdateEmailSuccess(prev => ({ ...prev, [documentId]: false }));
+
+    try {
+      const response = await fetch(`${BASE_URL}/student/document/verifier-email`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ document_id: documentId, verifier_email: email, doc_category }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setUpdateEmailSuccess(prev => ({ ...prev, [documentId]: true }));
+        setTimeout(() => setUpdateEmailSuccess(prev => ({ ...prev, [documentId]: false })), 3000);
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        setUpdateEmailError(prev => ({ ...prev, [documentId]: data.message || 'Update failed' }));
+      }
+    } catch (err) {
+      setUpdateEmailError(prev => ({ ...prev, [documentId]: 'Network error' }));
+    } finally {
+      setUpdatingEmail(prev => ({ ...prev, [documentId]: false }));
+    }
+  };
+
+  const emailSuggestions = Array.from(
+    new Set(documents.map(d => d.verifier_email).filter(Boolean) as string[])
+  );
 
   if (loading) {
     return (
@@ -542,7 +686,10 @@ export default function DocumentsPage({ onDocumentUpload }: DocumentsPageProps) 
 
   const cardHandlers: DocumentCardHandlers = {
     activeTab, uploading, uploadProgress, uploadErrors, uploadSuccess,
-    selectedFile, verifierEmail, setVerifierEmail, handleFileSelect, uploadFile, formatDate, getStatusIcon,
+    selectedFile, verifierEmail, setVerifierEmail,
+    updatingEmail, updateEmailSuccess, updateEmailError,
+    handleFileSelect, uploadFile, updateVerifierEmail, emailSuggestions,
+    formatDate, getStatusIcon,
   };
 
   return (

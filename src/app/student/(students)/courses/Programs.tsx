@@ -297,7 +297,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (intakeId: number, appLogin: string, appPassword: string) => void;
+  onConfirm: (intakeId: number, appLogin: string, appPassword: string, appLink: string) => void;
   course: Course | null;
   loading: boolean;
 }
@@ -306,6 +306,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
   const [selectedIntakeId, setSelectedIntakeId] = useState<number>(0);
   const [appLogin, setAppLogin] = useState('');
   const [appPassword, setAppPassword] = useState('');
+  const [appLink, setAppLink] = useState('');
 
   const formatFee = (fee: string, currency: string) => {
     if (!fee || fee === '0.00') return 'Free';
@@ -317,6 +318,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
     else setSelectedIntakeId(0);
     setAppLogin('');
     setAppPassword('');
+    setAppLink('');
   }, [course]);
 
   if (!isOpen || !course) return null;
@@ -414,6 +416,12 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
                   placeholder="Enter password"
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
               </div>
+              <div className="col-span-2">
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Online Application Link</label>
+                <input type="url" value={appLink} onChange={e => setAppLink(e.target.value)}
+                  placeholder="https://"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
+              </div>
             </div>
           </div>
         </div>
@@ -423,7 +431,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
             className="flex-1 px-4 py-2.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50">
             Cancel
           </button>
-          <button onClick={() => onConfirm(selectedIntakeId, appLogin, appPassword)}
+          <button onClick={() => onConfirm(selectedIntakeId, appLogin, appPassword, appLink)}
             disabled={loading || !hasIntakes || !selectedIntakeId}
             className="flex-1 px-4 py-2.5 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             {loading ? (
@@ -768,7 +776,7 @@ export default function StudentProgramsPage() {
     setIsConfirmModalOpen(true);
   };
 
-  const handleConfirmApplication = async (intakeId: number, appLogin: string, appPassword: string) => {
+  const handleConfirmApplication = async (intakeId: number, appLogin: string, appPassword: string, appLink: string) => {
     if (!selectedCourse) return;
     setIsApplying(true);
     try {
@@ -784,6 +792,7 @@ export default function StudentProgramsPage() {
           course_intake_id: intakeId,
           application_login: appLogin,
           application_password: appPassword,
+          application_link: appLink,
         }),
       });
       const result = await res.json();

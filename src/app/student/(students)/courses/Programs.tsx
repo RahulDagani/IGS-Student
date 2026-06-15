@@ -127,6 +127,13 @@ const FilterModal: React.FC<FilterModalProps> = ({
   const [disciplineSearch, setDisciplineSearch] = useState('');
   const [universitySearch, setUniversitySearch] = useState('');
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
+
   const matchesSearch = (name: string, query: string) => {
     if (!query) return true;
     const q = query.toLowerCase();
@@ -312,6 +319,13 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
     if (!fee || fee === '0.00') return 'Free';
     return `${currency} ${parseFloat(fee).toLocaleString()}`;
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
 
   useEffect(() => {
     if (course?.intakes?.length) setSelectedIntakeId(course.intakes[0].id);

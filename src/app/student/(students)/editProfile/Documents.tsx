@@ -90,7 +90,7 @@ function FileInput({
   }, []);
 
   return (
-    <div className="w-64 flex flex-col gap-2">
+    <div className="w-full sm:w-64 flex flex-col gap-2">
       {success && (
         <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-md">
           <CheckCircle size={15} />
@@ -316,8 +316,8 @@ function DocumentCard({ doc, handlers }: { doc: Document; handlers: DocumentCard
 
   return (
     <div className={`border-l-4 ${statusConfig.borderColor} ${statusConfig.bgColor} p-5 rounded-md mb-4`}>
-      <div className="flex justify-between items-start">
-        <div className="flex-1">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
             {statusConfig.icon}
             <span className="font-semibold dark:text-white">
@@ -348,7 +348,7 @@ function DocumentCard({ doc, handlers }: { doc: Document; handlers: DocumentCard
           </div>
         </div>
         {activeTab !== 'Igs' && (
-          <div className="ml-4">
+          <div className="sm:ml-4 shrink-0">
             <FileInput
               documentId={doc.id}
               isCommon={isCommon}

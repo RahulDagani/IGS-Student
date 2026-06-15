@@ -923,11 +923,11 @@ const updateCredentials = async () => {
                       <div ref={messagesEndRef} />
                     </div>
 
-                    {chatUploadState.preview && (
+                    {chatUploadState.file && (
                       <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border dark:border-gray-600 relative">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            File Preview
+                            Attached File
                           </span>
                           <button
                             onClick={removeChatFile}
@@ -937,9 +937,13 @@ const updateCredentials = async () => {
                           </button>
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-white dark:bg-gray-600 rounded flex items-center justify-center">
-                            <ImageIcon size={20} className="text-blue-500 dark:text-blue-400" />
-                          </div>
+                          {chatUploadState.preview ? (
+                            <img src={chatUploadState.preview} alt="preview" className="w-12 h-12 object-cover rounded" />
+                          ) : (
+                            <div className="w-12 h-12 bg-white dark:bg-gray-600 rounded flex items-center justify-center">
+                              {getFileIcon(chatUploadState.file.name)}
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
                               {chatUploadState.file?.name}

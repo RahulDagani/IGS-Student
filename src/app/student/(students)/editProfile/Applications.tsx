@@ -1,25 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { 
-  Search, 
-  Calendar, 
-  School, 
-  GraduationCap, 
-  Plus, 
-  FileUp, 
-  Pencil, 
-  ChevronDown, 
-  Paperclip, 
-  Send, 
-  Upload, 
-  X, 
-  Eye, 
-  Download, 
+import {
+  Search,
+  Calendar,
+  School,
+  GraduationCap,
+  Plus,
+  FileUp,
+  Pencil,
+  ChevronDown,
+  Paperclip,
+  Send,
+  Upload,
+  X,
+  Eye,
+  Download,
   MessageCircle,
   Image as ImageIcon,
   FileText,
   CheckCircle,
   CreditCard,
+  Mail,
+  AlertCircle,
 } from 'lucide-react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -111,6 +113,8 @@ interface SpecificDocument {
   remarks: string | null;
   is_deleted: number;
   created_at: string;
+  verifier_email: string | null;
+  verification_email_sent_at: string | null;
 }
 
 interface ApplicationDetailResponse {
@@ -205,6 +209,13 @@ export default function Applications() {
     application_link: ''
   });
   const [isUpdatingCredentials, setIsUpdatingCredentials] = useState<boolean>(false);
+
+  const [verifierEmail, setVerifierEmail] = useState<{ [key: number]: string }>({});
+  const [updatingEmail, setUpdatingEmail] = useState<{ [key: number]: boolean }>({});
+  const [updateEmailSuccess, setUpdateEmailSuccess] = useState<{ [key: number]: boolean }>({});
+  const [updateEmailError, setUpdateEmailError] = useState<{ [key: number]: string }>({});
+  const [showEmailSuggestions, setShowEmailSuggestions] = useState<{ [key: number]: boolean }>({});
+  const emailSuggestRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
@@ -343,15 +354,22 @@ const updateCredentials = async () => {
       const data: { success: boolean; data: ApplicationDetailResponse } = await response.json();
       if (data.success) {
         setApplicationDetail(data.data.application);
-        setSpecificDocuments(data.data.specific_documents.list);
-        
-        const initialUploadStates = data.data.specific_documents.list.map(doc => ({
+        const docs = data.data.specific_documents.list;
+        setSpecificDocuments(docs);
+
+        const initialUploadStates = docs.map(doc => ({
           documentId: doc.id,
           file: null,
           isUploading: false,
           progress: 0
         }));
         setUploadStates(initialUploadStates);
+
+        setVerifierEmail(prev => {
+          const init: { [key: number]: string } = { ...prev };
+          docs.forEach(d => { if (d.verifier_email && !init[d.id]) init[d.id] = d.verifier_email; });
+          return init;
+        });
       }
     } catch (error) {
       console.error('Error fetching application details:', error);
@@ -413,13 +431,43 @@ const updateCredentials = async () => {
     });
   };
 
+  const updateDocumentVerifierEmail = async (documentId: number) => {
+    const email = verifierEmail[documentId];
+    if (!email) return;
+
+    setUpdatingEmail(prev => ({ ...prev, [documentId]: true }));
+    setUpdateEmailError(prev => ({ ...prev, [documentId]: '' }));
+    setUpdateEmailSuccess(prev => ({ ...prev, [documentId]: false }));
+
+    try {
+      const response = await fetch(`${BASE_URL}/student/document/verifier-email`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_id: documentId, verifier_email: email, doc_category: 'specific' }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUpdateEmailSuccess(prev => ({ ...prev, [documentId]: true }));
+        setTimeout(() => setUpdateEmailSuccess(prev => ({ ...prev, [documentId]: false })), 3000);
+        if (activeProgram) fetchApplicationDetails(activeProgram);
+      } else {
+        setUpdateEmailError(prev => ({ ...prev, [documentId]: data.message || 'Update failed' }));
+      }
+    } catch {
+      setUpdateEmailError(prev => ({ ...prev, [documentId]: 'Network error' }));
+    } finally {
+      setUpdatingEmail(prev => ({ ...prev, [documentId]: false }));
+    }
+  };
+
   const uploadDocument = async (applicationId: number, documentId: number, file: File) => {
     return new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
-      
+
       formData.append('document_id', documentId.toString());
       formData.append('file', file);
+      if (verifierEmail[documentId]) formData.append('verifier_email', verifierEmail[documentId]);
 
       setUploadStates(prev => prev.map(state => 
         state.documentId === documentId 
@@ -531,6 +579,10 @@ const updateCredentials = async () => {
   const getDocumentUploadState = (documentId: number) => {
     return uploadStates.find(state => state.documentId === documentId);
   };
+
+  const emailSuggestions = Array.from(
+    new Set(specificDocuments.map(d => d.verifier_email).filter(Boolean) as string[])
+  );
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -998,9 +1050,80 @@ const updateCredentials = async () => {
                               )}
                             </div>
 
+                            {/* Verifier email field - shared for both uploaded and not-uploaded */}
+                            {doc.status !== 'verified' && (
+                              <div className="mt-3 space-y-1.5">
+                                {updateEmailSuccess[doc.id] && (
+                                  <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">
+                                    <CheckCircle size={12} /> Verifier email updated
+                                  </div>
+                                )}
+                                {updateEmailError[doc.id] && (
+                                  <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
+                                    <AlertCircle size={12} /> {updateEmailError[doc.id]}
+                                  </div>
+                                )}
+                                <div
+                                  className="relative"
+                                  ref={el => { emailSuggestRefs.current[doc.id] = el; }}
+                                >
+                                  <input
+                                    type="email"
+                                    placeholder="Verifier email (e.g. bank@example.com)"
+                                    value={verifierEmail[doc.id] ?? ''}
+                                    onChange={(e) => {
+                                      setVerifierEmail(prev => ({ ...prev, [doc.id]: e.target.value }));
+                                      setShowEmailSuggestions(prev => ({ ...prev, [doc.id]: true }));
+                                    }}
+                                    onFocus={() => setShowEmailSuggestions(prev => ({ ...prev, [doc.id]: true }))}
+                                    onBlur={() => setTimeout(() => setShowEmailSuggestions(prev => ({ ...prev, [doc.id]: false })), 150)}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 text-xs dark:bg-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  />
+                                  {showEmailSuggestions[doc.id] && emailSuggestions.filter(e => e !== verifierEmail[doc.id] && e.toLowerCase().includes((verifierEmail[doc.id] ?? '').toLowerCase())).length > 0 && (
+                                    <div className="absolute z-10 top-full left-0 right-0 mt-0.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-md overflow-hidden">
+                                      {emailSuggestions.filter(e => e !== verifierEmail[doc.id] && e.toLowerCase().includes((verifierEmail[doc.id] ?? '').toLowerCase())).map(email => (
+                                        <button
+                                          key={email}
+                                          type="button"
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            setVerifierEmail(prev => ({ ...prev, [doc.id]: email }));
+                                            setShowEmailSuggestions(prev => ({ ...prev, [doc.id]: false }));
+                                          }}
+                                          className="w-full text-left px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 flex items-center gap-2"
+                                        >
+                                          <Mail size={11} className="text-gray-400 shrink-0" />
+                                          {email}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-400 dark:text-gray-500">Email of the authority who can verify this document</p>
+                                {doc.file_url && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateDocumentVerifierEmail(doc.id)}
+                                    disabled={updatingEmail[doc.id] || !verifierEmail[doc.id]}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs ${
+                                      updatingEmail[doc.id] || !verifierEmail[doc.id]
+                                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                                        : 'bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 text-white'
+                                    }`}
+                                  >
+                                    {updatingEmail[doc.id] ? (
+                                      <><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" /> Updating...</>
+                                    ) : (
+                                      <><Mail size={12} /> Update Verifier Email</>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
                             {doc.file_url ? (
                               <>
-                              <div className="flex items-center gap-2 mb-4">
+                              <div className="flex items-center gap-2 mt-3 mb-2">
                                 <a
                                   href="#"
                                   onClick={(e) => { e.preventDefault(); openSecureFile(doc.file_url); }}
@@ -1031,7 +1154,7 @@ const updateCredentials = async () => {
                                   }}
                                   disabled={isUploading}
                                 />
-                                
+
                                 {selectedFile && selectedDocument === doc.id ? (
                                   <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 p-3 rounded">
                                     <span className="text-sm truncate dark:text-gray-300">{selectedFile.name}</span>
@@ -1049,8 +1172,8 @@ const updateCredentials = async () => {
                                   <label
                                     htmlFor={`file-upload-${doc.id}`}
                                     className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-lg p-4 cursor-pointer ${
-                                      isUploading 
-                                        ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700' 
+                                      isUploading
+                                        ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700'
                                         : 'border-blue-300 dark:border-blue-700 hover:border-blue-500 dark:hover:border-blue-500'
                                     }`}
                                   >
@@ -1063,7 +1186,7 @@ const updateCredentials = async () => {
 
                                 {isUploading && (
                                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                    <div 
+                                    <div
                                       className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                                       style={{ width: `${progress}%` }}
                                     />
@@ -1082,7 +1205,7 @@ const updateCredentials = async () => {
                               </div>
                               </>
                             ) : (
-                              <div className="space-y-3">
+                              <div className="space-y-3 mt-3">
                                 <input
                                   type="file"
                                   id={`file-upload-${doc.id}`}
@@ -1094,7 +1217,7 @@ const updateCredentials = async () => {
                                   }}
                                   disabled={isUploading}
                                 />
-                                
+
                                 {selectedFile && selectedDocument === doc.id ? (
                                   <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 p-3 rounded">
                                     <span className="text-sm truncate dark:text-gray-300">{selectedFile.name}</span>
@@ -1112,8 +1235,8 @@ const updateCredentials = async () => {
                                   <label
                                     htmlFor={`file-upload-${doc.id}`}
                                     className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-lg p-4 cursor-pointer ${
-                                      isUploading 
-                                        ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700' 
+                                      isUploading
+                                        ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700'
                                         : 'border-blue-300 dark:border-blue-700 hover:border-blue-500 dark:hover:border-blue-500'
                                     }`}
                                   >
@@ -1126,7 +1249,7 @@ const updateCredentials = async () => {
 
                                 {isUploading && (
                                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                    <div 
+                                    <div
                                       className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                                       style={{ width: `${progress}%` }}
                                     />

@@ -114,7 +114,7 @@ const fallbackNavItems: NavItem[] = [
 ];
 
 const AppSidebar: React.FC = () => {
-  const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { isExpanded, isMobileOpen, isHovered, setIsHovered, toggleMobileSidebar } = useSidebar();
   const pathname = usePathname();
   const [navItems, setNavItems] = useState<NavItem[]>(fallbackNavItems);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -240,6 +240,7 @@ const AppSidebar: React.FC = () => {
                 isActive(item.path, item.name) ? "menu-item-active" : "menu-item-inactive"
               }`}
               style={{ paddingLeft: `${level * 20 + 16}px` }}
+              onClick={() => { if (isMobileOpen) toggleMobileSidebar(); }}
             >
               <span className={isActive(item.path, item.name) ? "menu-item-icon-active" : "menu-item-icon-inactive"}>
                 {item.icon}
@@ -339,7 +340,7 @@ const AppSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`py-8 flex  ${
+        className={`py-8 hidden lg:flex  ${
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-center"
         }`}
       >

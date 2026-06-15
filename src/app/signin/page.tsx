@@ -233,7 +233,7 @@ function StudentLoginContent() {
               <div className="space-y-6">
                 <div>
                   <Label>
-                    Email <span className="text-red-500">*</span>
+                    Email 1 <span className="text-red-500">*</span>
                   </Label>
                   <InputField 
                     type="email"

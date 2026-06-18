@@ -92,6 +92,28 @@ function saveCoursesState(filters: FilterOptions, search: string, labels: Record
   } catch {}
 }
 
+// Read filters from URL params (passed from universities page)
+function getFiltersFromUrl(): FilterOptions | null {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  const f = emptyFilters();
+  let hasAny = false;
+
+  const universityId = params.get('university_id');
+  if (universityId && !isNaN(Number(universityId))) { f.universities = [Number(universityId)]; hasAny = true; }
+
+  const studyLevelId = params.get('study_level_id');
+  if (studyLevelId && !isNaN(Number(studyLevelId))) { f.studyLevels = [Number(studyLevelId)]; hasAny = true; }
+
+  const disciplineIds = params.getAll('discipline_id').map(Number).filter(n => !isNaN(n));
+  if (disciplineIds.length) { f.disciplines = disciplineIds; hasAny = true; }
+
+  const countryId = params.get('country_id');
+  if (countryId && !isNaN(Number(countryId))) { f.countries = [Number(countryId)]; hasAny = true; }
+
+  return hasAny ? f : null;
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
 const getCountryName = (code: string | undefined | null) => {
@@ -646,7 +668,13 @@ export default function StudentProgramsPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(() => loadCoursesState()?.search ?? '');
+  const [searchTerm, setSearchTerm] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const s = new URLSearchParams(window.location.search).get('search');
+      if (s) return s;
+    }
+    return loadCoursesState()?.search ?? '';
+  });
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
@@ -654,9 +682,9 @@ export default function StudentProgramsPage() {
   const [alertMessage, setAlertMessage] = useState('');
   const [isApplying, setIsApplying] = useState(false);
 
-  const [filters, setFilters] = useState<FilterOptions>(() => loadCoursesState()?.filters ?? emptyFilters());
-  const [modalFilters, setModalFilters] = useState<FilterOptions>(() => loadCoursesState()?.filters ?? emptyFilters());
-  const [filterLabels, setFilterLabels] = useState<Record<string, Record<number, string>>>(() => loadCoursesState()?.labels ?? {});
+  const [filters, setFilters] = useState<FilterOptions>(() => getFiltersFromUrl() ?? loadCoursesState()?.filters ?? emptyFilters());
+  const [modalFilters, setModalFilters] = useState<FilterOptions>(() => getFiltersFromUrl() ?? loadCoursesState()?.filters ?? emptyFilters());
+  const [filterLabels, setFilterLabels] = useState<Record<string, Record<number, string>>>(() => getFiltersFromUrl() ? {} : (loadCoursesState()?.labels ?? {}));
 
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);

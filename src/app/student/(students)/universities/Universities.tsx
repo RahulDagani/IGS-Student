@@ -1,10 +1,11 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Building2, MapPin, BookOpen, ChevronDown, ChevronUp, X, Search, Globe, ExternalLink, Filter } from "lucide-react";
+import { Building2, MapPin, BookOpen, ChevronDown, ChevronUp, X, Search, Globe, ExternalLink, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const WIZARD_BASE = "https://api.applystore.org/api";
+const PAGE_SIZE = 10;
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 
@@ -38,12 +39,12 @@ interface UniversitySearchResult {
 interface Filters {
   countries: number[];
   studyLevels: number[];
-  disciplines: string[];
+  disciplines: number[];   // IDs — so we can pass to courses page
 }
 
 const emptyFilters = (): Filters => ({ countries: [], studyLevels: [], disciplines: [] });
 
-// ─── Filter Section (sidebar) ────────────────────────────────────────────────
+// ─── Filter Section ───────────────────────────────────────────────────────────
 
 const SidebarSection = ({ title, count, expanded, onToggle, children }: {
   title: string; count?: number; expanded: boolean;
@@ -62,16 +63,18 @@ const SidebarSection = ({ title, count, expanded, onToggle, children }: {
   </div>
 );
 
-// ─── University Card (list design) ───────────────────────────────────────────
+// ─── University Card ──────────────────────────────────────────────────────────
 
-const UniversityCard: React.FC<{ university: University }> = ({ university }) => {
+const UniversityCard: React.FC<{
+  university: University;
+  onViewPrograms: (universityId: number) => void;
+}> = ({ university, onViewPrograms }) => {
   const initials = university.university.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <div className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
       <div className="p-5">
         <div className="flex items-start gap-4">
-          {/* Logo */}
           <div className="shrink-0">
             {university.logo_url ? (
               <Image src={university.logo_url} alt={university.university}
@@ -84,7 +87,6 @@ const UniversityCard: React.FC<{ university: University }> = ({ university }) =>
             )}
           </div>
 
-          {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div>
@@ -98,10 +100,11 @@ const UniversityCard: React.FC<{ university: University }> = ({ university }) =>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <Link href={`/student/courses?university=${university.id}`}
+                <button
+                  onClick={() => onViewPrograms(university.id)}
                   className="px-4 py-2 text-sm font-semibold rounded-xl bg-brand-50 hover:bg-brand-100 dark:bg-brand-900/20 dark:hover:bg-brand-900/40 text-brand-600 dark:text-brand-400 transition-colors whitespace-nowrap">
                   View Programs
-                </Link>
+                </button>
                 {university.website_url && (
                   <a href={university.website_url} target="_blank" rel="noopener noreferrer"
                     className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-gray-600 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
@@ -112,7 +115,6 @@ const UniversityCard: React.FC<{ university: University }> = ({ university }) =>
               </div>
             </div>
 
-            {/* Stats */}
             <div className="flex flex-wrap gap-2 mt-3">
               <span className="inline-flex items-center gap-1.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2.5 py-1 rounded-full font-medium">
                 <BookOpen className="w-3 h-3" />
@@ -124,20 +126,18 @@ const UniversityCard: React.FC<{ university: University }> = ({ university }) =>
               </span>
             </div>
 
-            {/* Description */}
             {university.description && (
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2.5 line-clamp-2 leading-relaxed">
                 {university.description.replace(/<[^>]*>/g, '')}
               </p>
             )}
 
-            {/* Sample disciplines */}
             {university.courses && university.courses.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-3">
-                {[...new Set(university.courses.map(c => c.discipline_name))].slice(0, 4).map(discipline => (
-                  <span key={discipline}
+                {[...new Set(university.courses.map(c => c.discipline_name))].slice(0, 4).map(d => (
+                  <span key={d}
                     className="text-xs bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 border border-brand-100 dark:border-brand-800 px-2 py-0.5 rounded-full">
-                    {discipline}
+                    {d}
                   </span>
                 ))}
               </div>
@@ -152,20 +152,24 @@ const UniversityCard: React.FC<{ university: University }> = ({ university }) =>
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Universities() {
-  // Filter data
+  const router = useRouter();
+
   const [countries, setCountries] = useState<WizardCountry[]>([]);
   const [studyLevels, setStudyLevels] = useState<WizardStudyLevel[]>([]);
   const [disciplines, setDisciplines] = useState<WizardDiscipline[]>([]);
 
-  // Results
   const [universities, setUniversities] = useState<University[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [filtersLoading, setFiltersLoading] = useState(true);
 
-  // Filters
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+
   const [filters, setFilters] = useState<Filters>(emptyFilters);
 
-  // Autocomplete
   const [uniSearch, setUniSearch] = useState('');
   const [uniSearchResults, setUniSearchResults] = useState<UniversitySearchResult[]>([]);
   const [uniSearchLoading, setUniSearchLoading] = useState(false);
@@ -173,25 +177,64 @@ export default function Universities() {
   const uniSearchRef = useRef<HTMLDivElement>(null);
   const uniSearchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Sidebar filter search
   const [countrySearch, setCountrySearch] = useState('');
   const [disciplineSearch, setDisciplineSearch] = useState('');
 
-  // Expanded sections
   const [expanded, setExpanded] = useState({ destination: true, studyLevel: true, discipline: true });
-
-  // Mobile sidebar toggle
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const toggle = (key: keyof typeof expanded) =>
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
 
-  // ── Load filter options ────────────────────────────────────────────────────
+  // ── Build API query string ────────────────────────────────────────────────
+
+  const buildParams = useCallback((f: Filters, page: number) => {
+    const p = new URLSearchParams();
+    if (f.countries.length)    p.set('country_id',    String(f.countries[0]));
+    if (f.studyLevels.length)  p.set('study_level_id', String(f.studyLevels[0]));
+    f.disciplines.forEach(id => p.append('discipline_id[]', String(id)));
+    p.set('page',  String(page));
+    p.set('limit', String(PAGE_SIZE));
+    return p.toString();
+  }, []);
+
+  // ── Fetch universities ────────────────────────────────────────────────────
+
+  const fetchUniversities = useCallback(async (f: Filters, page: number, append = false) => {
+    if (!f.countries.length) {
+      setUniversities([]);
+      setTotal(0);
+      setTotalPages(1);
+      setHasNextPage(false);
+      return;
+    }
+    append ? setLoadingMore(true) : setLoading(true);
+    try {
+      const res = await fetch(`${WIZARD_BASE}/wizard/universities?${buildParams(f, page)}`);
+      const data = await res.json();
+      if (data.success) {
+        setUniversities(prev => append ? [...prev, ...data.data] : data.data);
+        setCurrentPage(data.page ?? page);
+        setTotalPages(data.totalPages ?? 1);
+        setTotal(data.total ?? 0);
+        setHasNextPage(data.hasNextPage ?? false);
+      } else {
+        if (!append) setUniversities([]);
+      }
+    } catch {
+      if (!append) setUniversities([]);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [buildParams]);
+
+  // ── Load filter data ──────────────────────────────────────────────────────
 
   useEffect(() => {
     (async () => {
+      setFiltersLoading(true);
       try {
-        setFiltersLoading(true);
         const res = await fetch(`${WIZARD_BASE}/wizard/countries`);
         const data = await res.json();
         if (data.success) setCountries(data.data);
@@ -200,7 +243,6 @@ export default function Universities() {
     })();
   }, []);
 
-  // Load study levels when countries change
   useEffect(() => {
     (async () => {
       try {
@@ -213,7 +255,6 @@ export default function Universities() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.countries]);
 
-  // Load disciplines when country + study level change
   useEffect(() => {
     if (!filters.countries.length || !filters.studyLevels.length) {
       setDisciplines([]);
@@ -230,41 +271,18 @@ export default function Universities() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.countries, filters.studyLevels]);
 
-  // ── Load universities ──────────────────────────────────────────────────────
-
-  const fetchUniversities = useCallback(async (f: Filters) => {
-    if (!f.countries.length) {
-      setUniversities([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.set('country_id', String(f.countries[0]));
-      if (f.studyLevels.length) params.set('study_level_id', String(f.studyLevels[0]));
-      f.disciplines.forEach(slug => params.append('discipline[]', slug));
-
-      const res = await fetch(`${WIZARD_BASE}/wizard/universities?${params.toString()}`);
-      const data = await res.json();
-      if (data.success) setUniversities(data.data);
-      else setUniversities([]);
-    } catch { setUniversities([]); }
-    finally { setLoading(false); }
-  }, []);
-
+  // Fetch when filters change (reset to page 1)
   useEffect(() => {
-    fetchUniversities(filters);
+    setCurrentPage(1);
+    fetchUniversities(filters, 1, false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
-  // ── University autocomplete ────────────────────────────────────────────────
+  // ── University autocomplete ───────────────────────────────────────────────
 
   useEffect(() => {
     if (uniSearchTimeout.current) clearTimeout(uniSearchTimeout.current);
-    if (!uniSearch.trim() || uniSearch.length < 2) {
-      setUniSearchResults([]);
-      return;
-    }
+    if (!uniSearch.trim() || uniSearch.length < 2) { setUniSearchResults([]); return; }
     uniSearchTimeout.current = setTimeout(async () => {
       setUniSearchLoading(true);
       try {
@@ -276,44 +294,67 @@ export default function Universities() {
     }, 300);
   }, [uniSearch]);
 
-  // Close autocomplete on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (uniSearchRef.current && !uniSearchRef.current.contains(e.target as Node)) {
+      if (uniSearchRef.current && !uniSearchRef.current.contains(e.target as Node))
         setUniSearchFocused(false);
-      }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // ── Filter helpers ─────────────────────────────────────────────────────────
+  // ── Filter helpers ────────────────────────────────────────────────────────
 
   const toggleCountry = (id: number, checked: boolean) => {
-    setFilters(prev => {
-      const next = checked ? [id] : prev.countries.filter(c => c !== id);
-      // Reset study level and discipline when country changes
-      return { countries: next, studyLevels: [], disciplines: [] };
-    });
+    setFilters(prev => ({
+      countries: checked ? [id] : prev.countries.filter(c => c !== id),
+      studyLevels: [],
+      disciplines: [],
+    }));
   };
 
   const toggleStudyLevel = (id: number, checked: boolean) => {
-    setFilters(prev => {
-      const next = checked ? [id] : prev.studyLevels.filter(s => s !== id);
-      return { ...prev, studyLevels: next, disciplines: [] };
-    });
+    setFilters(prev => ({
+      ...prev,
+      studyLevels: checked ? [id] : prev.studyLevels.filter(s => s !== id),
+      disciplines: [],
+    }));
   };
 
-  const toggleDiscipline = (slug: string, checked: boolean) => {
-    setFilters(prev => {
-      const next = checked ? [...prev.disciplines, slug] : prev.disciplines.filter(d => d !== slug);
-      return { ...prev, disciplines: next };
-    });
+  const toggleDiscipline = (id: number, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      disciplines: checked ? [...prev.disciplines, id] : prev.disciplines.filter(d => d !== id),
+    }));
   };
 
-  const clearFilters = () => {
-    setFilters(emptyFilters());
-    setUniSearch('');
+  const clearFilters = () => { setFilters(emptyFilters()); setUniSearch(''); };
+
+  // ── Navigate to courses with all active filters ───────────────────────────
+
+  const handleViewPrograms = (universityId: number) => {
+    const p = new URLSearchParams();
+    p.set('university_id', String(universityId));
+    if (filters.countries.length)   p.set('country_id',    String(filters.countries[0]));
+    if (filters.studyLevels.length) p.set('study_level_id', String(filters.studyLevels[0]));
+    filters.disciplines.forEach(id => p.append('discipline_id', String(id)));
+    router.push(`/student/courses?${p.toString()}`);
+  };
+
+  const handleAutoCompleteSelect = (u: UniversitySearchResult) => {
+    setUniSearchFocused(false);
+    setUniSearch(u.university);
+    const p = new URLSearchParams();
+    p.set('university_id', String(u.id));
+    router.push(`/student/courses?${p.toString()}`);
+  };
+
+  // ── Load more ─────────────────────────────────────────────────────────────
+
+  const handleLoadMore = () => {
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+    fetchUniversities(filters, nextPage, true);
   };
 
   const hasFilters = filters.countries.length > 0 || filters.studyLevels.length > 0 || filters.disciplines.length > 0;
@@ -327,24 +368,20 @@ export default function Universities() {
     ? disciplines.filter(d => d.name.toLowerCase().includes(disciplineSearch.toLowerCase()))
     : disciplines;
 
-  // ── Sidebar content ────────────────────────────────────────────────────────
+  // ── Sidebar ───────────────────────────────────────────────────────────────
 
   const sidebar = (
     <div className="space-y-4">
-      {/* University autocomplete search */}
+      {/* University autocomplete */}
       <div>
         <p className="text-sm font-semibold text-gray-800 dark:text-white mb-2">Search University</p>
         <div className="relative" ref={uniSearchRef}>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search by university name..."
-              value={uniSearch}
-              onChange={e => setUniSearch(e.target.value)}
+            <input type="text" placeholder="Search by university name..."
+              value={uniSearch} onChange={e => setUniSearch(e.target.value)}
               onFocus={() => setUniSearchFocused(true)}
-              className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300"
-            />
+              className="w-full pl-9 pr-8 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300" />
             {uniSearch && (
               <button onClick={() => { setUniSearch(''); setUniSearchResults([]); }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -352,8 +389,6 @@ export default function Universities() {
               </button>
             )}
           </div>
-
-          {/* Autocomplete dropdown */}
           {uniSearchFocused && (uniSearchResults.length > 0 || uniSearchLoading) && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
               {uniSearchLoading ? (
@@ -362,10 +397,9 @@ export default function Universities() {
                 <ul>
                   {uniSearchResults.map(u => (
                     <li key={u.id}>
-                      <Link
-                        href={`/student/courses?university=${u.id}`}
-                        className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                        onClick={() => { setUniSearchFocused(false); setUniSearch(u.university); }}>
+                      <button type="button"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                        onClick={() => handleAutoCompleteSelect(u)}>
                         <div className="shrink-0">
                           {u.logo_url ? (
                             <Image src={u.logo_url} alt={u.university} width={32} height={32}
@@ -380,7 +414,7 @@ export default function Universities() {
                           <p className="text-sm font-medium text-gray-800 dark:text-white truncate">{u.university}</p>
                           <p className="text-xs text-gray-400">{u.country_name} · {u.total_courses} programs</p>
                         </div>
-                      </Link>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -400,7 +434,7 @@ export default function Universities() {
           {filtersLoading ? (
             <div className="text-sm text-gray-400 py-2">Loading...</div>
           ) : (
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
               {filteredCountries.map(c => (
                 <label key={c.country_id}
                   className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
@@ -426,7 +460,7 @@ export default function Universities() {
               {filters.countries.length ? 'No study levels available' : 'Select a destination first'}
             </p>
           ) : (
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
               {studyLevels.map(sl => (
                 <label key={sl.id}
                   className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
@@ -455,13 +489,13 @@ export default function Universities() {
               <input type="text" placeholder="Search disciplines..."
                 value={disciplineSearch} onChange={e => setDisciplineSearch(e.target.value)}
                 className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 mb-2" />
-              <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
                 {filteredDisciplines.map(d => (
                   <label key={d.id}
                     className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
                     <input type="checkbox"
-                      checked={filters.disciplines.includes(d.slug)}
-                      onChange={e => toggleDiscipline(d.slug, e.target.checked)}
+                      checked={filters.disciplines.includes(d.id)}
+                      onChange={e => toggleDiscipline(d.id, e.target.checked)}
                       className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 shrink-0" />
                     <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{d.name}</span>
                   </label>
@@ -475,7 +509,6 @@ export default function Universities() {
         </SidebarSection>
       </div>
 
-      {/* Clear filters */}
       {hasFilters && (
         <button onClick={clearFilters}
           className="w-full py-2.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -485,7 +518,7 @@ export default function Universities() {
     </div>
   );
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div>
@@ -497,10 +530,7 @@ export default function Universities() {
             Discover universities that match your academic goals
           </p>
         </div>
-
-        {/* Mobile filter button */}
-        <button
-          onClick={() => setSidebarOpen(prev => !prev)}
+        <button onClick={() => setSidebarOpen(prev => !prev)}
           className="flex lg:hidden items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
           <Filter className="w-4 h-4" />
           Filters
@@ -513,7 +543,7 @@ export default function Universities() {
       </div>
 
       <div className="flex gap-6">
-        {/* Sidebar — desktop always visible, mobile toggleable */}
+        {/* Sidebar */}
         <aside className={`
           ${sidebarOpen ? 'block' : 'hidden'} lg:block
           w-full lg:w-72 shrink-0
@@ -532,36 +562,27 @@ export default function Universities() {
               {filters.countries.map(id => {
                 const c = countries.find(x => x.country_id === id);
                 return c ? (
-                  <span key={id}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 px-2.5 py-1 rounded-full">
+                  <span key={id} className="inline-flex items-center gap-1.5 text-xs font-medium bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 px-2.5 py-1 rounded-full">
                     {c.country_name}
-                    <button onClick={() => toggleCountry(id, false)} className="hover:text-red-500">
-                      <X className="w-3 h-3" />
-                    </button>
+                    <button onClick={() => toggleCountry(id, false)} className="hover:text-red-500"><X className="w-3 h-3" /></button>
                   </span>
                 ) : null;
               })}
               {filters.studyLevels.map(id => {
                 const sl = studyLevels.find(x => x.id === id);
                 return sl ? (
-                  <span key={id}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 px-2.5 py-1 rounded-full">
+                  <span key={id} className="inline-flex items-center gap-1.5 text-xs font-medium bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 px-2.5 py-1 rounded-full">
                     {sl.name}
-                    <button onClick={() => toggleStudyLevel(id, false)} className="hover:text-red-500">
-                      <X className="w-3 h-3" />
-                    </button>
+                    <button onClick={() => toggleStudyLevel(id, false)} className="hover:text-red-500"><X className="w-3 h-3" /></button>
                   </span>
                 ) : null;
               })}
-              {filters.disciplines.map(slug => {
-                const d = disciplines.find(x => x.slug === slug);
+              {filters.disciplines.map(id => {
+                const d = disciplines.find(x => x.id === id);
                 return d ? (
-                  <span key={slug}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 px-2.5 py-1 rounded-full">
+                  <span key={id} className="inline-flex items-center gap-1.5 text-xs font-medium bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 px-2.5 py-1 rounded-full">
                     {d.name}
-                    <button onClick={() => toggleDiscipline(slug, false)} className="hover:text-red-500">
-                      <X className="w-3 h-3" />
-                    </button>
+                    <button onClick={() => toggleDiscipline(id, false)} className="hover:text-red-500"><X className="w-3 h-3" /></button>
                   </span>
                 ) : null;
               })}
@@ -580,24 +601,20 @@ export default function Universities() {
               </div>
             </div>
           ) : !filters.countries.length ? (
-            /* No country selected — destination picker */
             <div>
               <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
                 Select a study destination to explore universities
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {countries.slice(0, 12).map(c => (
-                  <button key={c.country_id}
-                    onClick={() => toggleCountry(c.country_id, true)}
+                  <button key={c.country_id} onClick={() => toggleCountry(c.country_id, true)}
                     className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-700 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors text-left group">
                     <div className="w-9 h-9 bg-gradient-to-br from-brand-100 to-brand-200 dark:from-brand-900/40 dark:to-brand-800/40 rounded-lg flex items-center justify-center shrink-0">
                       <Building2 className="w-4 h-4 text-brand-600 dark:text-brand-400" />
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-800 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 truncate transition-colors">
-                        {c.country_name}
-                      </p>
-                    </div>
+                    <p className="text-sm font-medium text-gray-800 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 truncate transition-colors">
+                      {c.country_name}
+                    </p>
                   </button>
                 ))}
               </div>
@@ -622,11 +639,38 @@ export default function Universities() {
           ) : (
             <div className="space-y-4">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {universities.length} {universities.length === 1 ? 'university' : 'universities'} found
+                Showing {universities.length} of {total} {total === 1 ? 'university' : 'universities'}
               </p>
+
               {universities.map(u => (
-                <UniversityCard key={u.id} university={u} />
+                <UniversityCard key={u.id} university={u} onViewPrograms={handleViewPrograms} />
               ))}
+
+              {/* Load More */}
+              {hasNextPage && (
+                <div className="flex justify-center pt-2">
+                  <button onClick={handleLoadMore} disabled={loadingMore}
+                    className="flex items-center gap-2 px-6 py-2.5 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50">
+                    {loadingMore ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-brand-500" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Loading...
+                      </>
+                    ) : (
+                      <>Load More <ChevronRight className="w-4 h-4" /></>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {!hasNextPage && universities.length > 0 && (
+                <p className="text-center text-xs text-gray-400 dark:text-gray-500 pt-2">
+                  All {total} {total === 1 ? 'university' : 'universities'} loaded
+                </p>
+              )}
             </div>
           )}
         </div>

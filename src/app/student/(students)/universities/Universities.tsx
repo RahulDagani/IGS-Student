@@ -184,6 +184,7 @@ export default function Universities() {
 
   const [filters, setFilters] = useState<Filters>(() => loadUniState() ?? emptyFilters());
 
+  const [selectedUniversityId, setSelectedUniversityId] = useState<number | null>(null);
   const [uniSearch, setUniSearch] = useState('');
   const [uniSearchResults, setUniSearchResults] = useState<UniversitySearchResult[]>([]);
   const [uniSearchLoading, setUniSearchLoading] = useState(false);
@@ -325,6 +326,8 @@ export default function Universities() {
   // ── Filter helpers ────────────────────────────────────────────────────────
 
   const toggleCountry = (id: number, checked: boolean) => {
+    setSelectedUniversityId(null);
+    setUniSearch('');
     setFilters(prev => ({
       countries: checked ? [id] : prev.countries.filter(c => c !== id),
       studyLevels: [],
@@ -347,7 +350,7 @@ export default function Universities() {
     }));
   };
 
-  const clearFilters = () => { setFilters(emptyFilters()); setUniSearch(''); };
+  const clearFilters = () => { setFilters(emptyFilters()); setUniSearch(''); setSelectedUniversityId(null); };
 
   // ── Navigate to courses with all active filters ───────────────────────────
 
@@ -363,7 +366,7 @@ export default function Universities() {
   const handleAutoCompleteSelect = (u: UniversitySearchResult) => {
     setUniSearchFocused(false);
     setUniSearch(u.university);
-    // Find matching country_id from our loaded countries list via ISO code
+    setSelectedUniversityId(u.id);
     const matched = countries.find(c => c.iso_code === u.country_code);
     if (matched) {
       setFilters({ countries: [matched.country_id], studyLevels: [], disciplines: [] });
@@ -404,7 +407,7 @@ export default function Universities() {
               onFocus={() => setUniSearchFocused(true)}
               className="w-full pl-9 pr-8 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-300" />
             {uniSearch && (
-              <button onClick={() => { setUniSearch(''); setUniSearchResults([]); }}
+              <button onClick={() => { setUniSearch(''); setUniSearchResults([]); setSelectedUniversityId(null); }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <X className="w-4 h-4" />
               </button>
@@ -660,10 +663,15 @@ export default function Universities() {
           ) : (
             <div className="space-y-4">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Showing {universities.length} of {total} {total === 1 ? 'university' : 'universities'}
+                {selectedUniversityId
+                  ? `Showing 1 university`
+                  : `Showing ${universities.length} of ${total} ${total === 1 ? 'university' : 'universities'}`}
               </p>
 
-              {universities.map(u => (
+              {(selectedUniversityId
+                ? universities.filter(u => u.id === selectedUniversityId)
+                : universities
+              ).map(u => (
                 <UniversityCard key={u.id} university={u} onViewPrograms={handleViewPrograms} />
               ))}
 

@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
 import { ChevronDownIcon, HorizontaLDots } from "@/icons/index";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, Building2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 interface ApiModule {
@@ -95,6 +95,11 @@ const fallbackNavItems: NavItem[] = [
     name: "Programs",
     path: "/programs",
     icon: <LayoutDashboard size={18} />,
+  },
+  {
+    name: "Universities",
+    path: "/universities",
+    icon: <Building2 size={18} />,
   },
   {
     name: "Applications",

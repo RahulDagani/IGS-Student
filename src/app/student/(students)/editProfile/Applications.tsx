@@ -184,7 +184,7 @@ export default function Applications() {
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState<boolean>(false);
-  const [newMessage, setNewMessage] = useState<string>('');
+  const [newMessageByApp, setNewMessageByApp] = useState<Record<number, string>>({});
   const [chatUploadState, setChatUploadState] = useState<ChatUploadState>({
     file: null,
     preview: null,
@@ -526,6 +526,7 @@ const updateCredentials = async () => {
   };
 
   const sendMessage = async () => {
+    const newMessage = newMessageByApp[activeProgram!] ?? '';
     if (!activeProgram || (!newMessage.trim() && !chatUploadState.file)) return;
 
     try {
@@ -551,11 +552,11 @@ const updateCredentials = async () => {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         await loadMessages(activeProgram);
-        
-        setNewMessage('');
+
+        setNewMessageByApp(prev => ({ ...prev, [activeProgram!]: '' }));
         removeChatFile();
         setHideFromCounselor(false);
       }
@@ -961,8 +962,8 @@ const updateCredentials = async () => {
 
                     <div className="flex flex-col gap-3">
                       <textarea
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
+                        value={newMessageByApp[activeProgram!] ?? ''}
+                        onChange={(e) => setNewMessageByApp(prev => ({ ...prev, [activeProgram!]: e.target.value }))}
                         placeholder="Write your message..."
                         className="flex-1 border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-4 py-3 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 resize-none"
                         rows={3}
@@ -1009,9 +1010,9 @@ const updateCredentials = async () => {
                         
                         <button
                           onClick={sendMessage}
-                          disabled={(!newMessage.trim() && !chatUploadState.file) || chatUploadState.isUploading}
+                          disabled={(!(newMessageByApp[activeProgram!] ?? '').trim() && !chatUploadState.file) || chatUploadState.isUploading}
                           className={`px-4 py-2 rounded-md flex items-center gap-2 ${
-                            (!newMessage.trim() && !chatUploadState.file) || chatUploadState.isUploading
+                            (!(newMessageByApp[activeProgram!] ?? '').trim() && !chatUploadState.file) || chatUploadState.isUploading
                               ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                               : 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600'
                           }`}

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import Badge from "@/components/ui/badge/Badge";
 import { DockIcon, DollarSign, GraduationCap, Book, Building2, Star, X, ChevronDown, ChevronUp, Heart } from "lucide-react";
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Country, State } from "country-state-city";
 import Image from "next/image";
@@ -668,13 +668,7 @@ export default function StudentProgramsPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const s = new URLSearchParams(window.location.search).get('search');
-      if (s) return s;
-    }
-    return loadCoursesState()?.search ?? '';
-  });
+  const [searchTerm, setSearchTerm] = useState(() => loadCoursesState()?.search ?? '');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
@@ -682,9 +676,9 @@ export default function StudentProgramsPage() {
   const [alertMessage, setAlertMessage] = useState('');
   const [isApplying, setIsApplying] = useState(false);
 
-  const [filters, setFilters] = useState<FilterOptions>(() => getFiltersFromUrl() ?? loadCoursesState()?.filters ?? emptyFilters());
-  const [modalFilters, setModalFilters] = useState<FilterOptions>(() => getFiltersFromUrl() ?? loadCoursesState()?.filters ?? emptyFilters());
-  const [filterLabels, setFilterLabels] = useState<Record<string, Record<number, string>>>(() => getFiltersFromUrl() ? {} : (loadCoursesState()?.labels ?? {}));
+  const [filters, setFilters] = useState<FilterOptions>(() => loadCoursesState()?.filters ?? emptyFilters());
+  const [modalFilters, setModalFilters] = useState<FilterOptions>(() => loadCoursesState()?.filters ?? emptyFilters());
+  const [filterLabels, setFilterLabels] = useState<Record<string, Record<number, string>>>(() => loadCoursesState()?.labels ?? {});
 
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -755,13 +749,37 @@ export default function StudentProgramsPage() {
     finally { setLoading(false); setIsLoadingMore(false); }
   }, [token, logout, buildCoursesQueryString]);
 
+  const searchParams = useSearchParams();
+
   // ── Effects ─────────────────────────────────────────────────────────────────
 
+  // Reactive to both initial load and client-side navigation (e.g. from universities page)
   useEffect(() => {
-    fetchFilters(filters);
-    fetchCourses(1, false, filters, searchTerm);
+    const universityId  = searchParams.get('university_id');
+    const studyLevelId  = searchParams.get('study_level_id');
+    const disciplineIds = searchParams.getAll('discipline_id');
+    const countryId     = searchParams.get('country_id');
+    const hasUrlFilters = !!(universityId || studyLevelId || disciplineIds.length || countryId);
+
+    if (hasUrlFilters) {
+      const urlFilters = emptyFilters();
+      if (universityId)          urlFilters.universities = [Number(universityId)];
+      if (studyLevelId)          urlFilters.studyLevels  = [Number(studyLevelId)];
+      if (disciplineIds.length)  urlFilters.disciplines  = disciplineIds.map(Number).filter(n => !isNaN(n));
+      if (countryId)             urlFilters.countries    = [Number(countryId)];
+
+      setFilters(urlFilters);
+      setModalFilters(urlFilters);
+      setFilterLabels({});
+      setCurrentPage(1);
+      fetchFilters(urlFilters);
+      fetchCourses(1, false, urlFilters, '');
+    } else {
+      fetchFilters(filters);
+      fetchCourses(1, false, filters, searchTerm);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   // Persist filters + search to sessionStorage so back-navigation restores them
   useEffect(() => {

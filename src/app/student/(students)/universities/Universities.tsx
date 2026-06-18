@@ -6,6 +6,19 @@ import { useRouter } from "next/navigation";
 
 const WIZARD_BASE = "https://api.applystore.org/api";
 const PAGE_SIZE = 10;
+const UNI_STATE_KEY = 'igs_student_universities_state';
+
+function loadUniState(): Filters | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = sessionStorage.getItem(UNI_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveUniState(filters: Filters) {
+  try { sessionStorage.setItem(UNI_STATE_KEY, JSON.stringify(filters)); } catch {}
+}
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 
@@ -168,7 +181,7 @@ export default function Universities() {
   const [total, setTotal] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
 
-  const [filters, setFilters] = useState<Filters>(emptyFilters);
+  const [filters, setFilters] = useState<Filters>(() => loadUniState() ?? emptyFilters());
 
   const [uniSearch, setUniSearch] = useState('');
   const [uniSearchResults, setUniSearchResults] = useState<UniversitySearchResult[]>([]);
@@ -270,6 +283,11 @@ export default function Universities() {
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.countries, filters.studyLevels]);
+
+  // Persist filters to sessionStorage so back-navigation restores them
+  useEffect(() => {
+    saveUniState(filters);
+  }, [filters]);
 
   // Fetch when filters change (reset to page 1)
   useEffect(() => {

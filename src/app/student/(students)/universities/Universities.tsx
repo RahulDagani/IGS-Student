@@ -117,7 +117,7 @@ const UniversityCard: React.FC<{
                 <button
                   onClick={() => onViewPrograms(university.id)}
                   className="px-4 py-2 text-sm font-semibold rounded-xl bg-brand-50 hover:bg-brand-100 dark:bg-brand-900/20 dark:hover:bg-brand-900/40 text-brand-600 dark:text-brand-400 transition-colors whitespace-nowrap">
-                  View Programs
+                  View Courses
                 </button>
                 {university.website_url && (
                   <a href={university.website_url} target="_blank" rel="noopener noreferrer"

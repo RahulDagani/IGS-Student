@@ -950,8 +950,8 @@ export default function StudentProgramsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Browse Programs</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Discover and apply to programs that match your interests</p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Browse Courses</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Discover and apply to courses that match your interests</p>
         </div>
         <div className="flex gap-4 text-sm">
           <div className="text-center">

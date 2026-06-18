@@ -539,6 +539,14 @@ export default function Universities() {
           Clear All Filters
         </button>
       )}
+
+      {/* Mobile Apply button */}
+      <button
+        onClick={() => setSidebarOpen(false)}
+        className="lg:hidden w-full py-3 text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white rounded-xl transition-colors">
+        Apply Filters &amp; View Results
+        {hasFilters && <span className="ml-1.5 bg-white/20 text-white text-xs rounded-full px-1.5 py-0.5">{filterCount}</span>}
+      </button>
     </div>
   );
 
@@ -575,6 +583,14 @@ export default function Universities() {
           bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5
           max-h-[calc(100vh-6rem)] overflow-y-auto
         `}>
+          {/* Mobile sidebar header */}
+          <div className="flex items-center justify-between mb-4 lg:hidden">
+            <span className="text-sm font-semibold text-gray-800 dark:text-white">Filters</span>
+            <button onClick={() => setSidebarOpen(false)}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
           {sidebar}
         </aside>
 

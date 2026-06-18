@@ -533,20 +533,6 @@ export default function Universities() {
         </SidebarSection>
       </div>
 
-      {hasFilters && (
-        <button onClick={clearFilters}
-          className="w-full py-2.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-          Clear All Filters
-        </button>
-      )}
-
-      {/* Mobile Apply button */}
-      <button
-        onClick={() => setSidebarOpen(false)}
-        className="lg:hidden w-full py-3 text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white rounded-xl transition-colors">
-        Apply Filters &amp; View Results
-        {hasFilters && <span className="ml-1.5 bg-white/20 text-white text-xs rounded-full px-1.5 py-0.5">{filterCount}</span>}
-      </button>
     </div>
   );
 
@@ -577,21 +563,41 @@ export default function Universities() {
       <div className="flex gap-6">
         {/* Sidebar */}
         <aside className={`
-          ${sidebarOpen ? 'block' : 'hidden'} lg:block
+          ${sidebarOpen ? 'flex' : 'hidden'} lg:flex flex-col
           w-full lg:w-72 shrink-0
           lg:sticky lg:top-4 lg:self-start
-          bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5
-          max-h-[calc(100vh-6rem)] overflow-y-auto
+          bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700
+          max-h-[calc(100vh-6rem)]
         `}>
           {/* Mobile sidebar header */}
-          <div className="flex items-center justify-between mb-4 lg:hidden">
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0 lg:hidden border-b border-gray-100 dark:border-gray-800">
             <span className="text-sm font-semibold text-gray-800 dark:text-white">Filters</span>
             <button onClick={() => setSidebarOpen(false)}
               className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
-          {sidebar}
+
+          {/* Scrollable filter content */}
+          <div className="flex-1 overflow-y-auto p-5">
+            {sidebar}
+          </div>
+
+          {/* Sticky footer — always visible */}
+          <div className="shrink-0 px-5 pb-5 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-2">
+            {hasFilters && (
+              <button onClick={clearFilters}
+                className="w-full py-2.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                Clear All Filters
+              </button>
+            )}
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden w-full py-3 text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white rounded-xl transition-colors">
+              Apply Filters &amp; View Results
+              {hasFilters && <span className="ml-1.5 bg-white/20 text-white text-xs rounded-full px-1.5 py-0.5">{filterCount}</span>}
+            </button>
+          </div>
         </aside>
 
         {/* Content */}

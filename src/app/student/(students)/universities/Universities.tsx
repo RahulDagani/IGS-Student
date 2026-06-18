@@ -45,6 +45,7 @@ interface UniversitySearchResult {
   university: string;
   university_slug: string;
   country_name: string;
+  country_code: string;
   logo_url: string | null;
   total_courses: number;
 }
@@ -362,9 +363,11 @@ export default function Universities() {
   const handleAutoCompleteSelect = (u: UniversitySearchResult) => {
     setUniSearchFocused(false);
     setUniSearch(u.university);
-    const p = new URLSearchParams();
-    p.set('university_id', String(u.id));
-    router.push(`/student/courses?${p.toString()}`);
+    // Find matching country_id from our loaded countries list via ISO code
+    const matched = countries.find(c => c.iso_code === u.country_code);
+    if (matched) {
+      setFilters({ countries: [matched.country_id], studyLevels: [], disciplines: [] });
+    }
   };
 
   // ── Load more ─────────────────────────────────────────────────────────────
@@ -475,7 +478,7 @@ export default function Universities() {
           expanded={expanded.studyLevel} onToggle={() => toggle('studyLevel')}>
           {studyLevels.length === 0 ? (
             <p className="text-sm text-gray-400 py-1">
-              {filters.countries.length ? 'No study levels available' : 'Select a destination first'}
+              {filters.countries.length ? 'No study levels available' : 'Select a destination or search a university first'}
             </p>
           ) : (
             <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
@@ -498,7 +501,7 @@ export default function Universities() {
           expanded={expanded.discipline} onToggle={() => toggle('discipline')}>
           {!filters.countries.length || !filters.studyLevels.length ? (
             <p className="text-sm text-gray-400 py-1">
-              {!filters.countries.length ? 'Select a destination first' : 'Select a study level first'}
+              {!filters.countries.length ? 'Select a destination or university first' : 'Select a study level first'}
             </p>
           ) : disciplines.length === 0 ? (
             <p className="text-sm text-gray-400 py-1">No disciplines available</p>

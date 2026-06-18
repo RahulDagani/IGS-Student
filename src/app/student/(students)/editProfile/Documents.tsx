@@ -119,7 +119,9 @@ function FileInput({
         <div className="flex flex-col gap-1.5">
           <div className="relative" ref={suggestRef}>
             <input
-              type="email"
+              type="text"
+              autoComplete="new-password"
+              name={`verifier_email_${documentId}`}
               placeholder="Verifier email (e.g. bank@example.com)"
               value={verifierEmailValue}
               onChange={(e) => { onVerifierEmailChange(e.target.value); setShowSuggestions(true); }}

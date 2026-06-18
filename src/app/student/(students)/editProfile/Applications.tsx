@@ -209,6 +209,7 @@ export default function Applications() {
     application_link: ''
   });
   const [isUpdatingCredentials, setIsUpdatingCredentials] = useState<boolean>(false);
+  const [credentialsStatus, setCredentialsStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const [verifierEmail, setVerifierEmail] = useState<{ [key: number]: string }>({});
   const [updatingEmail, setUpdatingEmail] = useState<{ [key: number]: boolean }>({});
@@ -269,6 +270,7 @@ export default function Applications() {
         application_password: applicationDetail.application_password || '',
         application_link: applicationDetail.application_link || ''
       });
+      setCredentialsStatus(null);
       setShowCredentialsModal(true);
     }
   };
@@ -276,10 +278,11 @@ export default function Applications() {
 
 const updateCredentials = async () => {
   if (!activeProgram || !editingCredentials.application_login || !editingCredentials.application_password) {
-    alert('Please fill in both login and password');
+    setCredentialsStatus({ type: 'error', message: 'Please fill in both login and password' });
     return;
   }
 
+  setCredentialsStatus(null);
   try {
     setIsUpdatingCredentials(true);
 
@@ -307,14 +310,14 @@ const updateCredentials = async () => {
           application_link: editingCredentials.application_link || null
         });
       }
-      setShowCredentialsModal(false);
-      alert('Credentials updated successfully!');
+      setCredentialsStatus({ type: 'success', message: 'Credentials updated successfully!' });
+      setTimeout(() => { setShowCredentialsModal(false); setCredentialsStatus(null); }, 1500);
     } else {
-      alert(data.message || 'Failed to update credentials');
+      setCredentialsStatus({ type: 'error', message: data.message || 'Failed to update credentials' });
     }
   } catch (error) {
     console.error('Error updating credentials:', error);
-    alert('Failed to update credentials. Please try again.');
+    setCredentialsStatus({ type: 'error', message: 'Failed to update credentials. Please try again.' });
   } finally {
     setIsUpdatingCredentials(false);
   }
@@ -1375,9 +1378,27 @@ const updateCredentials = async () => {
         </div>
       </div>
       
-      <div className="flex justify-end gap-3 p-6 border-t dark:border-gray-700">
+      {credentialsStatus && (
+        <div className={`mx-6 mb-2 px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 ${
+          credentialsStatus.type === 'success'
+            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
+            : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
+        }`}>
+          {credentialsStatus.type === 'success' ? (
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          {credentialsStatus.message}
+        </div>
+      )}
+      <div className="flex justify-end gap-3 px-6 pb-6 border-t dark:border-gray-700 pt-4">
         <button
-          onClick={() => setShowCredentialsModal(false)}
+          onClick={() => { setShowCredentialsModal(false); setCredentialsStatus(null); }}
           className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
           disabled={isUpdatingCredentials}
         >

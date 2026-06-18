@@ -501,7 +501,7 @@ export default function Universities() {
           expanded={expanded.discipline} onToggle={() => toggle('discipline')}>
           {!filters.countries.length || !filters.studyLevels.length ? (
             <p className="text-sm text-gray-400 py-1">
-              {!filters.countries.length ? 'Select a destination or university first' : 'Select a study level first'}
+              {!filters.countries.length ? 'Select a destination first' : 'Select a study level first'}
             </p>
           ) : disciplines.length === 0 ? (
             <p className="text-sm text-gray-400 py-1">No disciplines available</p>

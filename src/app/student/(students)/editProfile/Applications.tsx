@@ -1077,7 +1077,8 @@ const updateCredentials = async () => {
                                 >
                                   <input
                                     type="text"
-                                    autoComplete="off"
+                                    autoComplete="new-password"
+                                    name={`verifier_email_${doc.id}`}
                                     placeholder="Verifier email (e.g. bank@example.com)"
                                     value={verifierEmail[doc.id] ?? ''}
                                     onChange={(e) => {

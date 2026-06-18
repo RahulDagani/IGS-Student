@@ -1076,7 +1076,8 @@ const updateCredentials = async () => {
                                   ref={el => { emailSuggestRefs.current[doc.id] = el; }}
                                 >
                                   <input
-                                    type="email"
+                                    type="text"
+                                    autoComplete="off"
                                     placeholder="Verifier email (e.g. bank@example.com)"
                                     value={verifierEmail[doc.id] ?? ''}
                                     onChange={(e) => {

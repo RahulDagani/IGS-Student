@@ -118,6 +118,7 @@ function ForgotPasswordContent() {
         },
         body: JSON.stringify({
           email: formData.email,
+          panel_type: 'student',
         }),
       });
       

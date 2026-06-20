@@ -458,7 +458,7 @@ export default function Universities() {
           {filtersLoading ? (
             <div className="text-sm text-gray-400 py-2">Loading...</div>
           ) : (
-            <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+            <div className="space-y-1 max-h-52 overflow-y-auto pr-1 custom-scrollbar">
               {filteredCountries.map(c => (
                 <label key={c.country_id}
                   className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
@@ -484,7 +484,7 @@ export default function Universities() {
               {filters.countries.length ? 'No study levels available' : 'Select a destination or search a university first'}
             </p>
           ) : (
-            <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+            <div className="space-y-1 max-h-52 overflow-y-auto pr-1 custom-scrollbar">
               {studyLevels.map(sl => (
                 <label key={sl.id}
                   className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
@@ -513,7 +513,7 @@ export default function Universities() {
               <input type="text" placeholder="Search disciplines..."
                 value={disciplineSearch} onChange={e => setDisciplineSearch(e.target.value)}
                 className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 mb-2" />
-              <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+              <div className="space-y-1 max-h-52 overflow-y-auto pr-1 custom-scrollbar">
                 {filteredDisciplines.map(d => (
                   <label key={d.id}
                     className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
@@ -579,7 +579,7 @@ export default function Universities() {
           </div>
 
           {/* Scrollable filter content */}
-          <div className="flex-1 overflow-y-auto p-5">
+          <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
             {sidebar}
           </div>
 

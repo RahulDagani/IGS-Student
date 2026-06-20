@@ -463,8 +463,8 @@ const updateCredentials = async () => {
     }
   };
 
-  const uploadDocument = async (applicationId: number, documentId: number, file: File) => {
-    return new Promise<void>((resolve, reject) => {
+  const uploadDocument = async (applicationId: number, documentId: number, file: File): Promise<string | null> => {
+    return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
 
@@ -472,8 +472,8 @@ const updateCredentials = async () => {
       formData.append('file', file);
       if (verifierEmail[documentId]) formData.append('verifier_email', verifierEmail[documentId]);
 
-      setUploadStates(prev => prev.map(state => 
-        state.documentId === documentId 
+      setUploadStates(prev => prev.map(state =>
+        state.documentId === documentId
           ? { ...state, isUploading: true, progress: 0 }
           : state
       ));
@@ -486,8 +486,8 @@ const updateCredentials = async () => {
         if (event.lengthComputable) {
           const progress = Math.round((event.loaded / event.total) * 100);
           setUploadProgress(progress);
-          setUploadStates(prev => prev.map(state => 
-            state.documentId === documentId 
+          setUploadStates(prev => prev.map(state =>
+            state.documentId === documentId
               ? { ...state, progress }
               : state
           ));
@@ -496,6 +496,7 @@ const updateCredentials = async () => {
 
       xhr.onload = () => {
         if (xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
           setUploadStates(prev => prev.map(state =>
             state.documentId === documentId
               ? { ...state, isUploading: false, progress: 100 }
@@ -504,15 +505,15 @@ const updateCredentials = async () => {
           setIsUploading(false);
           setSelectedFile(null);
           setSelectedDocument(null);
-          resolve();
+          resolve(response.file_url || null);
         } else {
           reject(new Error('Upload failed'));
         }
       };
 
       xhr.onerror = () => {
-        setUploadStates(prev => prev.map(state => 
-          state.documentId === documentId 
+        setUploadStates(prev => prev.map(state =>
+          state.documentId === documentId
             ? { ...state, isUploading: false, progress: 0 }
             : state
         ));
@@ -570,11 +571,14 @@ const updateCredentials = async () => {
   const handleUpload = async () => {
     if (!selectedFile || !selectedDocument || !activeProgram) return;
 
-    const savedScrollY = window.scrollY;
     try {
-      await uploadDocument(activeProgram, selectedDocument, selectedFile);
-      await fetchApplicationDetails(activeProgram, true);
-      requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: 'instant' as ScrollBehavior }));
+      const fileUrl = await uploadDocument(activeProgram, selectedDocument, selectedFile);
+      // Update only the specific document in-place — no full refetch, no scroll reset
+      setSpecificDocuments(prev => prev.map(doc =>
+        doc.id === selectedDocument
+          ? { ...doc, file_url: fileUrl, status: 'uploaded', uploaded_at: new Date().toISOString() }
+          : doc
+      ));
     } catch (error) {
       console.error('Error uploading document:', error);
       alert('Failed to upload document. Please try again.');

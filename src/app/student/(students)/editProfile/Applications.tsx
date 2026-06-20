@@ -344,9 +344,9 @@ const updateCredentials = async () => {
     }
   };
 
-  const fetchApplicationDetails = async (applicationId: number) => {
+  const fetchApplicationDetails = async (applicationId: number, silent = false) => {
     try {
-      setDetailLoading(true);
+      if (!silent) setDetailLoading(true);
       const response = await fetch(`${BASE_URL}/student/application/student/detail/${applicationId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -452,7 +452,7 @@ const updateCredentials = async () => {
       if (data.success) {
         setUpdateEmailSuccess(prev => ({ ...prev, [documentId]: true }));
         setTimeout(() => setUpdateEmailSuccess(prev => ({ ...prev, [documentId]: false })), 3000);
-        if (activeProgram) fetchApplicationDetails(activeProgram);
+        if (activeProgram) fetchApplicationDetails(activeProgram, true);
       } else {
         setUpdateEmailError(prev => ({ ...prev, [documentId]: data.message || 'Update failed' }));
       }
@@ -496,7 +496,7 @@ const updateCredentials = async () => {
 
       xhr.onload = () => {
         if (xhr.status === 200) {
-          fetchApplicationDetails(applicationId);
+          fetchApplicationDetails(applicationId, true);
           setUploadStates(prev => prev.map(state => 
             state.documentId === documentId 
               ? { ...state, isUploading: false, progress: 100 }
@@ -573,7 +573,7 @@ const updateCredentials = async () => {
 
     try {
       await uploadDocument(activeProgram, selectedDocument, selectedFile);
-      await fetchApplicationDetails(activeProgram);
+      await fetchApplicationDetails(activeProgram, true);
     } catch (error) {
       console.error('Error uploading document:', error);
       alert('Failed to upload document. Please try again.');

@@ -496,9 +496,8 @@ const updateCredentials = async () => {
 
       xhr.onload = () => {
         if (xhr.status === 200) {
-          fetchApplicationDetails(applicationId, true);
-          setUploadStates(prev => prev.map(state => 
-            state.documentId === documentId 
+          setUploadStates(prev => prev.map(state =>
+            state.documentId === documentId
               ? { ...state, isUploading: false, progress: 100 }
               : state
           ));
@@ -571,9 +570,11 @@ const updateCredentials = async () => {
   const handleUpload = async () => {
     if (!selectedFile || !selectedDocument || !activeProgram) return;
 
+    const savedScrollY = window.scrollY;
     try {
       await uploadDocument(activeProgram, selectedDocument, selectedFile);
       await fetchApplicationDetails(activeProgram, true);
+      requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: 'instant' as ScrollBehavior }));
     } catch (error) {
       console.error('Error uploading document:', error);
       alert('Failed to upload document. Please try again.');

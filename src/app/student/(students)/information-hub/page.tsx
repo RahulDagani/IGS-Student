@@ -1,5 +1,6 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
 import {
   Settings,
@@ -103,48 +104,14 @@ const universityWebinars = [
   },
 ];
 
-const universityNews = [
-  {
-    id: 1,
-    title: "QS Rankings 2025: Top Universities Revealed",
-    source: "IGS News",
-    date: "2025-01-10",
-    category: "Rankings",
-    excerpt: "The QS World University Rankings 2025 have been announced. MIT tops the list for the 13th consecutive year, followed by Cambridge and Oxford.",
-    imageUrl: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=400&q=80",
-    readMoreUrl: "#",
-  },
-  {
-    id: 2,
-    title: "Canada Introduces New Student Visa Pathways for 2025",
-    source: "IGS Updates",
-    date: "2025-01-05",
-    category: "Visa",
-    excerpt: "IRCC has announced new study permit processing changes to ease the backlog and improve turnaround times for international students.",
-    imageUrl: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80",
-    readMoreUrl: "#",
-  },
-  {
-    id: 3,
-    title: "UK Universities Offering Record Scholarships for 2025 Intake",
-    source: "IGS News",
-    date: "2024-12-28",
-    category: "Scholarships",
-    excerpt: "Leading UK institutions have announced significant scholarship packages to attract international talent for the 2025 academic year.",
-    imageUrl: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&q=80",
-    readMoreUrl: "#",
-  },
-  {
-    id: 4,
-    title: "Australia's New Post-Study Work Visa Extension",
-    source: "IGS Updates",
-    date: "2024-12-15",
-    category: "Visa",
-    excerpt: "Australia extends post-study work rights for graduates from select universities and in-demand sectors.",
-    imageUrl: "https://images.unsplash.com/photo-1494587351196-bbf5f29cff42?w=400&q=80",
-    readMoreUrl: "#",
-  },
-];
+interface NewsItem {
+  id: number;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  category_name: string | null;
+  created_at: string;
+}
 
 // ─── Loan Modal ───────────────────────────────────────────────────────────────
 
@@ -564,41 +531,75 @@ function UniversityWebinarsTab() {
 // ─── Tab: University News ─────────────────────────────────────────────────────
 
 function UniversityNewsTab() {
-  const categoryColors: Record<string, string> = {
-    Rankings: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-    Visa: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    Scholarships: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  };
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("https://api.applystore.org/api/front/news?news_type=student&limit=6")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) setNews(d.data);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden animate-pulse">
+            <div className="h-40 bg-gray-200 dark:bg-gray-700" />
+            <div className="p-4 space-y-2">
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (news.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-sm text-gray-500 dark:text-gray-400">No news available at the moment.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        Stay up to date with the latest news from universities and study abroad destinations.
-      </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {universityNews.map((news) => (
-          <div key={news.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm flex flex-col">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={news.imageUrl}
-              alt={news.title}
-              className="w-full h-40 object-cover"
-            />
+        {news.map((item) => (
+          <div key={item.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm flex flex-col">
+            {item.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={item.image_url} alt={item.title} className="w-full h-40 object-cover" />
+            ) : (
+              <div className="w-full h-40 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                <Newspaper className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+              </div>
+            )}
             <div className="p-4 flex flex-col flex-grow">
               <div className="flex items-center gap-2 mb-2">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${categoryColors[news.category] ?? "bg-gray-100 text-gray-600"}`}>
-                  {news.category}
-                </span>
+                {item.category_name && (
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                    {item.category_name}
+                  </span>
+                )}
                 <span className="text-xs text-gray-400 flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  {new Date(news.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                  {new Date(item.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                 </span>
               </div>
-              <h3 className="font-semibold text-sm text-gray-900 dark:text-white mb-2 leading-snug">{news.title}</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed flex-grow">{news.excerpt}</p>
-              <a href={news.readMoreUrl} className="mt-3 text-xs font-medium text-brand-500 hover:text-brand-600 flex items-center gap-1">
-                Read More <ChevronRight className="w-3.5 h-3.5" />
-              </a>
+              <h3 className="font-semibold text-sm text-gray-900 dark:text-white mb-2 leading-snug">{item.title}</h3>
+              {item.description && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed flex-grow line-clamp-3">
+                  {item.description.replace(/<[^>]*>/g, "")}
+                </p>
+              )}
             </div>
           </div>
         ))}

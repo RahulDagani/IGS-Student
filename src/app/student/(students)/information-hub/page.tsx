@@ -38,35 +38,17 @@ interface LoanFormData {
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
-const trainingResources = [
-  {
-    id: 1,
-    title: "Study Abroad Application Guide",
-    channel: "IGS Education",
-    publishDate: "2024-09-10",
-    youtubeUrl: "https://www.youtube.com/embed/ffqQSDjZl3E",
-    description: "Step-by-step walkthrough of the entire study abroad application process from selecting a country to visa approval.",
-    tags: ["Application", "Study Abroad", "Visa"],
-  },
-  {
-    id: 2,
-    title: "IELTS Preparation Masterclass",
-    channel: "IGS Training",
-    publishDate: "2024-08-22",
-    youtubeUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-    description: "Comprehensive IELTS preparation covering all four modules: Listening, Reading, Writing, and Speaking.",
-    tags: ["IELTS", "English", "Exam Prep"],
-  },
-  {
-    id: 3,
-    title: "Scholarship Application Tips",
-    channel: "IGS Education",
-    publishDate: "2024-07-15",
-    youtubeUrl: "https://www.youtube.com/embed/abc123def456",
-    description: "Expert tips on finding and applying for scholarships at top universities worldwide.",
-    tags: ["Scholarship", "Funding", "University"],
-  },
-];
+interface ResourceItem {
+  id: number;
+  title: string;
+  description: string | null;
+  resource_type: "video" | "news" | "guide" | "link";
+  audience_type: string;
+  url: string;
+  thumbnail: string | null;
+  thumbnail_url: string | null;
+  created_at: string;
+}
 
 interface WebinarItem {
   id: number;
@@ -453,42 +435,137 @@ function IgsServicesTab() {
 // ─── Tab: Training Resources ──────────────────────────────────────────────────
 
 function TrainingResourcesTab() {
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        Explore our curated video resources to help you prepare for your study abroad journey.
-      </p>
+  const { token } = useAuth();
+  const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "video" | "guide" | "link" | "news">("all");
+
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+
+  useEffect(() => {
+    if (!token) return;
+    setLoading(true);
+    Promise.all([
+      fetch(`${BASE_URL}/tenant/resources?audience_type=student&limit=50`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+      fetch(`${BASE_URL}/tenant/resources?audience_type=all&limit=50`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+    ])
+      .then(([studentRes, allRes]) => {
+        const studentData: ResourceItem[] = studentRes.success ? studentRes.data : [];
+        const allData: ResourceItem[] = allRes.success ? allRes.data : [];
+        const seen = new Set<number>();
+        const merged = [...studentData, ...allData].filter(r => {
+          if (seen.has(r.id)) return false;
+          seen.add(r.id);
+          return true;
+        });
+        setResources(merged);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [token, BASE_URL]);
+
+  const typeConfig = {
+    video: { label: "Video", icon: <Video className="w-3.5 h-3.5" />, color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+    guide: { label: "Guide", icon: <BookOpen className="w-3.5 h-3.5" />, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+    link:  { label: "Link",  icon: <ExternalLink className="w-3.5 h-3.5" />, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
+    news:  { label: "News",  icon: <Newspaper className="w-3.5 h-3.5" />, color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+  };
+
+  const filtered = filter === "all" ? resources : resources.filter(r => r.resource_type === filter);
+
+  if (loading) {
+    return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {trainingResources.map((r) => (
-          <div key={r.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm flex flex-col">
-            <div className="relative h-48 overflow-hidden bg-gray-100 dark:bg-gray-800">
-              <iframe
-                src={r.youtubeUrl}
-                frameBorder="0"
-                allowFullScreen
-                className="w-full h-full"
-                title={r.title}
-              />
-            </div>
-            <div className="p-4 flex flex-col flex-grow">
-              <h3 className="font-semibold text-sm text-gray-900 dark:text-white mb-1">{r.title}</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">{r.channel}</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed flex-grow">{r.description}</p>
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                {r.tags.map((tag) => (
-                  <span key={tag} className="text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-              <p className="text-xs text-gray-400 mt-3 flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {new Date(r.publishDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
-              </p>
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden animate-pulse">
+            <div className="h-40 bg-gray-200 dark:bg-gray-700" />
+            <div className="p-4 space-y-2">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
             </div>
           </div>
         ))}
       </div>
+    );
+  }
+
+  if (resources.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <BookOpen className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">No training resources available yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Filter tabs */}
+      <div className="flex flex-wrap gap-2">
+        {(["all", "video", "guide", "link", "news"] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setFilter(t)}
+            className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors ${
+              filter === t
+                ? "bg-brand-500 text-white"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
+          >
+            {t === "all" ? "All" : typeConfig[t].label}
+            {t !== "all" && (
+              <span className="ml-1 opacity-70">({resources.filter(r => r.resource_type === t).length})</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-gray-400 py-6 text-center">No {filter} resources found.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filtered.map((r) => {
+            const type = typeConfig[r.resource_type] ?? typeConfig.link;
+            return (
+              <div key={r.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm flex flex-col">
+                {/* Thumbnail */}
+                {r.thumbnail_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={r.thumbnail_url} alt={r.title} className="w-full h-40 object-cover" />
+                ) : (
+                  <div className="w-full h-40 bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
+                    <span className="text-gray-300 dark:text-gray-600 scale-150">{type.icon}</span>
+                  </div>
+                )}
+                <div className="p-4 flex flex-col flex-grow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${type.color}`}>
+                      {type.icon}{type.label}
+                    </span>
+                    <span className="text-xs text-gray-400 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-sm text-gray-900 dark:text-white mb-1 leading-snug">{r.title}</h3>
+                  {r.description && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed flex-grow line-clamp-3">{r.description}</p>
+                  )}
+                  <a
+                    href={r.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand-500 hover:text-brand-600"
+                  >
+                    {r.resource_type === "video" ? "Watch" : r.resource_type === "guide" ? "Read Guide" : "Open"}
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

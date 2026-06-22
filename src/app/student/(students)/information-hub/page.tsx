@@ -12,7 +12,6 @@ import {
   GraduationCap,
   Languages,
   X,
-  ChevronRight,
   Calendar,
   ExternalLink,
 } from "lucide-react";
@@ -21,20 +20,9 @@ import {
 
 type Tab = "igs-services" | "training-resources" | "university-webinars" | "university-news";
 
-interface LoanFormData {
-  fullName: string;
-  email: string;
-  phone: string;
-  country: string;
-  studyLevel: string;
-  discipline: string;
-  university: string;
-  course: string;
-  intakeMonth: string;
-  intakeYear: string;
-  intakeCourse: string;
-  gpa: string;
-}
+interface FilterOption { id?: number | string; country_id?: number | string; name?: string; university?: string; country_name?: string; intake?: string; intake_year?: number; intake_id?: number; intake_name?: string; }
+interface CourseOption { id: number; course_name: string; }
+interface IntakeOption { id: number; intake_id: number; intake_year: number; intake_name: string; }
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
@@ -111,46 +99,141 @@ interface NewsItem {
 // ─── Loan Modal ───────────────────────────────────────────────────────────────
 
 function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const [form, setForm] = useState<LoanFormData>({
-    fullName: "",
-    email: "",
-    phone: "",
-    country: "",
-    studyLevel: "",
-    discipline: "",
-    university: "",
-    course: "",
-    intakeMonth: "",
-    intakeYear: "",
-    intakeCourse: "",
-    gpa: "",
-  });
+  const { token } = useAuth();
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+
+  // Pre-filled profile
+  const [profile, setProfile] = useState({ fullName: "", email: "", phone: "", country: "", address: "" });
+  // Academic qualification (pre-filled or user-entered)
+  const [academic, setAcademic] = useState({ levelOfStudy: "", institution: "", gradingSystem: "", score: "" });
+  const [hasAcademicRecord, setHasAcademicRecord] = useState(false);
+
+  // Cascading filter options
+  const [countries, setCountries] = useState<FilterOption[]>([]);
+  const [universities, setUniversities] = useState<FilterOption[]>([]);
+  const [studyLevels, setStudyLevels] = useState<FilterOption[]>([]);
+  const [disciplines, setDisciplines] = useState<FilterOption[]>([]);
+  const [courses, setCourses] = useState<CourseOption[]>([]);
+  const [intakes, setIntakes] = useState<IntakeOption[]>([]);
+
+  // Selected IDs
+  const [selCountry, setSelCountry] = useState("");
+  const [selUniversity, setSelUniversity] = useState("");
+  const [selStudyLevel, setSelStudyLevel] = useState("");
+  const [selDiscipline, setSelDiscipline] = useState("");
+  const [selCourse, setSelCourse] = useState("");
+  const [selIntake, setSelIntake] = useState("");
+
+  const [loadingInit, setLoadingInit] = useState(true);
+  const [loadingUniversities, setLoadingUniversities] = useState(false);
+  const [loadingStudyLevels, setLoadingStudyLevels] = useState(false);
+  const [loadingDisciplines, setLoadingDisciplines] = useState(false);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+  const [loadingIntakes, setLoadingIntakes] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const set = (field: keyof LoanFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const headers = { Authorization: `Bearer ${token}` };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitted(true);
-  };
+  const fetchFilters = (params: Record<string, string>) =>
+    fetch(`${BASE_URL}/student/course/filters/dynamic?${new URLSearchParams(params)}`, { headers }).then(r => r.json());
+
+  // Load profile + academic + initial countries on open
+  useEffect(() => {
+    if (!isOpen || !token) return;
+    setLoadingInit(true);
+    Promise.all([
+      fetch(`${BASE_URL}/student`, { headers }).then(r => r.json()),
+      fetch(`${BASE_URL}/student/student/academic/records`, { headers }).then(r => r.json()),
+      fetchFilters({}),
+    ]).then(([pRes, aRes, fRes]) => {
+      if (pRes.success && pRes.data) {
+        const p = pRes.data;
+        setProfile({
+          fullName: [p.first_name, p.last_name].filter(Boolean).join(" "),
+          email: p.email || "",
+          phone: p.phone || "",
+          country: p.country_name || "",
+          address: p.address || "",
+        });
+      }
+      if (aRes.success && aRes.data?.length > 0) {
+        const r = aRes.data[0];
+        setAcademic({ levelOfStudy: r.level_of_study || "", institution: r.institution_name || "", gradingSystem: r.grading_system || "", score: String(r.score || "") });
+        setHasAcademicRecord(true);
+      }
+      if (fRes.success) setCountries(fRes.data.filters.locations.countries || []);
+    }).catch(console.error).finally(() => setLoadingInit(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, token]);
+
+  // Country → universities
+  useEffect(() => {
+    if (!selCountry) { setUniversities([]); setStudyLevels([]); setDisciplines([]); setCourses([]); setIntakes([]); return; }
+    setLoadingUniversities(true);
+    fetchFilters({ country_id: selCountry }).then(d => {
+      if (d.success) setUniversities(d.data.filters.universities || []);
+    }).catch(console.error).finally(() => setLoadingUniversities(false));
+    setSelUniversity(""); setSelStudyLevel(""); setSelDiscipline(""); setSelCourse(""); setSelIntake("");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selCountry]);
+
+  // University → study levels
+  useEffect(() => {
+    if (!selUniversity) { setStudyLevels([]); setDisciplines([]); setCourses([]); setIntakes([]); return; }
+    setLoadingStudyLevels(true);
+    fetchFilters({ country_id: selCountry, university_id: selUniversity }).then(d => {
+      if (d.success) setStudyLevels(d.data.filters.studyLevels || []);
+    }).catch(console.error).finally(() => setLoadingStudyLevels(false));
+    setSelStudyLevel(""); setSelDiscipline(""); setSelCourse(""); setSelIntake("");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selUniversity]);
+
+  // Study level → disciplines
+  useEffect(() => {
+    if (!selStudyLevel) { setDisciplines([]); setCourses([]); setIntakes([]); return; }
+    setLoadingDisciplines(true);
+    fetchFilters({ university_id: selUniversity, study_level_id: selStudyLevel }).then(d => {
+      if (d.success) setDisciplines(d.data.filters.disciplines || []);
+    }).catch(console.error).finally(() => setLoadingDisciplines(false));
+    setSelDiscipline(""); setSelCourse(""); setSelIntake("");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selStudyLevel]);
+
+  // Discipline → courses
+  useEffect(() => {
+    if (!selDiscipline) { setCourses([]); setIntakes([]); return; }
+    setLoadingCourses(true);
+    fetch(`${BASE_URL}/student/courses?university_id=${selUniversity}&study_level_id=${selStudyLevel}&discipline_id=${selDiscipline}&limit=100`, { headers })
+      .then(r => r.json())
+      .then(d => { if (d.success) setCourses(d.data || []); })
+      .catch(console.error).finally(() => setLoadingCourses(false));
+    setSelCourse(""); setSelIntake("");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selDiscipline]);
+
+  // Course → intakes (future only via API)
+  useEffect(() => {
+    if (!selCourse) { setIntakes([]); return; }
+    setLoadingIntakes(true);
+    fetch(`${BASE_URL}/student/course/intake/${selCourse}`, { headers })
+      .then(r => r.json())
+      .then(d => { if (d.success) setIntakes(d.data || []); })
+      .catch(console.error).finally(() => setLoadingIntakes(false));
+    setSelIntake("");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selCourse]);
 
   const handleClose = () => {
-    setSubmitted(false);
-    setForm({
-      fullName: "", email: "", phone: "", country: "", studyLevel: "",
-      discipline: "", university: "", course: "", intakeMonth: "", intakeYear: "",
-      intakeCourse: "", gpa: "",
-    });
+    if (submitting) return;
+    setSubmitted(false); setError(null);
+    setSelCountry(""); setSelUniversity(""); setSelStudyLevel(""); setSelDiscipline(""); setSelCourse(""); setSelIntake("");
     onClose();
   };
 
   React.useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = isOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
@@ -158,164 +241,222 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
     if (isOpen) document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selCourse) { setError("Please select a course."); return; }
+    setError(null); setSubmitting(true);
+    try {
+      const selectedIntakeObj = intakes.find(i => String(i.id) === selIntake);
+      const res = await fetch(`${BASE_URL}/student/loan/enquiry`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          country_id: selCountry || null,
+          university_id: selUniversity || null,
+          study_level_id: selStudyLevel || null,
+          discipline_id: selDiscipline || null,
+          course_id: selCourse,
+          intake_id: selectedIntakeObj?.intake_id || null,
+          intake_year: selectedIntakeObj?.intake_year || null,
+          intake_name: selectedIntakeObj?.intake_name || null,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Submission failed. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (!isOpen) return null;
 
-  const inputCls =
-    "w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500";
+  const inputCls = "w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 disabled:opacity-50";
   const labelCls = "block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1";
+  const sectionCls = "text-sm font-semibold text-gray-800 dark:text-white mb-3 pb-2 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2";
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-start justify-center p-4 sm:p-6 overflow-y-auto">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={handleClose}
-      />
-
-      {/* Modal panel */}
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
       <div className="relative w-full max-w-2xl my-auto bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col">
 
-        {/* Header — always visible */}
+        {/* Header */}
         <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Education Loan Enquiry</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Fill in your details and we&apos;ll connect you with the right lender.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">We&apos;ll connect you with the right lender based on your profile.</p>
           </div>
-          <button
-            onClick={handleClose}
-            className="ml-4 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-          >
+          <button onClick={handleClose} className="ml-4 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {submitted ? (
-          <div className="text-center py-12 px-6">
+          <div className="text-center py-14 px-6">
             <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Request Submitted!</h3>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Enquiry Submitted!</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Our loan advisor will contact you within 2 business days.</p>
-            <button onClick={handleClose} className="px-6 py-2.5 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600">
-              Done
-            </button>
+            <button onClick={handleClose} className="px-6 py-2.5 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600">Done</button>
+          </div>
+        ) : loadingInit ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col">
-            {/* Scrollable body */}
-            <div className="px-6 py-5 space-y-5 overflow-y-auto max-h-[60vh]">
+            <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[65vh]">
 
-              {/* Personal Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Full Name *</label>
-                  <input required type="text" placeholder="John Doe" value={form.fullName} onChange={set("fullName")} className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>Email Address *</label>
-                  <input required type="email" placeholder="john@example.com" value={form.email} onChange={set("email")} className={inputCls} />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className={labelCls}>Phone Number *</label>
-                  <input required type="tel" placeholder="+1 234 567 8900" value={form.phone} onChange={set("phone")} className={inputCls} />
+              {/* ── Profile ── */}
+              <div>
+                <p className={sectionCls}>Personal Information</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Full Name</label>
+                    <input type="text" value={profile.fullName} readOnly className={`${inputCls} bg-gray-50 dark:bg-gray-800/50`} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Email</label>
+                    <input type="email" value={profile.email} readOnly className={`${inputCls} bg-gray-50 dark:bg-gray-800/50`} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Phone</label>
+                    <input type="text" value={profile.phone} readOnly className={`${inputCls} bg-gray-50 dark:bg-gray-800/50`} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Country of Residence</label>
+                    <input type="text" value={profile.country} readOnly className={`${inputCls} bg-gray-50 dark:bg-gray-800/50`} />
+                  </div>
+                  {profile.address && (
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Current Address</label>
+                      <input type="text" value={profile.address} readOnly className={`${inputCls} bg-gray-50 dark:bg-gray-800/50`} />
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Tell Us About You */}
+              {/* ── Academic Qualification ── */}
               <div>
-                <p className="text-sm font-semibold text-gray-800 dark:text-white mb-3 border-b border-gray-200 dark:border-gray-700 pb-2">
-                  Tell Us About You
+                <p className={sectionCls}>
+                  Academic Qualification
+                  {!hasAcademicRecord && <span className="text-xs font-normal text-amber-500">(not filled in profile — please enter)</span>}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelCls}>Country of Residence *</label>
-                    <select required value={form.country} onChange={set("country")} className={inputCls}>
+                    <label className={labelCls}>Highest Level of Study</label>
+                    <input type="text" value={academic.levelOfStudy}
+                      readOnly={hasAcademicRecord}
+                      onChange={e => setAcademic(p => ({ ...p, levelOfStudy: e.target.value }))}
+                      placeholder="e.g. Undergraduate"
+                      className={`${inputCls} ${hasAcademicRecord ? "bg-gray-50 dark:bg-gray-800/50" : ""}`} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Institution Name</label>
+                    <input type="text" value={academic.institution}
+                      readOnly={hasAcademicRecord}
+                      onChange={e => setAcademic(p => ({ ...p, institution: e.target.value }))}
+                      placeholder="e.g. Delhi University"
+                      className={`${inputCls} ${hasAcademicRecord ? "bg-gray-50 dark:bg-gray-800/50" : ""}`} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Grading System</label>
+                    <input type="text" value={academic.gradingSystem}
+                      readOnly={hasAcademicRecord}
+                      onChange={e => setAcademic(p => ({ ...p, gradingSystem: e.target.value }))}
+                      placeholder="e.g. Percentage / CGPA"
+                      className={`${inputCls} ${hasAcademicRecord ? "bg-gray-50 dark:bg-gray-800/50" : ""}`} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Score / GPA</label>
+                    <input type="text" value={academic.score}
+                      readOnly={hasAcademicRecord}
+                      onChange={e => setAcademic(p => ({ ...p, score: e.target.value }))}
+                      placeholder="e.g. 8.5 or 75%"
+                      className={`${inputCls} ${hasAcademicRecord ? "bg-gray-50 dark:bg-gray-800/50" : ""}`} />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Course Selection ── */}
+              <div>
+                <p className={sectionCls}>Course Applying For</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                  {/* Country */}
+                  <div>
+                    <label className={labelCls}>Country *</label>
+                    <select required value={selCountry} onChange={e => setSelCountry(e.target.value)} className={inputCls}>
                       <option value="">Select country</option>
-                      {["India", "Nigeria", "Pakistan", "Bangladesh", "Nepal", "Sri Lanka", "Philippines", "Vietnam", "Indonesia", "Other"].map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
+                      {countries.map(c => <option key={c.country_id ?? c.id} value={String(c.country_id ?? c.id)}>{c.country_name ?? c.name}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className={labelCls}>Study Level *</label>
-                    <select required value={form.studyLevel} onChange={set("studyLevel")} className={inputCls}>
-                      <option value="">Select level</option>
-                      {["Undergraduate", "Postgraduate", "PhD / Doctorate", "Diploma", "Certificate"].map((l) => (
-                        <option key={l} value={l}>{l}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Discipline *</label>
-                    <input required type="text" placeholder="e.g. Computer Science" value={form.discipline} onChange={set("discipline")} className={inputCls} />
-                  </div>
+
+                  {/* University */}
                   <div>
                     <label className={labelCls}>University *</label>
-                    <input required type="text" placeholder="e.g. University of Toronto" value={form.university} onChange={set("university")} className={inputCls} />
+                    <select required value={selUniversity} onChange={e => setSelUniversity(e.target.value)} className={inputCls} disabled={!selCountry || loadingUniversities}>
+                      <option value="">{loadingUniversities ? "Loading..." : "Select university"}</option>
+                      {universities.map(u => <option key={u.id} value={String(u.id)}>{u.university ?? u.name}</option>)}
+                    </select>
                   </div>
+
+                  {/* Study Level */}
+                  <div>
+                    <label className={labelCls}>Study Level *</label>
+                    <select required value={selStudyLevel} onChange={e => setSelStudyLevel(e.target.value)} className={inputCls} disabled={!selUniversity || loadingStudyLevels}>
+                      <option value="">{loadingStudyLevels ? "Loading..." : "Select study level"}</option>
+                      {studyLevels.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Discipline */}
+                  <div>
+                    <label className={labelCls}>Discipline *</label>
+                    <select required value={selDiscipline} onChange={e => setSelDiscipline(e.target.value)} className={inputCls} disabled={!selStudyLevel || loadingDisciplines}>
+                      <option value="">{loadingDisciplines ? "Loading..." : "Select discipline"}</option>
+                      {disciplines.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Course */}
                   <div className="sm:col-span-2">
-                    <label className={labelCls}>Course Name *</label>
-                    <input required type="text" placeholder="e.g. MSc Data Science" value={form.course} onChange={set("course")} className={inputCls} />
+                    <label className={labelCls}>Course *</label>
+                    <select required value={selCourse} onChange={e => setSelCourse(e.target.value)} className={inputCls} disabled={!selDiscipline || loadingCourses}>
+                      <option value="">{loadingCourses ? "Loading..." : "Select course"}</option>
+                      {courses.map(c => <option key={c.id} value={String(c.id)}>{c.course_name}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Intake */}
+                  <div className="sm:col-span-2">
+                    <label className={labelCls}>Intake (Future intakes only)</label>
+                    <select value={selIntake} onChange={e => setSelIntake(e.target.value)} className={inputCls} disabled={!selCourse || loadingIntakes}>
+                      <option value="">{loadingIntakes ? "Loading..." : intakes.length === 0 && selCourse ? "No upcoming intakes" : "Select intake"}</option>
+                      {intakes.map(i => <option key={i.id} value={String(i.id)}>{i.intake_name} {i.intake_year}</option>)}
+                    </select>
                   </div>
                 </div>
               </div>
 
-              {/* Intake */}
-              <div>
-                <p className="text-sm font-semibold text-gray-800 dark:text-white mb-3 border-b border-gray-200 dark:border-gray-700 pb-2">
-                  Intake Details
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className={labelCls}>Intake Month</label>
-                    <select value={form.intakeMonth} onChange={set("intakeMonth")} className={inputCls}>
-                      <option value="">Month</option>
-                      {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Intake Year</label>
-                    <select value={form.intakeYear} onChange={set("intakeYear")} className={inputCls}>
-                      <option value="">Year</option>
-                      {["2025", "2026", "2027"].map((y) => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Course Start</label>
-                    <input type="text" placeholder="e.g. Sep 2025" value={form.intakeCourse} onChange={set("intakeCourse")} className={inputCls} />
-                  </div>
-                </div>
-              </div>
-
-              {/* GPA */}
-              <div>
-                <label className={labelCls}>GPA / Percentage *</label>
-                <input required type="text" placeholder="e.g. 3.5 / 10 or 75%" value={form.gpa} onChange={set("gpa")} className={inputCls} />
-              </div>
+              {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
             </div>
 
-            {/* Footer — always visible */}
+            {/* Footer */}
             <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors"
-              >
+              <button type="button" onClick={handleClose} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors">
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="flex-1 px-4 py-2.5 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600 transition-colors"
-              >
-                Submit Enquiry
+              <button type="submit" disabled={submitting} className="flex-1 px-4 py-2.5 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+                {submitting ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Submitting...</> : "Submit Enquiry"}
               </button>
             </div>
           </form>
@@ -454,22 +595,17 @@ function toEmbedUrl(url: string): string {
 }
 
 function TrainingResourcesTab() {
-  const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [videos, setVideos] = useState<ResourceItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"video" | "guide">("video");
 
   useEffect(() => {
     setLoading(true);
-    fetch("https://api.applystore.org/api/front/resources?limit=100")
+    fetch("https://api.applystore.org/api/front/resources?resource_type=video&limit=100")
       .then(r => r.json())
-      .then(d => { if (d.success) setResources(d.data.filter((r: ResourceItem) => r.resource_type === "video" || r.resource_type === "guide")); })
+      .then(d => { if (d.success) setVideos(d.data); })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
-
-  const videos = resources.filter(r => r.resource_type === "video");
-  const guides = resources.filter(r => r.resource_type === "guide");
-  const filtered = tab === "video" ? videos : guides;
 
   if (loading) {
     return (
@@ -487,46 +623,24 @@ function TrainingResourcesTab() {
     );
   }
 
-  if (resources.length === 0) {
+  if (videos.length === 0) {
     return (
       <div className="text-center py-12">
-        <BookOpen className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-        <p className="text-sm text-gray-500 dark:text-gray-400">No training resources available yet.</p>
+        <Video className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">No training videos available yet.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-fit">
-        <button
-          onClick={() => setTab("video")}
-          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            tab === "video" ? "bg-white dark:bg-gray-700 text-gray-800 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
-          }`}
-        >
-          <Video className="w-3.5 h-3.5" /> Videos
-          <span className="text-xs opacity-60">({videos.length})</span>
-        </button>
-        <button
-          onClick={() => setTab("guide")}
-          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            tab === "guide" ? "bg-white dark:bg-gray-700 text-gray-800 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
-          }`}
-        >
-          <BookOpen className="w-3.5 h-3.5" /> Guides
-          <span className="text-xs opacity-60">({guides.length})</span>
-        </button>
-      </div>
-
-      {filtered.length === 0 ? (
+      {videos.length === 0 ? (
         <div className="text-center py-10">
-          <p className="text-sm text-gray-400">No {tab === "video" ? "videos" : "guides"} available yet.</p>
+          <p className="text-sm text-gray-400">No videos available yet.</p>
         </div>
-      ) : tab === "video" ? (
+      ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {filtered.map((r) => (
+          {videos.map((r) => (
             <div key={r.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm flex flex-col">
               <div className="relative w-full" style={{ paddingTop: "56.25%" }}>
                 <iframe
@@ -546,41 +660,6 @@ function TrainingResourcesTab() {
                   <Calendar className="w-3 h-3" />
                   {new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {filtered.map((r) => (
-            <div key={r.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm flex flex-col">
-              {r.thumbnail_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.thumbnail_url} alt={r.title} className="w-full h-40 object-cover" />
-              ) : (
-                <div className="w-full h-40 bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
-                  <BookOpen className="w-10 h-10 text-blue-300 dark:text-blue-600" />
-                </div>
-              )}
-              <div className="p-4 flex flex-col flex-grow">
-                <h3 className="font-semibold text-sm text-gray-900 dark:text-white mb-1 leading-snug">{r.title}</h3>
-                {r.description && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed flex-grow line-clamp-3">{r.description}</p>
-                )}
-                <div className="flex items-center justify-between mt-3">
-                  <p className="text-xs text-gray-400 flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    {new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                  </p>
-                  <a
-                    href={r.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-medium text-brand-500 hover:text-brand-600"
-                  >
-                    Read Guide <ChevronRight className="w-3.5 h-3.5" />
-                  </a>
-                </div>
               </div>
             </div>
           ))}

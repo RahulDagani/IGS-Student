@@ -435,34 +435,18 @@ function IgsServicesTab() {
 // ─── Tab: Training Resources ──────────────────────────────────────────────────
 
 function TrainingResourcesTab() {
-  const { token } = useAuth();
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "video" | "guide" | "link" | "news">("all");
 
-  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
-
   useEffect(() => {
-    if (!token) return;
     setLoading(true);
-    Promise.all([
-      fetch(`${BASE_URL}/tenant/resources?audience_type=student&limit=50`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-      fetch(`${BASE_URL}/tenant/resources?audience_type=all&limit=50`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-    ])
-      .then(([studentRes, allRes]) => {
-        const studentData: ResourceItem[] = studentRes.success ? studentRes.data : [];
-        const allData: ResourceItem[] = allRes.success ? allRes.data : [];
-        const seen = new Set<number>();
-        const merged = [...studentData, ...allData].filter(r => {
-          if (seen.has(r.id)) return false;
-          seen.add(r.id);
-          return true;
-        });
-        setResources(merged);
-      })
+    fetch("https://api.applystore.org/api/front/resources?limit=100")
+      .then(r => r.json())
+      .then(d => { if (d.success) setResources(d.data); })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [token, BASE_URL]);
+  }, []);
 
   const typeConfig = {
     video: { label: "Video", icon: <Video className="w-3.5 h-3.5" />, color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },

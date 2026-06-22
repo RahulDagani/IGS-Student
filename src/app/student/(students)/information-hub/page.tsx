@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
 import {
@@ -14,6 +14,7 @@ import {
   X,
   Calendar,
   ExternalLink,
+  Search,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -96,28 +97,158 @@ interface NewsItem {
   created_at: string;
 }
 
+// ─── Location autocomplete components (used in LoanModal) ─────────────────────
+
+interface LocCountry { id: number; name: string; iso_code: string; flag?: string; }
+interface LocState { id: number; name: string; state_code: string; }
+interface LocCity { id: number; name: string; }
+
+function LocCountryAC({ value, displayName, onChange, baseUrl, token, placeholder = "Search country..." }: {
+  value: number | null; displayName: string; onChange: (c: LocCountry | null) => void; baseUrl: string; token: string | null; placeholder?: string;
+}) {
+  const [query, setQuery] = useState(""); const [options, setOptions] = useState<LocCountry[]>([]); const [busy, setBusy] = useState(false); const [open, setOpen] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null); const wrapRef = useRef<HTMLDivElement>(null);
+  const fetchOptions = useCallback(async (q: string) => { if (!q.trim()) { setOptions([]); return; } setBusy(true); try { const r = await fetch(`${baseUrl}/location/countries?search=${encodeURIComponent(q)}&limit=10`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.success) setOptions(d.data); } finally { setBusy(false); } }, [baseUrl, token]);
+  useEffect(() => { if (timerRef.current) clearTimeout(timerRef.current); timerRef.current = setTimeout(() => fetchOptions(query), 280); return () => { if (timerRef.current) clearTimeout(timerRef.current); }; }, [query, fetchOptions]);
+  useEffect(() => { const fn = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) { setOpen(false); setQuery(""); } }; document.addEventListener("mousedown", fn); return () => document.removeEventListener("mousedown", fn); }, []);
+  const label = value && displayName ? displayName : null;
+  return (
+    <div ref={wrapRef} className="relative">
+      <div className="h-10 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 flex items-center gap-2 cursor-text focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/10" onClick={() => setOpen(true)}>
+        {open ? <input autoFocus type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder={label ?? placeholder} className="flex-1 bg-transparent text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none" />
+          : <span className={`flex-1 text-sm truncate ${label ? "text-gray-800 dark:text-white" : "text-gray-400"}`}>{label ?? placeholder}</span>}
+        {value ? <button type="button" onClick={e => { e.stopPropagation(); onChange(null); setQuery(""); setOptions([]); setOpen(false); }} className="text-gray-400 hover:text-gray-600 flex-shrink-0"><X size={13} /></button>
+          : <Search size={13} className="text-gray-400 flex-shrink-0 pointer-events-none" />}
+      </div>
+      {open && <div className="absolute z-[200] mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
+        {busy ? <div className="px-3 py-2.5 text-sm text-gray-400">Searching...</div>
+          : !query.trim() ? <div className="px-3 py-2.5 text-sm text-gray-400">Type to search countries...</div>
+          : options.length === 0 ? <div className="px-3 py-2.5 text-sm text-gray-400">No results</div>
+          : options.map(c => <button key={c.id} type="button" onClick={() => { onChange(c); setOpen(false); setQuery(""); setOptions([]); }} className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800 ${c.id === value ? "bg-brand-50 dark:bg-brand-900/20 text-brand-600" : "text-gray-800 dark:text-white"}`}>
+            {c.flag && <span>{c.flag}</span>}<span>{c.name}</span><span className="ml-auto text-xs text-gray-400">{c.iso_code}</span>
+          </button>)}
+      </div>}
+    </div>
+  );
+}
+
+function LocStateAC({ countryId, value, displayName, onChange, baseUrl, token, disabled = false }: {
+  countryId: number | null; value: number | null; displayName: string; onChange: (s: LocState | null) => void; baseUrl: string; token: string | null; disabled?: boolean;
+}) {
+  const [query, setQuery] = useState(""); const [options, setOptions] = useState<LocState[]>([]); const [busy, setBusy] = useState(false); const [open, setOpen] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null); const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { setQuery(""); setOptions([]); setOpen(false); }, [countryId]);
+  const fetchOptions = useCallback(async (q: string) => { if (!countryId || !q.trim()) { setOptions([]); return; } setBusy(true); try { const r = await fetch(`${baseUrl}/location/states?country_id=${countryId}&search=${encodeURIComponent(q)}&limit=10`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.success) setOptions(d.data); } finally { setBusy(false); } }, [baseUrl, token, countryId]);
+  useEffect(() => { if (timerRef.current) clearTimeout(timerRef.current); timerRef.current = setTimeout(() => fetchOptions(query), 280); return () => { if (timerRef.current) clearTimeout(timerRef.current); }; }, [query, fetchOptions]);
+  useEffect(() => { const fn = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) { setOpen(false); setQuery(""); } }; document.addEventListener("mousedown", fn); return () => document.removeEventListener("mousedown", fn); }, []);
+  const label = value && displayName ? displayName : null;
+  if (disabled) return <div className="h-10 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 flex items-center opacity-40 cursor-not-allowed"><span className="text-sm text-gray-400">Search state...</span></div>;
+  return (
+    <div ref={wrapRef} className="relative">
+      <div className="h-10 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 flex items-center gap-2 cursor-text focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/10" onClick={() => setOpen(true)}>
+        {open ? <input autoFocus type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder={label ?? "Search state..."} className="flex-1 bg-transparent text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none" />
+          : <span className={`flex-1 text-sm truncate ${label ? "text-gray-800 dark:text-white" : "text-gray-400"}`}>{label ?? "Search state..."}</span>}
+        {value ? <button type="button" onClick={e => { e.stopPropagation(); onChange(null); setQuery(""); setOptions([]); setOpen(false); }} className="text-gray-400 hover:text-gray-600 flex-shrink-0"><X size={13} /></button>
+          : <Search size={13} className="text-gray-400 flex-shrink-0 pointer-events-none" />}
+      </div>
+      {open && <div className="absolute z-[200] mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
+        {busy ? <div className="px-3 py-2.5 text-sm text-gray-400">Searching...</div>
+          : !query.trim() ? <div className="px-3 py-2.5 text-sm text-gray-400">Type to search states...</div>
+          : options.length === 0 ? <div className="px-3 py-2.5 text-sm text-gray-400">No results</div>
+          : options.map(s => <button key={s.id} type="button" onClick={() => { onChange(s); setOpen(false); setQuery(""); setOptions([]); }} className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800 ${s.id === value ? "bg-brand-50 dark:bg-brand-900/20 text-brand-600" : "text-gray-800 dark:text-white"}`}>
+            <span>{s.name}</span>{s.state_code && <span className="ml-auto text-xs text-gray-400">{s.state_code}</span>}
+          </button>)}
+      </div>}
+    </div>
+  );
+}
+
+function LocCityAC({ stateId, value, displayName, onChange, baseUrl, token, disabled = false }: {
+  stateId: number | null; value: number | null; displayName: string; onChange: (c: LocCity | null) => void; baseUrl: string; token: string | null; disabled?: boolean;
+}) {
+  const [query, setQuery] = useState(""); const [options, setOptions] = useState<LocCity[]>([]); const [busy, setBusy] = useState(false); const [open, setOpen] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null); const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { setQuery(""); setOptions([]); setOpen(false); }, [stateId]);
+  const fetchOptions = useCallback(async (q: string) => { if (!stateId || !q.trim()) { setOptions([]); return; } setBusy(true); try { const r = await fetch(`${baseUrl}/location/cities?state_id=${stateId}&search=${encodeURIComponent(q)}&limit=10`, { headers: { Authorization: `Bearer ${token}` } }); const d = await r.json(); if (d.success) setOptions(d.data); } finally { setBusy(false); } }, [baseUrl, token, stateId]);
+  useEffect(() => { if (timerRef.current) clearTimeout(timerRef.current); timerRef.current = setTimeout(() => fetchOptions(query), 280); return () => { if (timerRef.current) clearTimeout(timerRef.current); }; }, [query, fetchOptions]);
+  useEffect(() => { const fn = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) { setOpen(false); setQuery(""); } }; document.addEventListener("mousedown", fn); return () => document.removeEventListener("mousedown", fn); }, []);
+  const label = value && displayName ? displayName : null;
+  if (disabled) return <div className="h-10 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 flex items-center opacity-40 cursor-not-allowed"><span className="text-sm text-gray-400">Search city...</span></div>;
+  return (
+    <div ref={wrapRef} className="relative">
+      <div className="h-10 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 flex items-center gap-2 cursor-text focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/10" onClick={() => setOpen(true)}>
+        {open ? <input autoFocus type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder={label ?? "Search city..."} className="flex-1 bg-transparent text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none" />
+          : <span className={`flex-1 text-sm truncate ${label ? "text-gray-800 dark:text-white" : "text-gray-400"}`}>{label ?? "Search city..."}</span>}
+        {value ? <button type="button" onClick={e => { e.stopPropagation(); onChange(null); setQuery(""); setOptions([]); setOpen(false); }} className="text-gray-400 hover:text-gray-600 flex-shrink-0"><X size={13} /></button>
+          : <Search size={13} className="text-gray-400 flex-shrink-0 pointer-events-none" />}
+      </div>
+      {open && <div className="absolute z-[200] mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
+        {busy ? <div className="px-3 py-2.5 text-sm text-gray-400">Searching...</div>
+          : !query.trim() ? <div className="px-3 py-2.5 text-sm text-gray-400">Type to search cities...</div>
+          : options.length === 0 ? <div className="px-3 py-2.5 text-sm text-gray-400">No results</div>
+          : options.map(c => <button key={c.id} type="button" onClick={() => { onChange(c); setOpen(false); setQuery(""); setOptions([]); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${c.id === value ? "bg-brand-50 dark:bg-brand-900/20 text-brand-600" : "text-gray-800 dark:text-white"}`}>{c.name}</button>)}
+      </div>}
+    </div>
+  );
+}
+
+function UniversitySearch({ options, value, displayName, onSelect, disabled = false }: {
+  options: FilterOption[]; value: string; displayName: string; onSelect: (id: string, name: string) => void; disabled?: boolean;
+}) {
+  const [query, setQuery] = useState(""); const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { const fn = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) { setOpen(false); setQuery(""); } }; document.addEventListener("mousedown", fn); return () => document.removeEventListener("mousedown", fn); }, []);
+  const filtered = options.filter(o => (o.university || o.name || "").toLowerCase().includes(query.toLowerCase()));
+  const label = value && displayName ? displayName : null;
+  if (disabled) return <div className="h-10 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 flex items-center opacity-40 cursor-not-allowed"><span className="text-sm text-gray-400">Search university...</span></div>;
+  return (
+    <div ref={wrapRef} className="relative">
+      <div className="h-10 w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 flex items-center gap-2 cursor-text focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/10" onClick={() => setOpen(true)}>
+        {open ? <input autoFocus type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder={label ?? "Search university..."} className="flex-1 bg-transparent text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none" />
+          : <span className={`flex-1 text-sm truncate ${label ? "text-gray-800 dark:text-white" : "text-gray-400"}`}>{label ?? "Search university..."}</span>}
+        {value ? <button type="button" onClick={e => { e.stopPropagation(); onSelect("", ""); setQuery(""); setOpen(false); }} className="text-gray-400 hover:text-gray-600 flex-shrink-0"><X size={13} /></button>
+          : <Search size={13} className="text-gray-400 flex-shrink-0 pointer-events-none" />}
+      </div>
+      {open && <div className="absolute z-[200] mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
+        {filtered.length === 0 ? <div className="px-3 py-2.5 text-sm text-gray-400">{options.length === 0 ? "No universities available" : "No match found"}</div>
+          : filtered.map(u => <button key={u.id} type="button" onClick={() => { onSelect(String(u.id), u.university ?? u.name ?? ""); setOpen(false); setQuery(""); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${String(u.id) === value ? "bg-brand-50 dark:bg-brand-900/20 text-brand-600" : "text-gray-800 dark:text-white"}`}>{u.university ?? u.name}</button>)}
+      </div>}
+    </div>
+  );
+}
+
 // ─── Loan Modal ───────────────────────────────────────────────────────────────
+
+const STUDY_LEVELS = ["Grade 9","Grade 10","Grade 11","Grade 12","Diploma","Undergraduate","Postgraduate","Doctorate","Other"];
+const GRADING_SYSTEMS = ["Percentage","CGPA","GPA","Grade","Marks"];
+const LANGUAGES = ["English","Hindi","Spanish","French","German","Chinese","Arabic","Other"];
+
+interface AddrState { address: string; country_id: number | null; country_name: string; state_id: number | null; state_name: string; city_id: number | null; city_name: string; postal_code: string; }
+interface AcadState { institution_name: string; level_of_study: string; qualification_awarded: string; grading_system: string; score: string; country_id: number | null; country_name: string; state_id: number | null; state_name: string; city_id: number | null; city_name: string; primary_language: string; start_date: string; end_date: string; }
 
 function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { token } = useAuth();
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+  const LOC_BASE = `${BASE_URL}/student`;
 
-  // Pre-filled profile
-  const [profile, setProfile] = useState({ fullName: "", email: "", phone: "", country: "", address: "" });
-  // Academic qualification (pre-filled or user-entered)
-  const [academic, setAcademic] = useState({ levelOfStudy: "", institution: "", gradingSystem: "", score: "" });
-  const [hasAcademicRecord, setHasAcademicRecord] = useState(false);
+  // Profile (read-only)
+  const [profile, setProfile] = useState({ fullName: "", email: "", phone: "" });
 
-  // Cascading filter options
-  const [countries, setCountries] = useState<FilterOption[]>([]);
-  const [universities, setUniversities] = useState<FilterOption[]>([]);
+  // Address (pre-filled, editable)
+  const [addr, setAddr] = useState<AddrState>({ address: "", country_id: null, country_name: "", state_id: null, state_name: "", city_id: null, city_name: "", postal_code: "" });
+
+  // Academic qualification (pre-filled, editable)
+  const emptyAcad: AcadState = { institution_name: "", level_of_study: "", qualification_awarded: "", grading_system: "", score: "", country_id: null, country_name: "", state_id: null, state_name: "", city_id: null, city_name: "", primary_language: "", start_date: "", end_date: "" };
+  const [acad, setAcad] = useState<AcadState>(emptyAcad);
+  const [hasAcadRecord, setHasAcadRecord] = useState(false);
+
+  // Course selection
+  const [allUniversities, setAllUniversities] = useState<FilterOption[]>([]);
+  const [selUniversityName, setSelUniversityName] = useState("");
   const [studyLevels, setStudyLevels] = useState<FilterOption[]>([]);
   const [disciplines, setDisciplines] = useState<FilterOption[]>([]);
   const [courses, setCourses] = useState<CourseOption[]>([]);
   const [intakes, setIntakes] = useState<IntakeOption[]>([]);
-
-  // Selected IDs
-  const [selCountry, setSelCountry] = useState("");
   const [selUniversity, setSelUniversity] = useState("");
   const [selStudyLevel, setSelStudyLevel] = useState("");
   const [selDiscipline, setSelDiscipline] = useState("");
@@ -125,7 +256,6 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
   const [selIntake, setSelIntake] = useState("");
 
   const [loadingInit, setLoadingInit] = useState(true);
-  const [loadingUniversities, setLoadingUniversities] = useState(false);
   const [loadingStudyLevels, setLoadingStudyLevels] = useState(false);
   const [loadingDisciplines, setLoadingDisciplines] = useState(false);
   const [loadingCourses, setLoadingCourses] = useState(false);
@@ -135,11 +265,10 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
   const [error, setError] = useState<string | null>(null);
 
   const headers = { Authorization: `Bearer ${token}` };
-
   const fetchFilters = (params: Record<string, string>) =>
     fetch(`${BASE_URL}/student/course/filters/dynamic?${new URLSearchParams(params)}`, { headers }).then(r => r.json());
 
-  // Load profile + academic + initial countries on open
+  // Load everything on modal open
   useEffect(() => {
     if (!isOpen || !token) return;
     setLoadingInit(true);
@@ -150,40 +279,24 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
     ]).then(([pRes, aRes, fRes]) => {
       if (pRes.success && pRes.data) {
         const p = pRes.data;
-        setProfile({
-          fullName: [p.first_name, p.last_name].filter(Boolean).join(" "),
-          email: p.email || "",
-          phone: p.phone || "",
-          country: p.country_name || "",
-          address: p.address || "",
-        });
+        setProfile({ fullName: [p.first_name, p.last_name].filter(Boolean).join(" "), email: p.email || "", phone: p.phone || "" });
+        setAddr({ address: p.address || "", country_id: p.country_id || null, country_name: p.country_name || "", state_id: p.state_id || null, state_name: p.state_name || "", city_id: p.city_id || null, city_name: p.city_name || "", postal_code: p.postal_code || "" });
       }
       if (aRes.success && aRes.data?.length > 0) {
         const r = aRes.data[0];
-        setAcademic({ levelOfStudy: r.level_of_study || "", institution: r.institution_name || "", gradingSystem: r.grading_system || "", score: String(r.score || "") });
-        setHasAcademicRecord(true);
+        setAcad({ institution_name: r.institution_name || "", level_of_study: r.level_of_study || "", qualification_awarded: r.qualification_awarded || "", grading_system: r.grading_system || "", score: String(r.score || ""), country_id: r.country_id || null, country_name: r.country_name || "", state_id: r.state_id || null, state_name: r.state_name || "", city_id: r.city_id || null, city_name: r.city_name || "", primary_language: r.primary_language_of_instruction || "", start_date: r.start_date ? r.start_date.split("T")[0] : "", end_date: r.end_date ? r.end_date.split("T")[0] : "" });
+        setHasAcadRecord(true);
       }
-      if (fRes.success) setCountries(fRes.data.filters.locations.countries || []);
+      if (fRes.success) setAllUniversities(fRes.data.filters.universities || []);
     }).catch(console.error).finally(() => setLoadingInit(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, token]);
-
-  // Country → universities
-  useEffect(() => {
-    if (!selCountry) { setUniversities([]); setStudyLevels([]); setDisciplines([]); setCourses([]); setIntakes([]); return; }
-    setLoadingUniversities(true);
-    fetchFilters({ country_id: selCountry }).then(d => {
-      if (d.success) setUniversities(d.data.filters.universities || []);
-    }).catch(console.error).finally(() => setLoadingUniversities(false));
-    setSelUniversity(""); setSelStudyLevel(""); setSelDiscipline(""); setSelCourse(""); setSelIntake("");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selCountry]);
 
   // University → study levels
   useEffect(() => {
     if (!selUniversity) { setStudyLevels([]); setDisciplines([]); setCourses([]); setIntakes([]); return; }
     setLoadingStudyLevels(true);
-    fetchFilters({ country_id: selCountry, university_id: selUniversity }).then(d => {
+    fetchFilters({ university_id: selUniversity }).then(d => {
       if (d.success) setStudyLevels(d.data.filters.studyLevels || []);
     }).catch(console.error).finally(() => setLoadingStudyLevels(false));
     setSelStudyLevel(""); setSelDiscipline(""); setSelCourse(""); setSelIntake("");
@@ -205,21 +318,19 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
   useEffect(() => {
     if (!selDiscipline) { setCourses([]); setIntakes([]); return; }
     setLoadingCourses(true);
-    fetch(`${BASE_URL}/student/courses?university_id=${selUniversity}&study_level_id=${selStudyLevel}&discipline_id=${selDiscipline}&limit=100`, { headers })
-      .then(r => r.json())
-      .then(d => { if (d.success) setCourses(d.data || []); })
+    fetch(`${BASE_URL}/student/courses?university_id=${selUniversity}&study_level_id=${selStudyLevel}&discipline_id=${selDiscipline}&limit=200`, { headers })
+      .then(r => r.json()).then(d => { if (d.success) setCourses(d.data || []); })
       .catch(console.error).finally(() => setLoadingCourses(false));
     setSelCourse(""); setSelIntake("");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selDiscipline]);
 
-  // Course → intakes (future only via API)
+  // Course → intakes
   useEffect(() => {
     if (!selCourse) { setIntakes([]); return; }
     setLoadingIntakes(true);
     fetch(`${BASE_URL}/student/course/intake/${selCourse}`, { headers })
-      .then(r => r.json())
-      .then(d => { if (d.success) setIntakes(d.data || []); })
+      .then(r => r.json()).then(d => { if (d.success) setIntakes(d.data || []); })
       .catch(console.error).finally(() => setLoadingIntakes(false));
     setSelIntake("");
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -228,19 +339,17 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
   const handleClose = () => {
     if (submitting) return;
     setSubmitted(false); setError(null);
-    setSelCountry(""); setSelUniversity(""); setSelStudyLevel(""); setSelDiscipline(""); setSelCourse(""); setSelIntake("");
+    setSelUniversity(""); setSelUniversityName(""); setSelStudyLevel(""); setSelDiscipline(""); setSelCourse(""); setSelIntake("");
+    setAddr({ address: "", country_id: null, country_name: "", state_id: null, state_name: "", city_id: null, city_name: "", postal_code: "" });
+    setAcad(emptyAcad); setHasAcadRecord(false);
     onClose();
   };
 
-  React.useEffect(() => {
-    document.body.style.overflow = isOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
-  }, [isOpen]);
-
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
-    if (isOpen) document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+  useEffect(() => { document.body.style.overflow = isOpen ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [isOpen]);
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
+    if (isOpen) document.addEventListener("keydown", fn);
+    return () => document.removeEventListener("keydown", fn);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -249,20 +358,11 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
     if (!selCourse) { setError("Please select a course."); return; }
     setError(null); setSubmitting(true);
     try {
-      const selectedIntakeObj = intakes.find(i => String(i.id) === selIntake);
+      const intake = intakes.find(i => String(i.id) === selIntake);
       const res = await fetch(`${BASE_URL}/student/loan/enquiry`, {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          country_id: selCountry || null,
-          university_id: selUniversity || null,
-          study_level_id: selStudyLevel || null,
-          discipline_id: selDiscipline || null,
-          course_id: selCourse,
-          intake_id: selectedIntakeObj?.intake_id || null,
-          intake_year: selectedIntakeObj?.intake_year || null,
-          intake_name: selectedIntakeObj?.intake_name || null,
-        }),
+        body: JSON.stringify({ university_id: selUniversity || null, study_level_id: selStudyLevel || null, discipline_id: selDiscipline || null, course_id: selCourse, intake_id: intake?.intake_id || null, intake_year: intake?.intake_year || null, intake_name: intake?.intake_name || null }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
@@ -276,9 +376,10 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
 
   if (!isOpen) return null;
 
-  const inputCls = "w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 disabled:opacity-50";
-  const labelCls = "block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1";
-  const sectionCls = "text-sm font-semibold text-gray-800 dark:text-white mb-3 pb-2 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2";
+  const iCls = "w-full h-10 rounded-lg border border-gray-300 px-3 text-sm text-gray-800 placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 disabled:opacity-50";
+  const lCls = "block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5";
+  const sCls = "text-sm font-semibold text-gray-800 dark:text-white pb-2 mb-3 border-b border-gray-200 dark:border-gray-700";
+  const roCls = `${iCls} bg-gray-50 dark:bg-gray-800/60 cursor-default`;
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-start justify-center p-4 sm:p-6 overflow-y-auto">
@@ -299,147 +400,156 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
         {submitted ? (
           <div className="text-center py-14 px-6">
             <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
             </div>
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Enquiry Submitted!</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Our loan advisor will contact you within 2 business days.</p>
             <button onClick={handleClose} className="px-6 py-2.5 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600">Done</button>
           </div>
         ) : loadingInit ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-          </div>
+          <div className="flex items-center justify-center py-16"><div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col">
-            <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[65vh]">
+            <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[70vh]">
 
-              {/* ── Profile ── */}
+              {/* ── Personal Info ── */}
               <div>
-                <p className={sectionCls}>Personal Information</p>
+                <p className={sCls}>Personal Information</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelCls}>Full Name</label>
-                    <input type="text" value={profile.fullName} readOnly className={`${inputCls} bg-gray-50 dark:bg-gray-800/50`} />
+                  <div><label className={lCls}>Full Name</label><input type="text" value={profile.fullName} readOnly className={roCls} /></div>
+                  <div><label className={lCls}>Email</label><input type="email" value={profile.email} readOnly className={roCls} /></div>
+                  <div className="sm:col-span-2"><label className={lCls}>Phone</label><input type="text" value={profile.phone} readOnly className={roCls} /></div>
+                </div>
+              </div>
+
+              {/* ── Current Address ── */}
+              <div>
+                <p className={sCls}>Current Address</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className={lCls}>Address *</label>
+                    <input required type="text" value={addr.address} onChange={e => setAddr(p => ({ ...p, address: e.target.value }))} placeholder="Street address" className={iCls} />
                   </div>
                   <div>
-                    <label className={labelCls}>Email</label>
-                    <input type="email" value={profile.email} readOnly className={`${inputCls} bg-gray-50 dark:bg-gray-800/50`} />
+                    <label className={lCls}>Country *</label>
+                    <LocCountryAC value={addr.country_id} displayName={addr.country_name} baseUrl={LOC_BASE} token={token}
+                      onChange={c => setAddr(p => ({ ...p, country_id: c?.id ?? null, country_name: c?.name ?? "", state_id: null, state_name: "", city_id: null, city_name: "" }))} />
                   </div>
                   <div>
-                    <label className={labelCls}>Phone</label>
-                    <input type="text" value={profile.phone} readOnly className={`${inputCls} bg-gray-50 dark:bg-gray-800/50`} />
+                    <label className={lCls}>State / Province *</label>
+                    <LocStateAC countryId={addr.country_id} value={addr.state_id} displayName={addr.state_name} baseUrl={LOC_BASE} token={token} disabled={!addr.country_id}
+                      onChange={s => setAddr(p => ({ ...p, state_id: s?.id ?? null, state_name: s?.name ?? "", city_id: null, city_name: "" }))} />
                   </div>
                   <div>
-                    <label className={labelCls}>Country of Residence</label>
-                    <input type="text" value={profile.country} readOnly className={`${inputCls} bg-gray-50 dark:bg-gray-800/50`} />
+                    <label className={lCls}>City *</label>
+                    <LocCityAC stateId={addr.state_id} value={addr.city_id} displayName={addr.city_name} baseUrl={LOC_BASE} token={token} disabled={!addr.state_id}
+                      onChange={c => setAddr(p => ({ ...p, city_id: c?.id ?? null, city_name: c?.name ?? "" }))} />
                   </div>
-                  {profile.address && (
-                    <div className="sm:col-span-2">
-                      <label className={labelCls}>Current Address</label>
-                      <input type="text" value={profile.address} readOnly className={`${inputCls} bg-gray-50 dark:bg-gray-800/50`} />
-                    </div>
-                  )}
+                  <div>
+                    <label className={lCls}>Postal Code *</label>
+                    <input required type="text" value={addr.postal_code} onChange={e => setAddr(p => ({ ...p, postal_code: e.target.value }))} placeholder="Postal / ZIP code" className={iCls} />
+                  </div>
                 </div>
               </div>
 
               {/* ── Academic Qualification ── */}
               <div>
-                <p className={sectionCls}>
-                  Academic Qualification
-                  {!hasAcademicRecord && <span className="text-xs font-normal text-amber-500">(not filled in profile — please enter)</span>}
+                <p className={sCls}>
+                  Academic Qualification{!hasAcadRecord && <span className="text-xs font-normal text-amber-500 ml-2">(not in profile — please fill)</span>}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelCls}>Highest Level of Study</label>
-                    <input type="text" value={academic.levelOfStudy}
-                      readOnly={hasAcademicRecord}
-                      onChange={e => setAcademic(p => ({ ...p, levelOfStudy: e.target.value }))}
-                      placeholder="e.g. Undergraduate"
-                      className={`${inputCls} ${hasAcademicRecord ? "bg-gray-50 dark:bg-gray-800/50" : ""}`} />
+                  <div className="sm:col-span-2">
+                    <label className={lCls}>Institution Name *</label>
+                    <input required type="text" value={acad.institution_name} onChange={e => setAcad(p => ({ ...p, institution_name: e.target.value }))} placeholder="Enter institution name" className={iCls} />
                   </div>
                   <div>
-                    <label className={labelCls}>Institution Name</label>
-                    <input type="text" value={academic.institution}
-                      readOnly={hasAcademicRecord}
-                      onChange={e => setAcademic(p => ({ ...p, institution: e.target.value }))}
-                      placeholder="e.g. Delhi University"
-                      className={`${inputCls} ${hasAcademicRecord ? "bg-gray-50 dark:bg-gray-800/50" : ""}`} />
+                    <label className={lCls}>Level of Study *</label>
+                    <select required value={acad.level_of_study} onChange={e => setAcad(p => ({ ...p, level_of_study: e.target.value }))} className={iCls}>
+                      <option value="">Select Level</option>
+                      {STUDY_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
                   </div>
                   <div>
-                    <label className={labelCls}>Grading System</label>
-                    <input type="text" value={academic.gradingSystem}
-                      readOnly={hasAcademicRecord}
-                      onChange={e => setAcademic(p => ({ ...p, gradingSystem: e.target.value }))}
-                      placeholder="e.g. Percentage / CGPA"
-                      className={`${inputCls} ${hasAcademicRecord ? "bg-gray-50 dark:bg-gray-800/50" : ""}`} />
+                    <label className={lCls}>Qualification Awarded *</label>
+                    <input required type="text" value={acad.qualification_awarded} onChange={e => setAcad(p => ({ ...p, qualification_awarded: e.target.value }))} placeholder="e.g., Bachelor of Science" className={iCls} />
                   </div>
                   <div>
-                    <label className={labelCls}>Score / GPA</label>
-                    <input type="text" value={academic.score}
-                      readOnly={hasAcademicRecord}
-                      onChange={e => setAcademic(p => ({ ...p, score: e.target.value }))}
-                      placeholder="e.g. 8.5 or 75%"
-                      className={`${inputCls} ${hasAcademicRecord ? "bg-gray-50 dark:bg-gray-800/50" : ""}`} />
+                    <label className={lCls}>Grading System *</label>
+                    <select required value={acad.grading_system} onChange={e => setAcad(p => ({ ...p, grading_system: e.target.value }))} className={iCls}>
+                      <option value="">Select Grading System</option>
+                      {GRADING_SYSTEMS.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={lCls}>Score / GPA *</label>
+                    <input required type="text" value={acad.score} onChange={e => setAcad(p => ({ ...p, score: e.target.value }))} placeholder="Enter score" className={iCls} />
+                  </div>
+                  <div>
+                    <label className={lCls}>Country of Study *</label>
+                    <LocCountryAC value={acad.country_id} displayName={acad.country_name} baseUrl={LOC_BASE} token={token}
+                      onChange={c => setAcad(p => ({ ...p, country_id: c?.id ?? null, country_name: c?.name ?? "", state_id: null, state_name: "", city_id: null, city_name: "" }))} />
+                  </div>
+                  <div>
+                    <label className={lCls}>State / Province *</label>
+                    <LocStateAC countryId={acad.country_id} value={acad.state_id} displayName={acad.state_name} baseUrl={LOC_BASE} token={token} disabled={!acad.country_id}
+                      onChange={s => setAcad(p => ({ ...p, state_id: s?.id ?? null, state_name: s?.name ?? "", city_id: null, city_name: "" }))} />
+                  </div>
+                  <div>
+                    <label className={lCls}>City of Study *</label>
+                    <LocCityAC stateId={acad.state_id} value={acad.city_id} displayName={acad.city_name} baseUrl={LOC_BASE} token={token} disabled={!acad.state_id}
+                      onChange={c => setAcad(p => ({ ...p, city_id: c?.id ?? null, city_name: c?.name ?? "" }))} />
+                  </div>
+                  <div>
+                    <label className={lCls}>Primary Language *</label>
+                    <select required value={acad.primary_language} onChange={e => setAcad(p => ({ ...p, primary_language: e.target.value }))} className={iCls}>
+                      <option value="">Select Language</option>
+                      {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={lCls}>Start Date *</label>
+                    <input required type="date" value={acad.start_date} onChange={e => setAcad(p => ({ ...p, start_date: e.target.value }))} className={iCls} />
+                  </div>
+                  <div>
+                    <label className={lCls}>End Date *</label>
+                    <input required type="date" value={acad.end_date} onChange={e => setAcad(p => ({ ...p, end_date: e.target.value }))} className={iCls} />
                   </div>
                 </div>
               </div>
 
-              {/* ── Course Selection ── */}
+              {/* ── Course Applying For ── */}
               <div>
-                <p className={sectionCls}>Course Applying For</p>
+                <p className={sCls}>Course Applying For</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-                  {/* Country */}
-                  <div>
-                    <label className={labelCls}>Country *</label>
-                    <select required value={selCountry} onChange={e => setSelCountry(e.target.value)} className={inputCls}>
-                      <option value="">Select country</option>
-                      {countries.map(c => <option key={c.country_id ?? c.id} value={String(c.country_id ?? c.id)}>{c.country_name ?? c.name}</option>)}
-                    </select>
+                  <div className="sm:col-span-2">
+                    <label className={lCls}>University *</label>
+                    <UniversitySearch options={allUniversities} value={selUniversity} displayName={selUniversityName}
+                      onSelect={(id, name) => { setSelUniversity(id); setSelUniversityName(name); }} />
                   </div>
-
-                  {/* University */}
                   <div>
-                    <label className={labelCls}>University *</label>
-                    <select required value={selUniversity} onChange={e => setSelUniversity(e.target.value)} className={inputCls} disabled={!selCountry || loadingUniversities}>
-                      <option value="">{loadingUniversities ? "Loading..." : "Select university"}</option>
-                      {universities.map(u => <option key={u.id} value={String(u.id)}>{u.university ?? u.name}</option>)}
-                    </select>
-                  </div>
-
-                  {/* Study Level */}
-                  <div>
-                    <label className={labelCls}>Study Level *</label>
-                    <select required value={selStudyLevel} onChange={e => setSelStudyLevel(e.target.value)} className={inputCls} disabled={!selUniversity || loadingStudyLevels}>
+                    <label className={lCls}>Study Level *</label>
+                    <select required value={selStudyLevel} onChange={e => setSelStudyLevel(e.target.value)} className={iCls} disabled={!selUniversity || loadingStudyLevels}>
                       <option value="">{loadingStudyLevels ? "Loading..." : "Select study level"}</option>
                       {studyLevels.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
                     </select>
                   </div>
-
-                  {/* Discipline */}
                   <div>
-                    <label className={labelCls}>Discipline *</label>
-                    <select required value={selDiscipline} onChange={e => setSelDiscipline(e.target.value)} className={inputCls} disabled={!selStudyLevel || loadingDisciplines}>
+                    <label className={lCls}>Discipline *</label>
+                    <select required value={selDiscipline} onChange={e => setSelDiscipline(e.target.value)} className={iCls} disabled={!selStudyLevel || loadingDisciplines}>
                       <option value="">{loadingDisciplines ? "Loading..." : "Select discipline"}</option>
                       {disciplines.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
                     </select>
                   </div>
-
-                  {/* Course */}
                   <div className="sm:col-span-2">
-                    <label className={labelCls}>Course *</label>
-                    <select required value={selCourse} onChange={e => setSelCourse(e.target.value)} className={inputCls} disabled={!selDiscipline || loadingCourses}>
+                    <label className={lCls}>Course *</label>
+                    <select required value={selCourse} onChange={e => setSelCourse(e.target.value)} className={iCls} disabled={!selDiscipline || loadingCourses}>
                       <option value="">{loadingCourses ? "Loading..." : "Select course"}</option>
                       {courses.map(c => <option key={c.id} value={String(c.id)}>{c.course_name}</option>)}
                     </select>
                   </div>
-
-                  {/* Intake */}
                   <div className="sm:col-span-2">
-                    <label className={labelCls}>Intake (Future intakes only)</label>
-                    <select value={selIntake} onChange={e => setSelIntake(e.target.value)} className={inputCls} disabled={!selCourse || loadingIntakes}>
+                    <label className={lCls}>Intake <span className="text-gray-400 font-normal">(future intakes only)</span></label>
+                    <select value={selIntake} onChange={e => setSelIntake(e.target.value)} className={iCls} disabled={!selCourse || loadingIntakes}>
                       <option value="">{loadingIntakes ? "Loading..." : intakes.length === 0 && selCourse ? "No upcoming intakes" : "Select intake"}</option>
                       {intakes.map(i => <option key={i.id} value={String(i.id)}>{i.intake_name} {i.intake_year}</option>)}
                     </select>
@@ -452,9 +562,7 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
-              <button type="button" onClick={handleClose} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors">
-                Cancel
-              </button>
+              <button type="button" onClick={handleClose} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors">Cancel</button>
               <button type="submit" disabled={submitting} className="flex-1 px-4 py-2.5 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
                 {submitting ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Submitting...</> : "Submit Enquiry"}
               </button>

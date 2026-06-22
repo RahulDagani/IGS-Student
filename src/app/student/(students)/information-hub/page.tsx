@@ -362,7 +362,34 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
       const res = await fetch(`${BASE_URL}/student/loan/enquiry`, {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ university_id: selUniversity || null, study_level_id: selStudyLevel || null, discipline_id: selDiscipline || null, course_id: selCourse, intake_id: intake?.intake_id || null, intake_year: intake?.intake_year || null, intake_name: intake?.intake_name || null }),
+        body: JSON.stringify({
+          // address
+          address: addr.address || null,
+          address_country_id: addr.country_id || null,
+          address_state_id: addr.state_id || null,
+          address_city_id: addr.city_id || null,
+          postal_code: addr.postal_code || null,
+          // academic
+          institution_name: acad.institution_name || null,
+          level_of_study: acad.level_of_study || null,
+          qualification_awarded: acad.qualification_awarded || null,
+          grading_system: acad.grading_system || null,
+          score: acad.score || null,
+          acad_country_id: acad.country_id || null,
+          acad_state_id: acad.state_id || null,
+          acad_city_id: acad.city_id || null,
+          primary_language: acad.primary_language || null,
+          acad_start_date: acad.start_date || null,
+          acad_end_date: acad.end_date || null,
+          // course
+          university_id: selUniversity || null,
+          study_level_id: selStudyLevel || null,
+          discipline_id: selDiscipline || null,
+          course_id: selCourse,
+          intake_id: intake?.intake_id || null,
+          intake_year: intake?.intake_year || null,
+          intake_name: intake?.intake_name || null,
+        }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);

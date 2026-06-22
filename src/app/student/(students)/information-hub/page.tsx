@@ -68,6 +68,19 @@ const trainingResources = [
   },
 ];
 
+interface WebinarItem {
+  id: number;
+  title: string;
+  description: string | null;
+  scheduled_at: string;
+  duration_minutes: number;
+  platform: string;
+  recording_url: string;
+  status: string;
+  university_name: string | null;
+  university_logo_url: string | null;
+}
+
 const universityWebinars = [
   {
     id: 1,
@@ -483,43 +496,97 @@ function TrainingResourcesTab() {
 // ─── Tab: University Webinars ─────────────────────────────────────────────────
 
 function UniversityWebinarsTab() {
+  const [webinars, setWebinars] = useState<WebinarItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("https://api.applystore.org/api/front/webinars?limit=12")
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setWebinars(d.data); })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const platformLabel: Record<string, string> = {
+    zoom: "Zoom", google_meet: "Google Meet", teams: "Teams", other: "Other",
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 animate-pulse flex gap-4">
+            <div className="w-14 h-14 rounded-lg bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+            <div className="flex-grow space-y-2">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (webinars.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Video className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">No recorded webinars available yet.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500 dark:text-gray-400">
-        Register for upcoming university webinars or watch recorded sessions.
+        Watch recorded university webinar sessions.
       </p>
       <div className="flex flex-col gap-4">
-        {universityWebinars.map((w) => (
+        {webinars.map((w) => (
           <div key={w.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm flex flex-col sm:flex-row gap-4 items-start">
-            <div className="flex-shrink-0 w-14 h-14 rounded-lg bg-gray-50 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
-              <Video className="w-6 h-6 text-brand-500" />
+            <div className="flex-shrink-0 w-14 h-14 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center overflow-hidden">
+              {w.university_logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={w.university_logo_url} alt={w.university_name || ""} className="w-full h-full object-contain p-1" />
+              ) : (
+                <Video className="w-6 h-6 text-red-500" />
+              )}
             </div>
             <div className="flex-grow min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h3 className="font-semibold text-sm text-gray-900 dark:text-white">{w.title}</h3>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  w.status === "Upcoming"
-                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                }`}>
-                  {w.status}
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                  Recorded
                 </span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{w.university}</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed mb-3">{w.description}</p>
-              <div className="flex flex-wrap items-center gap-4">
-                <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" />
-                  {new Date(w.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} · {w.time}
+              {w.university_name && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{w.university_name}</p>
+              )}
+              <div className="flex items-center gap-3 mb-2 text-xs text-gray-400">
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  {new Date(w.scheduled_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                 </span>
-                <a
-                  href={w.registrationUrl}
-                  className="text-xs font-medium text-brand-500 hover:text-brand-600 flex items-center gap-1"
-                >
-                  {w.status === "Upcoming" ? "Register Now" : "Watch Recording"}
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </a>
+                {w.duration_minutes && (
+                  <span>{w.duration_minutes} min</span>
+                )}
+                <span className="capitalize">{platformLabel[w.platform] || w.platform}</span>
               </div>
+              {w.description && (
+                <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed mb-3 line-clamp-2">
+                  {w.description.replace(/<[^>]*>/g, "")}
+                </p>
+              )}
+              <a
+                href={w.recording_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+              >
+                <Video className="w-3.5 h-3.5" />
+                Watch Recording
+              </a>
             </div>
           </div>
         ))}

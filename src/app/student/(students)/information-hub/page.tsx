@@ -226,7 +226,7 @@ const LANGUAGES = ["English","Hindi","Spanish","French","German","Chinese","Arab
 interface AddrState { address: string; country_id: number | null; country_name: string; state_id: number | null; state_name: string; city_id: number | null; city_name: string; postal_code: string; }
 interface AcadState { institution_name: string; level_of_study: string; qualification_awarded: string; grading_system: string; score: string; country_id: number | null; country_name: string; state_id: number | null; state_name: string; city_id: number | null; city_name: string; primary_language: string; start_date: string; end_date: string; }
 
-function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+function LoanModal({ isOpen, onClose, onSubmitted }: { isOpen: boolean; onClose: () => void; onSubmitted?: () => void }) {
   const { token } = useAuth();
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
   const LOC_BASE = `${BASE_URL}/student`;
@@ -603,8 +603,109 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
 
 // ─── Tab: IGS Services ────────────────────────────────────────────────────────
 
+const ENQUIRY_STATUS: Record<string, { label: string; cls: string }> = {
+  pending:   { label: "Pending",   cls: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
+  in_review: { label: "In Review", cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  processed: { label: "Processed", cls: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+  rejected:  { label: "Rejected",  cls: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+};
+
+interface MyEnquiry {
+  id: number;
+  status: "pending" | "in_review" | "processed" | "rejected";
+  admin_notes: string | null;
+  university_name: string;
+  study_level_name: string;
+  course_name: string;
+  intake_name: string;
+  intake_year: number;
+  created_at: string;
+}
+
+function LoanEnquiriesModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const { token } = useAuth();
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
+  const [enquiries, setEnquiries] = useState<MyEnquiry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isOpen || !token) return;
+    setLoading(true);
+    fetch(`${BASE_URL}/student/loan/enquiries`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => { if (d.success) setEnquiries(d.data); })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [isOpen, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    if (isOpen) document.addEventListener("keydown", fn);
+    return () => document.removeEventListener("keydown", fn);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-start justify-center p-4 sm:p-6 overflow-y-auto">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg my-auto bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2">
+            <HandCoins className="w-5 h-5 text-green-600" />
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">My Loan Enquiries</h2>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-3 max-h-[70vh] overflow-y-auto">
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <div className="w-7 h-7 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : enquiries.length === 0 ? (
+            <div className="text-center py-10">
+              <HandCoins className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">No loan enquiries submitted yet.</p>
+            </div>
+          ) : enquiries.map(enq => {
+            const st = ENQUIRY_STATUS[enq.status] ?? ENQUIRY_STATUS.pending;
+            return (
+              <div key={enq.id} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4 space-y-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white leading-snug">
+                    {enq.course_name || "Course not specified"}
+                  </p>
+                  <span className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}`}>
+                    {st.label}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {[enq.university_name, enq.study_level_name].filter(Boolean).join(" · ")}
+                  {enq.intake_name && enq.intake_year ? ` · ${enq.intake_name} ${enq.intake_year}` : ""}
+                </p>
+                {enq.admin_notes && (
+                  <p className="text-xs text-gray-600 dark:text-gray-300 italic border-t border-gray-200 dark:border-gray-600 pt-1.5 mt-1">
+                    {enq.admin_notes}
+                  </p>
+                )}
+                <p className="text-xs text-gray-400">
+                  Submitted {new Date(enq.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function IgsServicesTab() {
   const [loanModalOpen, setLoanModalOpen] = useState(false);
+  const [loanEnquiriesOpen, setLoanEnquiriesOpen] = useState(false);
 
   const services = [
     {
@@ -636,13 +737,22 @@ function IgsServicesTab() {
       title: "Education Loan",
       description: "Get connected with trusted education loan partners to fund your studies abroad. Quick processing and competitive interest rates.",
       action: (
-        <button
-          onClick={() => setLoanModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-        >
-          <HandCoins className="w-4 h-4" />
-          Apply for Loan
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => setLoanModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+          >
+            <HandCoins className="w-4 h-4" />
+            Apply for Loan
+          </button>
+          <button
+            onClick={() => setLoanEnquiriesOpen(true)}
+            className="inline-flex items-center gap-1.5 text-sm text-green-700 dark:text-green-400 hover:underline"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            My Enquiries
+          </button>
+        </div>
       ),
     },
     {
@@ -704,6 +814,7 @@ function IgsServicesTab() {
       </div>
 
       <LoanModal isOpen={loanModalOpen} onClose={() => setLoanModalOpen(false)} />
+      <LoanEnquiriesModal isOpen={loanEnquiriesOpen} onClose={() => setLoanEnquiriesOpen(false)} />
     </>
   );
 }

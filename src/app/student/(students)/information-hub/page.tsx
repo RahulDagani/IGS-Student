@@ -1,7 +1,6 @@
 "use client";
 import React, { useState } from "react";
 import Image from "next/image";
-import { Modal } from "@/components/ui/modal";
 import {
   Settings,
   BookOpen,
@@ -184,34 +183,70 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
     onClose();
   };
 
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
+    if (isOpen) document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
   const inputCls =
     "w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500";
   const labelCls = "block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1";
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} className="max-w-2xl mx-4 my-8">
-      <div className="p-6 sm:p-8">
+    <div className="fixed inset-0 z-[99999] flex items-start justify-center p-4 sm:p-6 overflow-y-auto">
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={handleClose}
+      />
+
+      {/* Modal panel */}
+      <div className="relative w-full max-w-2xl my-auto bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col">
+
+        {/* Header — always visible */}
+        <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Education Loan Enquiry</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Fill in your details and we&apos;ll connect you with the right lender.</p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="ml-4 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
         {submitted ? (
-          <div className="text-center py-10">
+          <div className="text-center py-12 px-6">
             <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Request Submitted!</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-              Our loan advisor will contact you within 2 business days.
-            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Our loan advisor will contact you within 2 business days.</p>
             <button onClick={handleClose} className="px-6 py-2.5 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600">
               Done
             </button>
           </div>
         ) : (
-          <>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">Education Loan Enquiry</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Fill in your details and we'll connect you with the right lender.</p>
+          <form onSubmit={handleSubmit} className="flex flex-col">
+            {/* Scrollable body */}
+            <div className="px-6 py-5 space-y-5 overflow-y-auto max-h-[60vh]">
 
-            <form onSubmit={handleSubmit} className="space-y-5">
               {/* Personal Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -277,7 +312,7 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
                     <label className={labelCls}>Intake Month</label>
                     <select value={form.intakeMonth} onChange={set("intakeMonth")} className={inputCls}>
                       <option value="">Month</option>
-                      {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m) => (
+                      {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m) => (
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
@@ -303,20 +338,28 @@ function LoanModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
                 <label className={labelCls}>GPA / Percentage *</label>
                 <input required type="text" placeholder="e.g. 3.5 / 10 or 75%" value={form.gpa} onChange={set("gpa")} className={inputCls} />
               </div>
+            </div>
 
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={handleClose} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800">
-                  Cancel
-                </button>
-                <button type="submit" className="flex-1 px-4 py-2.5 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600">
-                  Submit Enquiry
-                </button>
-              </div>
-            </form>
-          </>
+            {/* Footer — always visible */}
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 px-4 py-2.5 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600 transition-colors"
+              >
+                Submit Enquiry
+              </button>
+            </div>
+          </form>
         )}
       </div>
-    </Modal>
+    </div>
   );
 }
 

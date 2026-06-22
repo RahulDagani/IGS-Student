@@ -434,35 +434,49 @@ function IgsServicesTab() {
 
 // ─── Tab: Training Resources ──────────────────────────────────────────────────
 
+function toEmbedUrl(url: string): string {
+  try {
+    // Already an embed URL
+    if (url.includes("youtube.com/embed/") || url.includes("player.vimeo.com")) return url;
+    // youtu.be/ID
+    const short = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    if (short) return `https://www.youtube.com/embed/${short[1]}`;
+    // youtube.com/watch?v=ID
+    const watch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    if (watch) return `https://www.youtube.com/embed/${watch[1]}`;
+    // Vimeo: vimeo.com/ID
+    const vimeo = url.match(/vimeo\.com\/(\d+)/);
+    if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
+    return url;
+  } catch {
+    return url;
+  }
+}
+
 function TrainingResourcesTab() {
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "video" | "guide" | "link" | "news">("all");
+  const [tab, setTab] = useState<"video" | "guide">("video");
 
   useEffect(() => {
     setLoading(true);
     fetch("https://api.applystore.org/api/front/resources?limit=100")
       .then(r => r.json())
-      .then(d => { if (d.success) setResources(d.data); })
+      .then(d => { if (d.success) setResources(d.data.filter((r: ResourceItem) => r.resource_type === "video" || r.resource_type === "guide")); })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
-  const typeConfig = {
-    video: { label: "Video", icon: <Video className="w-3.5 h-3.5" />, color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
-    guide: { label: "Guide", icon: <BookOpen className="w-3.5 h-3.5" />, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
-    link:  { label: "Link",  icon: <ExternalLink className="w-3.5 h-3.5" />, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
-    news:  { label: "News",  icon: <Newspaper className="w-3.5 h-3.5" />, color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
-  };
-
-  const filtered = filter === "all" ? resources : resources.filter(r => r.resource_type === filter);
+  const videos = resources.filter(r => r.resource_type === "video");
+  const guides = resources.filter(r => r.resource_type === "guide");
+  const filtered = tab === "video" ? videos : guides;
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {[...Array(6)].map((_, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden animate-pulse">
-            <div className="h-40 bg-gray-200 dark:bg-gray-700" />
+            <div className="h-48 bg-gray-200 dark:bg-gray-700" />
             <div className="p-4 space-y-2">
               <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
               <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
@@ -484,70 +498,92 @@ function TrainingResourcesTab() {
 
   return (
     <div className="space-y-4">
-      {/* Filter tabs */}
-      <div className="flex flex-wrap gap-2">
-        {(["all", "video", "guide", "link", "news"] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setFilter(t)}
-            className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors ${
-              filter === t
-                ? "bg-brand-500 text-white"
-                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }`}
-          >
-            {t === "all" ? "All" : typeConfig[t].label}
-            {t !== "all" && (
-              <span className="ml-1 opacity-70">({resources.filter(r => r.resource_type === t).length})</span>
-            )}
-          </button>
-        ))}
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-fit">
+        <button
+          onClick={() => setTab("video")}
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "video" ? "bg-white dark:bg-gray-700 text-gray-800 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+          }`}
+        >
+          <Video className="w-3.5 h-3.5" /> Videos
+          <span className="text-xs opacity-60">({videos.length})</span>
+        </button>
+        <button
+          onClick={() => setTab("guide")}
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "guide" ? "bg-white dark:bg-gray-700 text-gray-800 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5" /> Guides
+          <span className="text-xs opacity-60">({guides.length})</span>
+        </button>
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-sm text-gray-400 py-6 text-center">No {filter} resources found.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((r) => {
-            const type = typeConfig[r.resource_type] ?? typeConfig.link;
-            return (
-              <div key={r.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm flex flex-col">
-                {/* Thumbnail */}
-                {r.thumbnail_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={r.thumbnail_url} alt={r.title} className="w-full h-40 object-cover" />
-                ) : (
-                  <div className="w-full h-40 bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
-                    <span className="text-gray-300 dark:text-gray-600 scale-150">{type.icon}</span>
-                  </div>
+        <div className="text-center py-10">
+          <p className="text-sm text-gray-400">No {tab === "video" ? "videos" : "guides"} available yet.</p>
+        </div>
+      ) : tab === "video" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {filtered.map((r) => (
+            <div key={r.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm flex flex-col">
+              <div className="relative w-full" style={{ paddingTop: "56.25%" }}>
+                <iframe
+                  src={toEmbedUrl(r.url)}
+                  title={r.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full"
+                />
+              </div>
+              <div className="p-4 flex flex-col flex-grow">
+                <h3 className="font-semibold text-sm text-gray-900 dark:text-white mb-1 leading-snug">{r.title}</h3>
+                {r.description && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">{r.description}</p>
                 )}
-                <div className="p-4 flex flex-col flex-grow">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${type.color}`}>
-                      {type.icon}{type.label}
-                    </span>
-                    <span className="text-xs text-gray-400 flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-sm text-gray-900 dark:text-white mb-1 leading-snug">{r.title}</h3>
-                  {r.description && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed flex-grow line-clamp-3">{r.description}</p>
-                  )}
+                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  {new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {filtered.map((r) => (
+            <div key={r.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm flex flex-col">
+              {r.thumbnail_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={r.thumbnail_url} alt={r.title} className="w-full h-40 object-cover" />
+              ) : (
+                <div className="w-full h-40 bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+                  <BookOpen className="w-10 h-10 text-blue-300 dark:text-blue-600" />
+                </div>
+              )}
+              <div className="p-4 flex flex-col flex-grow">
+                <h3 className="font-semibold text-sm text-gray-900 dark:text-white mb-1 leading-snug">{r.title}</h3>
+                {r.description && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed flex-grow line-clamp-3">{r.description}</p>
+                )}
+                <div className="flex items-center justify-between mt-3">
+                  <p className="text-xs text-gray-400 flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </p>
                   <a
                     href={r.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand-500 hover:text-brand-600"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-brand-500 hover:text-brand-600"
                   >
-                    {r.resource_type === "video" ? "Watch" : r.resource_type === "guide" ? "Read Guide" : "Open"}
-                    <ChevronRight className="w-3.5 h-3.5" />
+                    Read Guide <ChevronRight className="w-3.5 h-3.5" />
                   </a>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -356,6 +356,7 @@ function LoanModal({ isOpen, onClose, onSubmitted }: { isOpen: boolean; onClose:
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selCourse) { setError("Please select a course."); return; }
+    if (!selIntake) { setError("Please select an intake."); return; }
     setError(null); setSubmitting(true);
     try {
       const intake = intakes.find(i => String(i.id) === selIntake);
@@ -575,8 +576,8 @@ function LoanModal({ isOpen, onClose, onSubmitted }: { isOpen: boolean; onClose:
                     </select>
                   </div>
                   <div className="sm:col-span-2">
-                    <label className={lCls}>Intake <span className="text-gray-400 font-normal">(future intakes only)</span></label>
-                    <select value={selIntake} onChange={e => setSelIntake(e.target.value)} className={iCls} disabled={!selCourse || loadingIntakes}>
+                    <label className={lCls}>Intake * <span className="text-gray-400 font-normal">(future intakes only)</span></label>
+                    <select required value={selIntake} onChange={e => setSelIntake(e.target.value)} className={iCls} disabled={!selCourse || loadingIntakes}>
                       <option value="">{loadingIntakes ? "Loading..." : intakes.length === 0 && selCourse ? "No upcoming intakes" : "Select intake"}</option>
                       {intakes.map(i => <option key={i.id} value={String(i.id)}>{i.intake_name} {i.intake_year}</option>)}
                     </select>

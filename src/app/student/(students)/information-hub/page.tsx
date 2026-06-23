@@ -847,7 +847,7 @@ function TrainingResourcesTab() {
 
   useEffect(() => {
     setLoading(true);
-    fetch("https://api.applystore.org/api/front/resources?resource_type=video&limit=100")
+    fetch("https://api.applystore.org/api/front/resources?resource_type=video&audience=student&limit=100")
       .then(r => r.json())
       .then(d => { if (d.success) setVideos(d.data); })
       .catch(console.error)

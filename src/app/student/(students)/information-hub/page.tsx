@@ -17,6 +17,7 @@ import {
   Search,
 } from "lucide-react";
 
+const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Tab = "igs-services" | "training-resources" | "university-webinars" | "university-news";
@@ -847,12 +848,12 @@ function TrainingResourcesTab() {
 
   useEffect(() => {
     setLoading(true);
-    fetch("https://api.applystore.org/api/front/resources?resource_type=video&audience=student&limit=100")
+    fetch(`${BASE_URL}/front/resources?resource_type=video&audience=student&limit=100`)
       .then(r => r.json())
       .then(d => { if (d.success) setVideos(d.data); })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [BASE_URL]);
 
   if (loading) {
     return (
@@ -923,12 +924,12 @@ function UniversityWebinarsTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("https://api.applystore.org/api/front/webinars?limit=12")
+    fetch(`${BASE_URL}/front/webinars?limit=12`)
       .then((r) => r.json())
       .then((d) => { if (d.success) setWebinars(d.data); })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [BASE_URL]);
 
   const platformLabel: Record<string, string> = {
     zoom: "Zoom", google_meet: "Google Meet", teams: "Teams", other: "Other",
@@ -1025,14 +1026,14 @@ function UniversityNewsTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("https://api.applystore.org/api/front/news?news_type=student&limit=6")
+    fetch(`${BASE_URL}/front/news?news_type=student&limit=6`)
       .then((r) => r.json())
       .then((d) => {
         if (d.success) setNews(d.data);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [BASE_URL]);
 
   if (loading) {
     return (

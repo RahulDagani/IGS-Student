@@ -49,7 +49,7 @@ export default function StudentDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
 
-  const BASE_URL = "https://api.applystore.org/api";
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
   useEffect(() => {
     const fetchDashboardData = async () => {

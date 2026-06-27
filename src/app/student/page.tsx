@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from "react";
-import { Check, Clock, File, Heart, Table, PenSquare, FileText, User, MessageSquare, X } from "lucide-react";
+import { Check, Clock, File, Heart, Table, PenSquare, FileText, User, MessageSquare, X,Newspaper, Video, Calendar } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import CalendlyEmbed from "@/components/CalendlyEmbed"
@@ -42,14 +42,33 @@ interface DashboardLinks {
   link: string;
 }
 
+interface NewsItem {
+  id: number;
+  title: string;
+  image_url: string | null;
+  created_at: string;
+}
+
+interface WebinarItem {
+  id: number;
+  title: string;
+  scheduled_at: string;
+  recording_url: string;
+  university_name: string | null;
+  university_logo_url: string | null;
+}
+
+
 export default function StudentDashboard() {
   const { user, token } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [webinars, setWebinars] = useState<WebinarItem[]>([]);
 
-  const BASE_URL = "https://api.applystore.org/api";
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -85,6 +104,20 @@ export default function StudentDashboard() {
     }
   }, [token]);
 
+  useEffect(() => {
+    // Fetch News
+    fetch(`${BASE_URL}/front/news?news_type=student&limit=2`)
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setNews(d.data); })
+      .catch(console.error);
+
+    // Fetch Webinars
+    fetch(`${BASE_URL}/front/webinars?limit=2`)
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setWebinars(d.data); })
+      .catch(console.error);
+  }, []);
+
   // Add this function to your component
 const checkAndRedirectForInterests = async (): Promise<void> => {
   try {
@@ -116,6 +149,8 @@ const checkAndRedirectForInterests = async (): Promise<void> => {
     window.location.href = '/student/editProfile?profileTab=interests';
   }
 };
+
+
 
 
   // Calculate document upload percentage
@@ -248,7 +283,7 @@ const checkAndRedirectForInterests = async (): Promise<void> => {
                   href="/student/courses/shortlisted"
                   className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
                 >
-                  View Shortlisted ›
+                  View List ›
                 </Link>
               </div>
             </div>
@@ -358,7 +393,7 @@ const checkAndRedirectForInterests = async (): Promise<void> => {
                         className="w-full inline-flex items-center justify-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2.5 rounded-md whitespace-nowrap"
                       >
                         Start Application ›
-                      </Link>
+                      </Link>9
                     </div>
 
                     {/* Get Recommended Courses */}
@@ -381,6 +416,48 @@ const checkAndRedirectForInterests = async (): Promise<void> => {
     Get Recommendations ›
   </button>
 </div>
+{/* University News Section */}
+                    {news.length > 0 && (
+                      <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-800">
+                        <h6 className="text-sm font-semibold text-gray-800 dark:text-white mb-3 flex items-center justify-between">
+                          <span className="flex items-center gap-2"><Newspaper size={16} className="text-indigo-600" /> University News</span>
+                          <Link href="/student/information-hub" className="text-xs text-indigo-600 hover:underline">View All</Link>
+                        </h6>
+                        <div className="space-y-3">
+                          {news.map((item) => (
+                            <Link href="/student/information-hub" key={item.id} className="block shadow-sm rounded-lg p-3 border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-800/50 hover:border-indigo-300 transition">
+                              <span className="text-[10px] text-gray-400 flex items-center gap-1 mb-1">
+                                <Calendar size={10} /> {new Date(item.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                              </span>
+                              <strong className="text-xs text-gray-800 dark:text-white line-clamp-2">{item.title}</strong>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Webinars Section */}
+                    {webinars.length > 0 && (
+                      <div className="pt-4 mt-2">
+                        <h6 className="text-sm font-semibold text-gray-800 dark:text-white mb-3 flex items-center justify-between">
+                          <span className="flex items-center gap-2"><Video size={16} className="text-red-500" /> Recent Webinars</span>
+                          <Link href="/student/information-hub" className="text-xs text-indigo-600 hover:underline">View All</Link>
+                        </h6>
+                        <div className="space-y-3">
+                          {webinars.map((w) => (
+                            <a href={w.recording_url} target="_blank" rel="noopener noreferrer" key={w.id} className="flex items-center justify-between shadow-sm rounded-lg p-3 border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-800/50 hover:border-red-300 transition">
+                              <div className="flex-grow pr-2">
+                                <strong className="text-xs text-gray-800 dark:text-white line-clamp-1">{w.university_name || w.title}</strong>
+                                <span className="text-[10px] text-gray-500 line-clamp-1">{w.title}</span>
+                              </div>
+                              <div className="flex items-center justify-center w-8 h-8 bg-red-50 rounded-md dark:bg-red-900/20 text-red-500 flex-shrink-0">
+                                <Video size={14} />
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

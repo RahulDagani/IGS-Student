@@ -103,11 +103,11 @@ const AppHeader: React.FC = () => {
           <Link href="/" className="lg:hidden">
           
             <Image
-                                    src="/images/site/igslogo.png"
-                                    alt="Logo"
-                                    width={84}
-                                    height={32}
-                                  /> 
+              src="/images/site/igslogo.png"
+              alt="Logo"
+              width={84}
+              height={32}
+            /> 
                         
           </Link>
 

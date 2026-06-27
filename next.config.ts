@@ -25,9 +25,13 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "api.applystore.org",
+        hostname: "api-staging.applystore.org",
         pathname: "/**",
       },
+      {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+      },      
     ],
   },
 };

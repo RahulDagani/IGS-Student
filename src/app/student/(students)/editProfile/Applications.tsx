@@ -225,7 +225,7 @@ export default function Applications() {
   const searchParams = useSearchParams();
   const activeProgramFromUrl = searchParams.get("app");
 
-  const BASE_URL = 'https://api.applystore.org/api';
+  const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
   const {token} = useAuth();
 
   useEffect(() => {

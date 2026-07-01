@@ -66,7 +66,7 @@ export default function StudentDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [isCalendlyModalOpen, setIsCalendlyModalOpen] = useState(false);
   const [news, setNews] = useState<NewsItem[]>([]);
-  const [webinars, setWebinars] = useState<WebinarItem[]>([]);
+  const [upcomingWebinars, setUpcomingWebinars] = useState<WebinarItem[]>([]);
 
   const BASE_URL = process.env.NEXT_PUBLIC_EXPRESS_API_BASE;
 
@@ -112,9 +112,11 @@ export default function StudentDashboard() {
       .catch(console.error);
 
     // Fetch Webinars
-    fetch(`${BASE_URL}/front/webinars?limit=2`)
+    fetch(`${BASE_URL}/front/upcoming-webinars?limit=2`)
       .then((r) => r.json())
-      .then((d) => { if (d.success) setWebinars(d.data); })
+      .then((d) => {
+        if (d.success) setUpcomingWebinars(d.data);
+      })
       .catch(console.error);
   }, []);
 
@@ -437,14 +439,14 @@ const checkAndRedirectForInterests = async (): Promise<void> => {
                     )}
 
                     {/* Webinars Section */}
-                    {webinars.length > 0 && (
+                    {upcomingWebinars.length > 0 && (
                       <div className="pt-4 mt-2">
                         <h6 className="text-sm font-semibold text-gray-800 dark:text-white mb-3 flex items-center justify-between">
-                          <span className="flex items-center gap-2"><Video size={16} className="text-red-500" /> Recent Webinars</span>
+                          <span className="flex items-center gap-2"><Video size={16} className="text-red-500" /> Upcoming Webinars</span>
                           <Link href="/student/information-hub" className="text-xs text-indigo-600 hover:underline">View All</Link>
                         </h6>
                         <div className="space-y-3">
-                          {webinars.map((w) => (
+                          {upcomingWebinars.map((w) => (
                             <a href={w.recording_url} target="_blank" rel="noopener noreferrer" key={w.id} className="flex items-center justify-between shadow-sm rounded-lg p-3 border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-800/50 hover:border-red-300 transition">
                               <div className="flex-grow pr-2">
                                 <strong className="text-xs text-gray-800 dark:text-white line-clamp-1">{w.university_name || w.title}</strong>
